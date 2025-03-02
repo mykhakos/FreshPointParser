@@ -650,18 +650,22 @@ class BasePage(BaseModel):
             Iterator[T]: A lazy iterator over all data items that match the
                 given constraint.
         """
+        if callable(constraint):
+            return filter(constraint, data_items.values())
+
         if isinstance(constraint, Mapping):
-            id_ = constraint.get('id_', None)
-            if id_ is not None and id_ not in data_items:
-                return iter(tuple())
             return filter(
                 lambda data_item: all(
-                    getattr(data_item, attr, None) == value
+                    getattr(data_item, attr) == value
                     for attr, value in constraint.items()
                 ),
                 data_items.values(),
             )
-        return filter(constraint, data_items.values())
+
+        raise TypeError(
+            f'Constraint must be either a dictionary or a callable function. '
+            f"Got type '{type(constraint).__name__}' instead."
+        )
 
     @staticmethod
     def _find_first_with_constraint(
@@ -807,15 +811,18 @@ class ProductPage(BasePage):
         )
         ```
 
-        Tip: To convert the result to a list, use
+        Tip: To convert the result from an iterator to a list, use
         `list(page.find_products(...))`.
 
         Args:
             constraint (Union[ProductAttrs, Mapping[str, Any], Callable[[Product], bool]]):
-                Either a callable that receives a `Product` instance and returns
+                Either a callable that receives a Product instance and returns
                 True if the product meets the constraint, or a mapping where
-                each key is an attribute (or property) name of the `Product`
+                each key is an attribute (or property) name of the Product
                 model and its value is the expected value.
+
+        Raises:
+            AttributeError: If a product attribute name is invalid.
 
         Returns:
             Iterator[Product]: A lazy iterator over all products that match
@@ -862,10 +869,13 @@ class ProductPage(BasePage):
 
         Args:
             constraint (Union[ProductAttrs, Mapping[str, Any], Callable[[Product], bool]]):
-                Either a callable that receives a `Product` instance and returns
+                Either a callable that receives a Product instance and returns
                 True if the product meets the constraint, or a mapping where
-                each key is an attribute (or property) name of the `Product`
+                each key is an attribute (or property) name of the Product
                 model and its value is the expected value.
+
+        Raises:
+            AttributeError: If a product attribute name is invalid.
 
         Returns:
             Optional[Product]: The first product that matches the given
@@ -958,15 +968,18 @@ class LocationPage(BasePage):
         )
         ```
 
-        Tip: To convert the result to a list, use
+        Tip: To convert the result from an iterator to a list, use
         `list(page.find_locations(...))`.
 
         Args:
             constraint (Union[LocationAttrs, Mapping[str, Any], Callable[[Location], bool]]):
-                Either a callable that receives a `Location` instance and
+                Either a callable that receives a Location instance and
                 returns True if the location meets the constraint, or a mapping
                 where each key is an attribute (or property) name of
-                the `Location` model and its value is the expected value.
+                the Location model and its value is the expected value.
+
+        Raises:
+            AttributeError: If a product attribute name is invalid.
 
         Returns:
             Iterator[Location]: A lazy iterator over all locations that match
@@ -999,10 +1012,13 @@ class LocationPage(BasePage):
 
         Args:
             constraint (Union[LocationAttrs, Mapping[str, Any], Callable[[Location], bool]]):
-                Either a callable that receives a `Location` instance and
+                Either a callable that receives a Location instance and
                 returns True if the location meets the constraint, or a mapping
                 where each key is an attribute (or property) name of
-                the `Location` model and its value is the expected value.
+                the Location model and its value is the expected value.
+
+        Raises:
+            AttributeError: If a product attribute name is invalid.
 
         Returns:
             Optional[Location]: The first location that matches the given
