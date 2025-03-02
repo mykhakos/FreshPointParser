@@ -121,6 +121,13 @@ class ProductHTMLParser:
         return cls._get_attr_value('data-glutenfree', product_data) == '1'
 
     @classmethod
+    def find_is_promo(cls, product_data: bs4.Tag) -> bool:
+        """Determine whether the product is being promoted
+        from the given product data.
+        """
+        return cls._get_attr_value('data-ispromo', product_data) == '1'
+
+    @classmethod
     def find_info(cls, product_data: bs4.Tag) -> str:
         """Extract the product info from the given product data."""
         text = html.unescape(cls._get_attr_value('data-info', product_data))
@@ -250,7 +257,7 @@ class ProductHTMLParser:
                 product_data,  # price_full_str
             )
             return price_full, price_full
-        elif len(result) == 2:
+        if len(result) == 2:
             price_full = cls._run_converter(
                 lambda: float(result[0].text),
                 product_data,  # price_full_str
@@ -267,8 +274,8 @@ class ProductHTMLParser:
                     f'the regular full price "{price_full}".'
                 )
             # elif price_curr < price_full:  # "data-isPromo" is unreliable
-            #     id_ = cls._find_id_safe(product_data)
-            #     if cls._get_attr_value('data-ispromo', product_data) != '1':
+            #     if not cls.find_is_promo(product_data):
+            #         id_ = cls._find_id_safe(product_data)
             #         raise ValueError(
             #             f'Unexpected product "id={id_}" parsing results: '
             #             f'current price "{price_curr}" is different from '
@@ -405,6 +412,7 @@ class ProductPageHTMLParser:
             category=ProductHTMLParser.find_category(data),
             is_vegetarian=ProductHTMLParser.find_is_vegetarian(data),
             is_gluten_free=ProductHTMLParser.find_is_gluten_free(data),
+            is_promo=ProductHTMLParser.find_is_promo(data),
             quantity=ProductHTMLParser.find_quantity(data),
             price_curr=price_curr,
             price_full=price_full,

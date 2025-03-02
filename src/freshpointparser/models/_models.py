@@ -152,6 +152,7 @@ class ProductAttrs(TypedDict, total=False):
     category: str
     is_vegetarian: bool
     is_gluten_free: bool
+    is_promo: bool
     quantity: int
     price_full: float
     price_curr: float
@@ -182,6 +183,12 @@ class Product(BaseModel):
             Indicates whether the product is vegetarian. Defaults to False.
         is_gluten_free (bool):
             Indicates whether the product is gluten-free. Defaults to False.
+        is_promo (bool):
+            Indicates whether the product is being promoted. Defaults to False.
+
+            **Note that the product being a promo does not guarantee that the
+            product currently has a discount and vice versa.** Use `is_on_sale`
+            to check if the product is currently on sale.
         quantity (int):
             Quantity of product items in stock. Defaults to 0.
         price_full (float):
@@ -238,6 +245,21 @@ class Product(BaseModel):
         description='Indicates if the product is gluten-free.',
     )
     """Indicates if the product is gluten-free."""
+    is_promo: bool = Field(
+        default=False,
+        title='Promo',
+        description=(
+            'Indicates if the product is being promoted. Note that the '
+            'product being a promo does not guarantee that the product '
+            'currently has a discount and vice versa.'
+        ),
+    )
+    """Indicates whether the product is being promoted.
+
+    **Note that the product being a promo does not guarantee that the product
+    currently has a discount and vice versa.** Use `is_on_sale` to
+    check if the product is currently on sale.
+    """
     quantity: NonNegativeInt = Field(
         default=0,
         title='Quantity',
