@@ -436,7 +436,7 @@ class ProductPageHTMLParser:
         from the page HTML.
 
         The value is cached after the first extraction until the page HTML
-        changes.
+        changes. If the value cannot be parsed, a ValueError is raised.
         """
         if 'location_id' in self._product_page.model_fields_set:  # cached
             return self._product_page.location_id
@@ -468,7 +468,7 @@ class ProductPageHTMLParser:
         from the page HTML.
 
         The value is cached after the first extraction until the page HTML
-        changes.
+        changes. If the value cannot be parsed, a ValueError is raised.
         """
         if 'location_name' in self._product_page.model_fields_set:  # cached
             return self._product_page.location_name
@@ -515,7 +515,7 @@ class ProductPageHTMLParser:
         """All product page data parsed and validated from the HTML contents.
 
         The data is cached after the first extraction until the page HTML
-        changes.
+        changes. If the data cannot be parsed, a ValueError is raised.
         """
         return ProductPage(
             html_hash_sha1=self._product_page.html_hash_sha1,
@@ -555,10 +555,16 @@ class ProductPageHTMLParser:
         Args:
             id_ (int): The ID of the product to filter by.
 
+        Raises:
+            ValueError: If the product ID is not an integer.
+
         Returns:
             Optional[Product]: A product with the specified ID. If the product
                 is not found, returns None.
         """
+        if not isinstance(id_, int):
+            type_ = type(id_).__name__
+            raise ValueError(f'Product ID must be an integer (got {type_}).')
         if id_ in self._product_page.products:  # found in cache
             product = self._product_page.products[id_]
             return product.model_copy(deep=True)  # copy for cache immutability
@@ -580,11 +586,17 @@ class ProductPageHTMLParser:
             name (str): The name of the product to filter by. Note that product
                 names are normalized to lowercase ASCII characters.
 
+        Raises:
+            ValueError: If the product name is not a string.
+
         Returns:
             Optional[Product]: A product matching the specified name.
                 If the product is not found, returns None. If multiple products
                 match the name, the first one is returned.
         """
+        if not isinstance(name, str):
+            type_ = type(name).__name__
+            raise ValueError(f'Product name must be a string (got {type_}).')
         product = self._product_page.find_product(
             lambda product: normalize_text(name) in normalize_text(product.name)
         )
@@ -607,10 +619,16 @@ class ProductPageHTMLParser:
             name (str): The name of the product to filter by. Note that product
                 names are normalized to lowercase ASCII characters.
 
+        Raises:
+            ValueError: If the product name is not a string.
+
         Returns:
             List[Product]: Products matching the specified name. If no products
                 are found, an empty list is returned.
         """
+        if not isinstance(name, str):
+            type_ = type(name).__name__
+            raise ValueError(f'Product name must be a string (got {type_}).')
         if self._all_products_found:  # use cache if all products are parsed
             products = self._product_page.find_products(
                 lambda product: normalize_text(name)
