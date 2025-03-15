@@ -1,6 +1,7 @@
 import html
 import json
 import logging
+import operator
 import re
 from typing import (
     Callable,
@@ -14,7 +15,7 @@ from typing import (
 
 import bs4
 
-from .._utils import hash_text_sha1, normalize_text
+from .._utils import hash_text_sha1, normalize_text, validate_id
 from ..models._models import (
     Location,
     LocationPage,
@@ -296,22 +297,28 @@ class ProductPageHTMLParser:
 
     Example:
     ```python
-    parser = ProductPageHTMLParser()  # create a new parser instance
+    # create a new parser instance
+    parser = ProductPageHTMLParser()
 
-    parser.parse(page_html=...)  # parse the HTML contents
+    # parse the HTML contents
+    parser.parse(page_html=...)
 
-    print(parser.location_id)  # get the location ID
-    print(parser.location_name)  # get the location name
+    # get the location ID and name
+    print(parser.location_id)
+    print(parser.location_name)
 
-    product = parser.find_product_by_id(480)  # find a product by ID number
-    print(product.name)  # print the name of the found product
+    # find a product by ID number
+    product = parser.find_product_by_id(1480)
+    print(product.name)
 
-    products = parser.find_products_by_name('sendvic')  # find products by name
+    # find products by name
+    products = parser.find_products_by_name('sendvic')
     for product in products:
-        print(product.name)  # print the names of the found products
+        print(product.name)
 
-    page = parser.product_page  # get the parsed product page data
-    print(len(page.products))  # print the number of products on the page
+    # get the parsed product page data as a ProductPage model
+    page = parser.product_page
+    print(len(page.products))
     ```
     """
 
@@ -367,11 +374,16 @@ class ProductPageHTMLParser:
             raise ValueError(f'ID="{id_}" is not unique.')
         return result[0]  # type: ignore
 
-    def _find_product_data_by_name(self, name: str) -> bs4.ResultSet[bs4.Tag]:
+    def _find_product_data_by_name(
+        self, name: str, partial_match: bool
+    ) -> bs4.ResultSet[bs4.Tag]:
         """Find product data matching the specified name.
 
         Args:
             name (str): The name of the product(s) to search for.
+            partial_match (bool): If True, the name match can be partial
+                (case-insensitive). If False, the name match must be exact
+                (case-insensitive).
 
         Returns:
             bs4.ResultSet: The ResultSet containing the data of the matched
@@ -382,7 +394,8 @@ class ProductPageHTMLParser:
             if not value:
                 return False
             try:
-                return normalize_text(name) in normalize_text(value)
+                op = operator.contains if partial_match else operator.eq
+                return op(normalize_text(name), normalize_text(value))
             except Exception as e:
                 raise ValueError(
                     f'Unable to parse the product name "{value}".'
@@ -548,23 +561,33 @@ class ProductPageHTMLParser:
             self._product_page = ProductPage(html_hash_sha1=html_hash_sha1)
             self._all_products_found = False
 
-    def find_product_by_id(self, id_: int) -> Optional[Product]:
-        """Find a single product based on the specified ID. The product ID
-        is expected to be unique.
+    def find_product_by_id(self, id_: Union[int, str]) -> Optional[Product]:
+        """Find a single product based on the specified ID.
+
+        Example:
+        ```python
+        product = parser.find_product_by_id(1480)
+        print(product)
+
+        product = parser.find_product_by_id('1480')
+        print(product)  # same as the previous example
+        ```
 
         Args:
-            id_ (int): The ID of the product to filter by.
+            id_ (Union[int, str]): The ID of the product to filter by.
+                The ID is expected to be a unique non-negative integer or
+                a string representation of a non-negative integer.
 
         Raises:
-            ValueError: If the product ID is not an integer.
+            TypeError: If the ID is not an integer and cannot be converted to
+                an integer.
+            ValueError: If the ID is an integer but is negative.
 
         Returns:
             Optional[Product]: A product with the specified ID. If the product
                 is not found, returns None.
         """
-        if not isinstance(id_, int):
-            type_ = type(id_).__name__
-            raise ValueError(f'Product ID must be an integer (got {type_}).')
+        id_ = validate_id(id_)
         if id_ in self._product_page.products:  # found in cache
             product = self._product_page.products[id_]
             return product.model_copy(deep=True)  # copy for cache immutability
@@ -577,67 +600,125 @@ class ProductPageHTMLParser:
         self._update_product_cache(product)
         return product
 
-    def find_product_by_name(self, name: str) -> Optional[Product]:
-        """Find a single product based on the specified name. The match is
-        case-insensitive and can be partial. If multiple products match
-        the name, the first one is returned.
+    def find_product_by_name(
+        self, name: str, partial_match: bool = True
+    ) -> Optional[Product]:
+        """Find a single product based on the specified name.
+
+        Example:
+        ```python
+        # standard usage, partial match to "bageta"
+        product = parser.find_product_by_name('bageta')
+        print(product)  # first product with "bageta" in the name
+
+        # exact match to "bageta" required ("bageta caesar velka" won't match)
+        product = parser.find_product_by_name('bageta', partial_match=False)
+        print(product)  # None if no product is named "bageta" exactly
+
+        # exact match to "bageta s trhaným vepřovým masem velká" required,
+        # no diacritics
+        name = 'bageta s trhaným vepřovým masem velká'
+        product_1 = parser.find_product_by_name(name, partial_match=False)
+        print(product_1)  # first product with the exact name <name>
+
+        # exact match to "Bageta s trhaným vepřovým masem velká" required,
+        # case and diacritics preserved but don't make a difference,
+        # equivalent to the previous example
+        name = 'Bageta s trhaným vepřovým masem velká'
+        product_2 = parser.find_product_by_name(name, partial_match=False)
+        print(product_2)  # same as product_1
+        ```
 
         Args:
             name (str): The name of the product to filter by. Note that product
-                names are normalized to lowercase ASCII characters.
+                names are normalized to lowercase ASCII characters. The match
+                is case-insensitive and ignores diacritics regardless of the
+                `partial_match` value.
+            partial_match (bool): If True, the name match can be partial.
+                If False, the name match must be exact.
 
         Raises:
-            ValueError: If the product name is not a string.
+            TypeError: If the product name is not a string.
 
         Returns:
             Optional[Product]: A product matching the specified name.
-                If the product is not found, returns None. If multiple products
-                match the name, the first one is returned.
+                If no product is found, returns None. If multiple products
+                match, the first one is returned.
         """
         if not isinstance(name, str):
             type_ = type(name).__name__
-            raise ValueError(f'Product name must be a string (got {type_}).')
+            raise TypeError(f'Product name must be a string (got {type_}).')
+        op = operator.contains if partial_match else operator.eq
         product = self._product_page.find_product(
-            lambda product: normalize_text(name) in normalize_text(product.name)
+            lambda pr: op(normalize_text(name), normalize_text(pr.name))
         )
         if product is not None:  # found in cache
             return product.model_copy(deep=True)  # copy for cache immutability
         if self._all_products_found:  # no new products to parse, cache is final
             return None
-        product_data = self._find_product_data_by_name(name)
+        product_data = self._find_product_data_by_name(name, partial_match)
         if len(product_data) == 0:  # no products found in the HTML
             return None
         product = self._parse_product_data(product_data[0])  # first match
         self._update_product_cache(product)
         return product
 
-    def find_products_by_name(self, name: str) -> List[Product]:
-        """Find products based on the specified name. The match is
-        case-insensitive and can be partial.
+    def find_products_by_name(
+        self, name: str, partial_match: bool = True
+    ) -> List[Product]:
+        """Find all products that match the specified name.
+
+        Example:
+        ```python
+        # standard usage, partial match to "borsc" (same as "Boršč")
+        products = parser.find_products_by_name('borsc')
+        print(len(products))  # number of products with "borsc" in the name
+
+        # exact match to "borsc" required ("borsc 300 g" won't match)
+        products = parser.find_products_by_name('borsc', partial_match=False)
+        print(len(products))  # only products with the exact name "borsc"
+
+        # exact match to "borsc 300 g" required, no diacritics
+        name = 'borsc 300 g'
+        products_1 = parser.find_products_by_name(name, partial_match=False)
+        print(len(products_1))  # number of products with the exact name <name>
+
+        # exact match to "Boršč 300 g" required,
+        # case and diacritics preserved but don't make a difference,
+        # equivalent to the previous example
+        name = 'Boršč 300 g'
+        products_2 = parser.find_products_by_name(name, partial_match=False)
+        print(len(products_2))  # equivalent to products_1
+        ```
 
         Args:
             name (str): The name of the product to filter by. Note that product
-                names are normalized to lowercase ASCII characters.
+                names are normalized to lowercase ASCII characters. The match
+                is case-insensitive and ignores diacritics regardless of the
+                `partial_match` value.
+            partial_match (bool): If True, the name match can be partial.
+                If False, the name match must be exact.
 
         Raises:
-            ValueError: If the product name is not a string.
+            TypeError: If the product name is not a string.
 
         Returns:
             List[Product]: Products matching the specified name. If no products
-                are found, an empty list is returned.
+                are found, returns an empty list.
         """
         if not isinstance(name, str):
             type_ = type(name).__name__
-            raise ValueError(f'Product name must be a string (got {type_}).')
+            raise TypeError(f'Product name must be a string (got {type_}).')
         if self._all_products_found:  # use cache if all products are parsed
+            op = operator.contains if partial_match else operator.eq
             products = self._product_page.find_products(
-                lambda product: normalize_text(name)
-                in normalize_text(product.name)
+                lambda pr: op(normalize_text(name), normalize_text(pr.name))
             )
             # copy for cache immutability
             return [product.model_copy(deep=True) for product in products]
         products = []
-        for product_data in self._find_product_data_by_name(name):
+        product_data_tags = self._find_product_data_by_name(name, partial_match)
+        for product_data in product_data_tags:
             product = self._parse_product_data(product_data)
             self._update_product_cache(product)
             products.append(product)
