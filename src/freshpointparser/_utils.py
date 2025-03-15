@@ -19,20 +19,21 @@ def validate_id(id_: object) -> int:
             either a string or an integer.
 
     Raises:
-        TypeError: If the object is not an integer and cannot be converted to
-            an integer.
-        ValueError: If the object is an integer but is negative.
+        TypeError: If the object is not an integer or not a string.
+        ValueError: If the object is a string that is not a numeric string
+            representing a non-negative integer, or if the object is an
+            integer that is negative.
 
     Returns:
         int: The validated ID, as a non-negative integer.
     """
     if isinstance(id_, str):
-        if id_.isnumeric():
+        if id_.isdecimal():
             return int(id_)
         else:
-            raise TypeError(
-                f'ID must be a numeric string representing '
-                f'a non-negative integer (got "{id_}").'
+            raise ValueError(
+                f'ID must be a numeric string representing a non-negative '
+                f'integer (got "{id_}").'
             )
     if not isinstance(id_, int):
         type_ = type(id_).__name__
