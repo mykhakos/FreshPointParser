@@ -50,7 +50,7 @@ MODEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 T = TypeVar('T', bound=BaseModel)
 
 
-class DiffValue(NamedTuple):
+class FieldDiff(NamedTuple):
     """Holds a pair of differing attribute values between two products.
     The first value is the attribute value of the first product, while
     the second value is the attribute value of the second product.
@@ -376,37 +376,53 @@ class Product(BaseModel):
         """
         return self.timestamp > other.timestamp
 
-    def diff(self, other: 'Product', **kwargs: Any) -> Dict[str, DiffValue]:
+    def diff(
+        self, other: 'Product', exclude_timestamp: bool = True, **kwargs: Any
+    ) -> Dict[str, FieldDiff]:
         """Compare this product with another to identify differences.
 
         This method compares the fields of this product with the fields of
         another product instance to identify differences between them.
-        `model_dump` method is used to extract the data from the product
-        instances.
+        Product timestamp is excluded from the comparison by default
+        (see `exclude_timestamp` argument). The data is serialized according to
+        the models' configurations with the `model_dump` method.
 
         Args:
             other (Product): The product to compare against.
+            exclude_timestamp (bool, optional): If True, the `timestamp` field
+                is always excluded from the comparison, even if `**kwargs`
+                explicitly includes it in the serialization. If False,
+                `timestamp` is only included or excluded based on `**kwargs`.
+                Defaults to True.
             **kwargs: Additional keyword arguments to pass to the `model_dump`
-                method calls of the product instances.
+                method calls of the product instances for serialization.
 
         Returns:
-            Dict[str, DiffValue]: A dictionary with keys as attribute names and
-                values as namedtuples containing the differing values between
-                this product and the other product.
+            Dict[str, FieldDiff]: A dictionary with keys as field names and
+                values as namedtuples containing pairs of the differing values
+                between the two products. The first value is the one of this
+                product and is accessible as `value_self`, and the second value
+                is the one of the other product and is accessible as `value_other`.
+                If a field is present in one product but not in the other,
+                the corresponding value in the namedtuple is set to None.
         """
         # get self's and other's data and remove the timestamps
         self_asdict = self.model_dump(**kwargs)
         other_asdict = other.model_dump(**kwargs)
+        if exclude_timestamp:
+            self_asdict.pop('timestamp', None)
+            other_asdict.pop('timestamp', None)
         # compare self to other
-        diff: Dict[str, DiffValue] = {}
-        for attr, value in self_asdict.items():
-            other_value = other_asdict.get(attr, None)
+        diff: Dict[str, FieldDiff] = {}
+        for field, value in self_asdict.items():
+            other_value = other_asdict.get(field, None)
             if value != other_value:
-                diff[attr] = DiffValue(value, other_value)
+                diff[field] = FieldDiff(value, other_value)
         # compare other to self (may be relevant for subclasses)
-        for attr, value in other_asdict.items():
-            if attr not in self_asdict:
-                diff[attr] = DiffValue(None, value)
+        if other_asdict.keys() != self_asdict.keys():
+            for field, value in other_asdict.items():
+                if field not in self_asdict:
+                    diff[field] = FieldDiff(None, value)
         return diff
 
     def compare_quantity(self, new: 'Product') -> ProductQuantityUpdateInfo:
@@ -422,7 +438,7 @@ class Product(BaseModel):
                 should represent the same product at a different state or time.
 
         Returns:
-            ProductQuantityUpdateInfo: An dataclass containing information about
+            ProductQuantityUpdateInfo: A dataclass containing information about
                 changes in stock quantity of this product when compared to
                 the provided product, such as decreases, increases, depletion,
                 or restocking.
