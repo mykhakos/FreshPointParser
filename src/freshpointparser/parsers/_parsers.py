@@ -395,7 +395,7 @@ class ProductPageHTMLParser:
                 return False
             try:
                 op = operator.contains if partial_match else operator.eq
-                return op(normalize_text(name), normalize_text(value))
+                return op(normalize_text(value), normalize_text(name))
             except Exception as e:
                 raise ValueError(
                     f'Unable to parse the product name "{value}".'
@@ -635,7 +635,7 @@ class ProductPageHTMLParser:
                 is case-insensitive and ignores diacritics regardless of the
                 `partial_match` value.
             partial_match (bool): If True, the name match can be partial.
-                If False, the name match must be exact.
+                If False, the name match must be exact. Defaults to True.
 
         Raises:
             TypeError: If the product name is not a string.
@@ -650,7 +650,7 @@ class ProductPageHTMLParser:
             raise TypeError(f'Product name must be a string (got {type_}).')
         op = operator.contains if partial_match else operator.eq
         product = self._product_page.find_product(
-            lambda pr: op(normalize_text(name), normalize_text(pr.name))
+            lambda pr: op(normalize_text(pr.name), normalize_text(name))
         )
         if product is not None:  # found in cache
             return product.model_copy(deep=True)  # copy for cache immutability
@@ -697,7 +697,7 @@ class ProductPageHTMLParser:
                 is case-insensitive and ignores diacritics regardless of the
                 `partial_match` value.
             partial_match (bool): If True, the name match can be partial.
-                If False, the name match must be exact.
+                If False, the name match must be exact. Defaults to True.
 
         Raises:
             TypeError: If the product name is not a string.
@@ -712,7 +712,7 @@ class ProductPageHTMLParser:
         if self._all_products_found:  # use cache if all products are parsed
             op = operator.contains if partial_match else operator.eq
             products = self._product_page.find_products(
-                lambda pr: op(normalize_text(name), normalize_text(pr.name))
+                lambda pr: op(normalize_text(pr.name), normalize_text(name))
             )
             # copy for cache immutability
             return [product.model_copy(deep=True) for product in products]
