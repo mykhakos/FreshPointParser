@@ -376,26 +376,22 @@ class Product(BaseModel):
         """
         return self.timestamp > other.timestamp
 
-    def diff(
-        self, other: 'Product', exclude_timestamp: bool = True, **kwargs: Any
-    ) -> Dict[str, FieldDiff]:
+    def diff(self, other: 'Product', **kwargs: Any) -> Dict[str, FieldDiff]:
         """Compare this product with another to identify differences.
 
         This method compares the fields of this product with the fields of
-        another product instance to identify differences between them.
-        Product timestamp is excluded from the comparison by default
-        (see `exclude_timestamp` argument). The data is serialized according to
-        the models' configurations with the `model_dump` method.
+        another product instance to identify differences between them. The data
+        is serialized according to the models' configurations using
+        the `model_dump` method.
+
+        Tip: To exclude the `timestamp` field from the comparison, set
+        `exclude='timestamp'` or equivalent in `kwargs`.
 
         Args:
             other (Product): The product to compare against.
-            exclude_timestamp (bool, optional): If True, the `timestamp` field
-                is always excluded from the comparison, even if `**kwargs`
-                explicitly includes it in the serialization. If False,
-                `timestamp` is only included or excluded based on `**kwargs`.
-                Defaults to True.
             **kwargs: Additional keyword arguments to pass to the `model_dump`
-                method calls of the product instances for serialization.
+                calls to control the serialization process, such as 'exclude',
+                'include', 'by_alias', and others.
 
         Returns:
             Dict[str, FieldDiff]: A dictionary with keys as field names and
@@ -409,9 +405,6 @@ class Product(BaseModel):
         # get self's and other's data and remove the timestamps
         self_asdict = self.model_dump(**kwargs)
         other_asdict = other.model_dump(**kwargs)
-        if exclude_timestamp:
-            self_asdict.pop('timestamp', None)
-            other_asdict.pop('timestamp', None)
         # compare self to other
         diff: Dict[str, FieldDiff] = {}
         for field, value in self_asdict.items():
