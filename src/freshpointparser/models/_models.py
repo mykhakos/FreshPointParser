@@ -380,18 +380,23 @@ class Product(BaseModel):
         """Compare this product with another to identify differences.
 
         This method compares the fields of this product with the fields of
-        another product instance to identify differences between them. The data
-        is serialized according to the models' configurations using
-        the `model_dump` method.
+        another product instance to identify which fields have different
+        values. The data is serialized according to the models' configurations
+        using the `model_dump` method.
 
-        Tip: To exclude the `timestamp` field from the comparison, set
-        `exclude='timestamp'` or equivalent in `kwargs`.
+        By default, the `timestamp` field is excluded from comparison. However,
+        if any keyword arguments (`kwargs`) are provided, *no default exclusions
+        are applied*, and the caller is responsible for specifying exclusions
+        explicitly. If you provide additional keyword arguments and still want
+        to exclude the `timestamp` field, set `exclude={'timestamp'}` or
+        equivalent in `kwargs`.
 
         Args:
             other (Product): The product to compare against.
             **kwargs: Additional keyword arguments to pass to the `model_dump`
                 calls to control the serialization process, such as 'exclude',
-                'include', 'by_alias', and others.
+                'include', 'by_alias', and others. If provided, the default
+                exclusion of the `timestamp` field is suppressed.
 
         Returns:
             Dict[str, FieldDiff]: A dictionary with keys as field names and
@@ -402,20 +407,22 @@ class Product(BaseModel):
                 If a field is present in one product but not in the other,
                 the corresponding value in the namedtuple is set to None.
         """
-        # get self's and other's data and remove the timestamps
+        # get self's and other's data, optionally remove the timestamps
+        if not kwargs:
+            kwargs['exclude'] = {'timestamp'}
         self_asdict = self.model_dump(**kwargs)
         other_asdict = other.model_dump(**kwargs)
         # compare self to other
         diff: Dict[str, FieldDiff] = {}
-        for field, value in self_asdict.items():
-            other_value = other_asdict.get(field, None)
-            if value != other_value:
-                diff[field] = FieldDiff(value, other_value)
+        for field, value_self in self_asdict.items():
+            value_other = other_asdict.get(field, None)
+            if value_self != value_other:
+                diff[field] = FieldDiff(value_self, value_other)
         # compare other to self (may be relevant for subclasses)
         if other_asdict.keys() != self_asdict.keys():
-            for field, value in other_asdict.items():
+            for field, value_other in other_asdict.items():
                 if field not in self_asdict:
-                    diff[field] = FieldDiff(None, value)
+                    diff[field] = FieldDiff(None, value_other)
         return diff
 
     def compare_quantity(self, new: 'Product') -> ProductQuantityUpdateInfo:
