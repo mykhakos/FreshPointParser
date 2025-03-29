@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import logging
 import sys
-import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import (
     Any,
     Callable,
@@ -10,12 +12,14 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Tuple,
     TypedDict,
     TypeVar,
     Union,
 )
 
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -44,45 +48,41 @@ DEFAULT_PRODUCT_PIC_URL = (
 The URL points to an image hosted on the FreshPoint server.
 """
 
+
 MODEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 """Pydantic model configuration dictionary for the models in this module."""
 
-T = TypeVar('T', bound=BaseModel)
+
+TBaseModel = TypeVar('TBaseModel', bound=BaseModel)
+"""Type variable for a subclass of `BaseModel`."""
 
 
 class FieldDiff(NamedTuple):
-    """Holds a pair of differing attribute values between two products.
-    The first value is the attribute value of the first product, while
-    the second value is the attribute value of the second product.
+    """Holds a pair of differing attribute values between two models.
 
-    Args:
-        value_self (Any):
-            Value of the attribute in the first product. None if
-            the attribute is not present in the first product.
-        value_other (Any):
-            Value of the attribute in the second product. None if
-            the attribute is not present in the second product.
+    The first value `value_self` is the attribute value of the model that is
+    being compared to the other model, or None if the attribute is not present
+    in the model. The second value `value_other` is the attribute value of the
+    other model, or None if the attribute is not present in the other model.
     """
 
     value_self: Any
-    """Value of the attribute in the first product."""
+    """Value of the attribute in the model being compared."""
     value_other: Any
-    """Value of the attribute in the second product."""
+    """Value of the attribute in the other model."""
 
 
 @dataclass
 class ProductQuantityUpdateInfo:
-    """Summarizes the details of stock quantity changes in a product,
-    as determined by comparing two instances of this product.
-    """
+    """Summarizes the details of stock quantity changes in a product."""
 
     stock_decrease: int = 0
-    """Decrease in stock quantity, representing how many items
+    """Decrease in stock quantity. Represents how many items
     are fewer in the new product compared to the old product.
     A value of 0 implies no decrease.
     """
     stock_increase: int = 0
-    """Increase in stock quantity, indicating how many items
+    """Increase in stock quantity. Indicates how many items
     are more in the new product compared to the old product.
     A value of 0 implies no increase.
     """
@@ -100,37 +100,35 @@ class ProductQuantityUpdateInfo:
 
 @dataclass
 class ProductPriceUpdateInfo:
-    """Summarizes the details of pricing changes of a product,
-    as determined by comparing two instances of this product.
-    """
+    """Summarizes the details of pricing changes of a product."""
 
     price_full_decrease: float = 0.0
-    """Decrease in the full price of the product, representing the difference
+    """Decrease in the full price of the product. Represents the difference
     between its old full price and its new full price.
     A value of 0.0 indicates no decrease.
     """
     price_full_increase: float = 0.0
-    """Increase of the full price of the product, representing the difference
+    """Increase of the full price of the product. Represents the difference
     between its new full price and its old full price.
     A value of 0.0 indicates no increase.
     """
     price_curr_decrease: float = 0.0
-    """Decrease in the current selling price of the product, representing
+    """Decrease in the current selling price of the product. Represents
     the difference between its old selling price and its new selling price.
     A value of 0.0 indicates no decrease.
     """
     price_curr_increase: float = 0.0
-    """Increase in the current selling price of the product, representing
+    """Increase in the current selling price of the product. Represents
     the difference between its new selling price and its old selling price.
     A value of 0.0 indicates no increase.
     """
     discount_rate_decrease: float = 0.0
-    """Decrease in the discount rate of the product, indicating the reduction
+    """Decrease in the discount rate of the product. Indicates the reduction
     of the discount rate in the new product compared to the old product.
     A value of 0.0 indicates that the discount rate has not decreased.
     """
     discount_rate_increase: float = 0.0
-    """Increase in the discount rate of the product, indicating the increment
+    """Increase in the discount rate of the product. Indicates the increment
     of the discount rate in the new product compared to the old product.
     A value of 0.0 indicates that the discount rate has not increased.
     """
@@ -170,46 +168,7 @@ class ProductAttrs(TypedDict, total=False):
 
 
 class Product(BaseModel):
-    """Data model of a FreshPoint product record.
-
-    Args:
-        id_ (int):
-            Unique identifier or the product. Defaults to 0.
-        name (str):
-            Name of the product. Defaults to an empty string.
-        category (str):
-            Category of the product. Defaults to an empty string.
-        is_vegetarian (bool):
-            Indicates whether the product is vegetarian. Defaults to False.
-        is_gluten_free (bool):
-            Indicates whether the product is gluten-free. Defaults to False.
-        is_promo (bool):
-            Indicates whether the product is being promoted. Defaults to False.
-
-            **Note that the product being a promo does not guarantee that the
-            product currently has a discount and vice versa.** Use `is_on_sale`
-            to check if the product is currently on sale.
-        quantity (int):
-            Quantity of product items in stock. Defaults to 0.
-        price_full (float):
-            Full price of the product. If not provided, matches the current
-            selling price if the latter is provided or is set to 0 otherwise.
-        price_curr (float):
-            Current selling price. If not provided, matches the full price
-            if the latter is provided or is set to 0 otherwise.
-        info (str):
-            Additional information about the product such as ingredients or
-            nutritional values. Defaults to an empty string.
-        pic_url (str):
-            URL of the illustrative product image. Default URL is used if not
-            provided.
-        location_id (int):
-            Unique identifier or the product location (also known as the page ID
-            or the device ID). Defaults to 0.
-        timestamp (int):
-            Timestamp of the product creation with the provided data.
-            Defaults to the time of instantiation.
-    """
+    """Data model of a FreshPoint product."""
 
     model_config = MODEL_CONFIG
 
@@ -250,15 +209,15 @@ class Product(BaseModel):
         title='Promo',
         description=(
             'Indicates if the product is being promoted. Note that the '
-            'product being a promo does not guarantee that the product '
+            'product being on a promo does not guarantee that the product '
             'currently has a discount and vice versa.'
         ),
     )
     """Indicates whether the product is being promoted.
 
-    **Note that the product being a promo does not guarantee that the product
-    currently has a discount and vice versa.** Use `is_on_sale` to
-    check if the product is currently on sale.
+    **The product being a promo does not guarantee that the product currently
+    has a discount and vice versa.** Use `is_on_sale` to check if the product is
+    on sale.
     """
     quantity: NonNegativeInt = Field(
         default=0,
@@ -291,8 +250,8 @@ class Product(BaseModel):
     """
     pic_url: str = Field(
         default=DEFAULT_PRODUCT_PIC_URL,
-        title='Illustrative Picture URL',
-        description='URL of the product image.',
+        title='Illustrative Product Picture URL',
+        description='URL of the illustrative product image.',
     )
     """URL of the illustrative product image."""
     location_id: int = Field(
@@ -306,14 +265,20 @@ class Product(BaseModel):
     """Unique identifier or the product location (also known as the page ID
     or the device ID).
     """
-    timestamp: float = Field(
-        default_factory=time.time,
-        title='Timestamp',
+    created_at: datetime = Field(
+        default_factory=datetime.now,
+        title='Created At',
         description='Timestamp of the product creation with the provided data.',
     )
     """Timestamp of the product creation with the provided data."""
 
     def model_post_init(self, __context: object) -> None:
+        """Post-initialization hook for the product model. Do not call directly.
+        Override with caution and call `super().model_post_init(__context)`.
+
+        Args:
+            __context (object): The context of the model instance.
+        """
         fields_set = self.model_fields_set
         if 'price_full' in fields_set and 'price_curr' not in fields_set:
             self.price_curr = self.price_full
@@ -363,8 +328,8 @@ class Product(BaseModel):
         """A product is considered the last piece if its quantity is one."""
         return self.quantity == 1
 
-    def is_newer_than(self, other: 'Product') -> bool:
-        """Determine if this product is newer than the given one by
+    def is_newer_than(self, other: Product) -> bool:
+        """Determine if this product is newer than the other one by
         comparing their creation timestamps.
 
         Args:
@@ -374,10 +339,10 @@ class Product(BaseModel):
             bool: True if this product is newer than the other product,
                 False otherwise.
         """
-        return self.timestamp > other.timestamp
+        return self.created_at > other.created_at
 
-    def diff(self, other: 'Product', **kwargs: Any) -> Dict[str, FieldDiff]:
-        """Compare this product with another to identify differences.
+    def diff(self, other: Product, **kwargs: Any) -> Dict[str, FieldDiff]:
+        """Compare this product with the other one to identify differences.
 
         This method compares the fields of this product with the fields of
         another product instance to identify which fields have different
@@ -406,10 +371,40 @@ class Product(BaseModel):
                 is the one of the other product and is accessible as `value_other`.
                 If a field is present in one product but not in the other,
                 the corresponding value in the namedtuple is set to None.
+
+        Examples:
+            >>> now, td = datetime.now(), timedelta(seconds=1)
+            >>> product1 = Product(id_=1, quantity=10, created_at=now)
+            >>> product2 = Product(id_=1, quantity=5, created_at=now + td)
+
+            >>> diff = product1.diff(product2)
+            >>> print(diff)
+            {'quantity': FieldDiff(value_self=10, value_other=5)}
+
+            >>> diff = product1.diff(product2, by_alias=True)
+            >>> print(diff)
+            {
+                'quantity': FieldDiff(value_self=10, value_other=5),
+                'createdAt': FieldDiff(value_self=now, value_other=now + td)
+            }
+
+            >>> diff = product1.diff(product2, exclude={'quantity'})
+            >>> print(diff)
+            {'created_at': FieldDiff(value_self=now, value_other=now + td)}
+
+            >>> diff = product1.diff(
+            ...     product2, exclude={'quantity', 'created_at'}
+            ... )
+            >>> print(diff)
+            {}
+
+            >>> diff = product1.diff(product2, include={'quantity'})
+            >>> print(diff)
+            {'quantity': FieldDiff(value_self=10, value_other=5)}
         """
         # get self's and other's data, optionally remove the timestamps
         if not kwargs:
-            kwargs['exclude'] = {'timestamp'}
+            kwargs['exclude'] = {'created_at'}
         self_asdict = self.model_dump(**kwargs)
         other_asdict = other.model_dump(**kwargs)
         # compare self to other
@@ -425,7 +420,7 @@ class Product(BaseModel):
                     diff[field] = FieldDiff(None, value_other)
         return diff
 
-    def compare_quantity(self, new: 'Product') -> ProductQuantityUpdateInfo:
+    def compare_quantity(self, new: Product) -> ProductQuantityUpdateInfo:
         """Compare the stock availability of the product in two different
         points in time.
 
@@ -462,7 +457,7 @@ class Product(BaseModel):
             decrease, increase, depleted, restocked
         )
 
-    def compare_price(self, new: 'Product') -> ProductPriceUpdateInfo:
+    def compare_price(self, new: Product) -> ProductPriceUpdateInfo:
         """Compare the pricing details of the product in two different points
         in time.
 
@@ -535,15 +530,13 @@ class LocationAttrs(TypedDict, total=False):
     is_suspended: bool
     name_lowercase_ascii: str
     address_lowercase_ascii: str
-    coordinates: tuple[float, float]
+    coordinates: Tuple[float, float]
 
 
 class LocationCoordinates(NamedTuple):
     """Holds the latitude and longitude of a location as a pair of floats.
-
-    Args:
-        latitude (float): Latitude of the location (first value in the pair).
-        longitude (float): Longitude of the location (second value in the pair).
+    Latitude is the first value in the pair, and longitude is the second
+    value in the pair.
     """
 
     latitude: float
@@ -553,26 +546,7 @@ class LocationCoordinates(NamedTuple):
 
 
 class Location(BaseModel):
-    """Data model of a FreshPoint location record.
-
-    Args:
-        id_ (int):
-            Unique identifier or the location. Defaults to 0.
-        name (str):
-            Name of the location. Defaults to an empty string.
-        address (str):
-            Address of the location. Defaults to an empty string.
-        latitude (float):
-            Latitude of the location. Defaults to 0.0.
-        longitude (float):
-            Longitude of the location. Defaults to 0.0.
-        discount_rate (float):
-            Discount rate applied at the location. Defaults to 0.0.
-        is_active (bool):
-            Indicates whether the location is active. Defaults to True.
-        is_suspended (bool):
-            Indicates whether the location is suspended. Defaults to False.
-    """
+    """Data model of a FreshPoint location."""
 
     model_config = MODEL_CONFIG
 
@@ -586,7 +560,7 @@ class Location(BaseModel):
     """Unique identifier or the location."""
     name: str = Field(
         default='',
-        validation_alias='username',
+        validation_alias=AliasChoices('username', 'name'),
         title='Name',
         description='Name of the location.',
     )
@@ -599,35 +573,35 @@ class Location(BaseModel):
     """Address of the location."""
     latitude: float = Field(
         default=0.0,
-        validation_alias='lat',
+        validation_alias=AliasChoices('lat', 'latitude'),
         title='Latitude',
         description='Latitude of the location.',
     )
     """Latitude of the location."""
     longitude: float = Field(
         default=0.0,
-        validation_alias='lon',
+        validation_alias=AliasChoices('lon', 'longitude'),
         title='Longitude',
         description='Longitude of the location.',
     )
     """Longitude of the location."""
     discount_rate: float = Field(
         default=0.0,
-        validation_alias='discount',
+        validation_alias=AliasChoices('discount', 'discountRate'),
         title='Discount Rate',
         description='Discount rate applied at the location.',
     )
     """Discount rate applied at the location."""
     is_active: bool = Field(
         default=True,
-        validation_alias='active',
+        validation_alias=AliasChoices('active', 'isActive'),
         title='Active',
         description='Indicates whether the location is active.',
     )
     """Indicates whether the location is active."""
     is_suspended: bool = Field(
         default=False,
-        validation_alias='suspended',
+        validation_alias=AliasChoices('suspended', 'isSuspended'),
         title='Suspended',
         description='Indicates whether the location is suspended.',
     )
@@ -650,12 +624,7 @@ class Location(BaseModel):
 
 
 class BasePage(BaseModel):
-    """Base data model of a FreshPoint webpage.
-
-    Args:
-        html_hash_sha1 (str):
-            Hexadecimal representation of the SHA-1 hash of the page HTML.
-    """
+    """Base data model of a FreshPoint webpage."""
 
     model_config = MODEL_CONFIG
 
@@ -670,22 +639,22 @@ class BasePage(BaseModel):
 
     @staticmethod
     def _find_all_with_constraint(
-        constraint: Union[Mapping[str, Any], Callable[[T], bool]],
-        data_items: Dict[int, T],
-    ) -> Iterator[T]:
+        constraint: Union[Mapping[str, Any], Callable[[TBaseModel], bool]],
+        data_items: Dict[int, TBaseModel],
+    ) -> Iterator[TBaseModel]:
         """Find all values in a dictionary that match a constraint.
 
         Args:
-            constraint (Union[Mapping[str, Any], Callable[[T], bool]]): Either
+            constraint (Union[Mapping[str, Any], Callable[[TBaseModel], bool]]): Either
                 a function that receives a data item and returns True if the
                 item meets the constraint, or a mapping where each key is
                 an attribute (or property) name of the data item and its value
                 is the expected value.
-            data_items (Dict[int, T]): A dictionary of data items with unique
+            data_items (Dict[int, TBaseModel]): A dictionary of data items with unique
                 integer IDs as keys and data item instances as values.
 
         Returns:
-            Iterator[T]: A lazy iterator over all data items that match the
+            Iterator[TBaseModel]: A lazy iterator over all data items that match the
                 given constraint.
         """
         if callable(constraint):
@@ -702,27 +671,27 @@ class BasePage(BaseModel):
 
         raise TypeError(
             f'Constraint must be either a dictionary or a callable function. '
-            f"Got type '{type(constraint).__name__}' instead."
+            f"Got type '{type(constraint)}' instead."
         )
 
     @staticmethod
     def _find_first_with_constraint(
-        constraint: Union[Mapping[str, Any], Callable[[T], bool]],
-        data_items: Dict[int, T],
-    ) -> Optional[T]:
+        constraint: Union[Mapping[str, Any], Callable[[TBaseModel], bool]],
+        data_items: Dict[int, TBaseModel],
+    ) -> Optional[TBaseModel]:
         """Find the first value in a dictionary that matches a constraint.
 
         Args:
-            constraint (Union[Mapping[str, Any], Callable[[T], bool]]): Either
+            constraint (Union[Mapping[str, Any], Callable[[TBaseModel], bool]]): Either
                 a function that receives a data item and returns True if the
                 item meets the constraint, or a mapping where each key is
                 an attribute (or property) name of the data item and its value
                 is the expected value.
-            data_items (Dict[int, T]): A dictionary of data items with unique
+            data_items (Dict[int, TBaseModel]): A dictionary of data items with unique
                 integer IDs as keys and data item instances as values.
 
         Returns:
-            Optional[T]: The first data item that matches the given constraint,
+            Optional[TBaseModel]: The first data item that matches the given constraint,
                 or None if no such data item is found.
         """
         return next(
@@ -731,20 +700,7 @@ class BasePage(BaseModel):
 
 
 class ProductPage(BasePage):
-    """Data model of a FreshPoint product webpage.
-
-    Args:
-        html_hash_sha1 (str):
-            Hexadecimal representation of the SHA-1 hash of the page HTML.
-        location_id (int):
-            Unique identifier of the product location (also known as the page
-            ID or the device ID). Defaults to 0.
-        location_name (str):
-            Name of the product location.
-        products (Dict[int, Product]):
-            Dictionary of product IDs as keys and data models on the page
-            as values.
-    """
+    """Data model of a FreshPoint product webpage."""
 
     location_id: int = Field(
         default=0,
@@ -830,25 +786,6 @@ class ProductPage(BasePage):
     ) -> Iterator[Product]:
         """Find all products that match a constraint.
 
-        Example:
-        ```python
-        # Category 'Dezerty' and available (with dictionary)
-        products = page.find_products({
-            'category': 'Dezerty',
-            'is_available': True,
-        })
-
-        # Category 'Dezerty' and available (with lambda)
-        products = page.find_products(
-            lambda p: p.category == 'Dezerty' and p.is_available
-        )
-
-        # 'sendvic' in the name and price less than 100 CZK
-        products = page.find_products(
-            lambda p: 'sendvic' in p.name_lowercase_ascii and p.price_curr < 100
-        )
-        ```
-
         Tip: To convert the result from an iterator to a list, use
         `list(page.find_products(...))`.
 
@@ -865,6 +802,24 @@ class ProductPage(BasePage):
         Returns:
             Iterator[Product]: A lazy iterator over all products that match
                 the given constraint.
+
+        Examples:
+            Category 'Dezerty' and available (with dictionary)
+            >>> products = page.find_products({
+            >>>     'category': 'Dezerty',
+            >>>     'is_available': True,
+            >>> })
+            # finds all available products in the 'Dezerty' category (using a dictionary for parameters)
+
+            >>> products = page.find_products(
+            >>>     lambda p: p.category == 'Dezerty' and p.is_available
+            >>> )
+            # finds all available products in the 'Dezerty' category (using a lambda function)
+
+            >>> products = page.find_products(
+            >>>     lambda p: 'sendvic' in p.name_lowercase_ascii and p.price_curr < 100
+            >>> )
+            # finds all products with 'sendvic' in the name and price less than 100 CZK
         """
         return self._find_all_with_constraint(constraint, self.products)
 
@@ -877,33 +832,8 @@ class ProductPage(BasePage):
         """Find a single product that matches a constraint. If more than one
         product matches the constraint, the first one found is returned.
 
-        Example:
-        ```python
-        # Category 'Dezerty' and available (with dictionary)
-        product = page.find_product({
-            'category': 'Dezerty',
-            'is_available': True,
-        })
-
-        # Category 'Dezerty' and available (with lambda)
-        product = page.find_product(
-            lambda p: p.category == 'Dezerty' and p.is_available
-        )
-
-        # 'sendvic' in the name and price less than 100 CZK
-        product = page.find_product(
-            lambda p: 'sendvic' in p.name_lowercase_ascii and p.price_curr < 100
-        )
-        ```
-
-        Note:
-        ```python
-        product = find_product(...)
-        ```
-        is equivalent to
-        ```python
-        product = next(find_products(...), None)
-        ```
+        Note: `product = find_product(...)` is equivalent to
+        `product = next(find_products(...), None)`.
 
         Args:
             constraint (Union[ProductAttrs, Mapping[str, Any], Callable[[Product], bool]]):
@@ -918,20 +848,30 @@ class ProductPage(BasePage):
         Returns:
             Optional[Product]: The first product that matches the given
                 constraint, or None if no such product is found.
+
+        Examples:
+            >>> product = page.find_product({
+            ...     'name': 'Vícezrnný rohlík se šunkou'
+            ... })
+            # finds the product named 'Vícezrnný rohlík se šunkou' (using a dictionary for parameters)
+
+            >>> product = page.find_product(
+            ...     lambda p: p.name == 'Vícezrnný rohlík se šunkou'
+            ... )
+            # finds the product named 'Vícezrnný rohlík se šunkou' (using a lambda function)
+
+            >>> product = page.find_product(
+            ...     lambda p: 'rohlik' in p.name_lowercase_ascii
+            ...     and p.quantity >= 2
+            ...     and p.price_curr <= 50
+            ... )
+            # finds the first product with 'rohlik' in the name, at least 2 items in stock, and price less than 50 CZK
         """
         return self._find_first_with_constraint(constraint, self.products)
 
 
 class LocationPage(BasePage):
-    """Data model of a FreshPoint location webpage.
-
-    Args:
-        html_hash_sha1 (str):
-            Hexadecimal representation of the SHA-1 hash of the page HTML.
-        locations (Dict[int, Location]):
-            Dictionary of location IDs as keys and data models on the page
-            as values.
-    """
+    """Data model of a FreshPoint location webpage."""
 
     model_config = MODEL_CONFIG
 
@@ -991,21 +931,6 @@ class LocationPage(BasePage):
     ) -> Iterator[Location]:
         """Find all locations that match a constraint.
 
-        Example:
-        ```python
-        # location with ID 296 (with dictionary)
-        locations = page.find_locations({'id_': 296})
-
-        # location with ID 296 (with lambda)
-        locations = page.find_locations(lambda loc: loc.id_ == 296)
-
-        # location in Prague and active
-
-        locations = page.find_locations(
-            lambda loc: loc.is_active and 'praha' in loc.address_lowercase_ascii
-        )
-        ```
-
         Tip: To convert the result from an iterator to a list, use
         `list(page.find_locations(...))`.
 
@@ -1021,7 +946,19 @@ class LocationPage(BasePage):
 
         Returns:
             Iterator[Location]: A lazy iterator over all locations that match
-                the given constraint.
+            the given constraint.
+
+        Examples:
+            >>> locations = page.find_locations({'is_active': True})
+            # finds all active locations (using a dictionary for parameters)
+
+            >>> locations = page.find_locations(lambda loc: loc.is_active)
+            # finds all active locations (using a lambda function)
+
+            >>> locations = page.find_locations(
+            >>>    lambda loc: loc.is_active and 'praha' in loc.address_lowercase_ascii
+            >>> )
+            # finds all active locations in Prague (using a lambda function)
         """
         return self._find_all_with_constraint(constraint, self.locations)
 
@@ -1033,20 +970,6 @@ class LocationPage(BasePage):
     ) -> Optional[Location]:
         """Find a single location that matches the given constraint. If more
         than one location matches the constraint, the first one found is returned.
-
-        Example:
-        ```python
-        # location with ID 296 (with dictionary)
-        location = page.find_location({'id_': 296})
-
-        # location with ID 296 (with lambda)
-        location = page.find_location(lambda loc: loc.id_ == 296)
-
-        # location in Prague and active
-        location = page.find_location(
-            lambda loc: loc.is_active and 'praha' in loc.address_lowercase_ascii
-        )
-        ```
 
         Args:
             constraint (Union[LocationAttrs, Mapping[str, Any], Callable[[Location], bool]]):
@@ -1061,5 +984,21 @@ class LocationPage(BasePage):
         Returns:
             Optional[Location]: The first location that matches the given
                 constraint, or None if no such location is found.
+
+        Examples:
+            >>> location = page.find_location({'name': 'Decathlon Letňany'})
+            # finds the location named 'Decathlon Letňany' (using a dictionary for parameters)
+
+            >>> location = page.find_location(
+            ...     lambda loc: loc.name == 'Decathlon Letňany'
+            ... )
+            # finds the location named 'Decathlon Letňany' (using a lambda function)
+
+            >>> location = page.find_location(
+            >>>     lambda loc: 'decathlon' in loc.name_lowercase_ascii
+            >>>     and 'praha' in loc.address_lowercase_ascii
+            >>>     and loc.is_active
+            >>> )
+            # finds the first active Decathlon location in Prague (using a lambda function)
         """
         return self._find_first_with_constraint(constraint, self.locations)
