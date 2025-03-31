@@ -10,6 +10,7 @@ from typing import (
     Dict,
     Iterator,
     List,
+    Literal,
     Mapping,
     Optional,
     Tuple,
@@ -157,7 +158,7 @@ class ProductAttrs(TypedDict, total=False):
     info: str
     pic_url: str
     location_id: int
-    timestamp: float
+    recorded_at: datetime
     name_lowercase_ascii: str
     category_lowercase_ascii: str
     discount_rate: float
@@ -265,12 +266,12 @@ class Product(BaseModel):
     """Unique identifier or the product location (also known as the page ID
     or the device ID).
     """
-    created_at: datetime = Field(
+    recorded_at: datetime = Field(
         default_factory=datetime.now,
-        title='Created At',
-        description='Timestamp of the product creation with the provided data.',
+        title='Recorded At',
+        description='Datetime when the product data has been recorded',
     )
-    """Timestamp of the product creation with the provided data."""
+    """Datetime when the product data has been recorded."""
 
     def model_post_init(self, __context: object) -> None:
         """Post-initialization hook for the product model. Do not call directly.
@@ -328,18 +329,67 @@ class Product(BaseModel):
         """A product is considered the last piece if its quantity is one."""
         return self.quantity == 1
 
-    def is_newer_than(self, other: Product) -> bool:
-        """Determine if this product is newer than the other one by
-        comparing their creation timestamps.
+    def is_newer_than(
+        self,
+        other: Product,
+        precision: Optional[Literal['s', 'm', 'h', 'd']] = None,
+    ) -> Optional[bool]:
+        """Check if this product's record datetime is newer than another's.
+
+        Compares the `recorded_at` datetime of this product with another product,
+        considering the specified precision. Note that precision here means
+        truncating the datetime to the desired level (e.g., cutting off seconds,
+        minutes, etc.), not rounding it.
 
         Args:
             other (Product): The product to compare against.
+            precision (Optional[Literal['s', 'm', 'h', 'd']]): The level of
+                precision for the comparison. Supported values:
+
+                - None: full precision (microseconds) (default)
+                - 's': second precision
+                - 'm': minute precision
+                - 'h': hour precision
+                - 'd': date precision
+
+        Raises:
+            ValueError: If the precision is not one of the supported values.
 
         Returns:
-            bool: True if this product is newer than the other product,
-                False otherwise.
+            Optional[bool]: With the specified precision taken into account,
+                - True if this product's record datetime is newer than the other's
+                - False if this product's record datetime is older than the other's
+                - None if the record datetimes are the same
         """
-        return self.created_at > other.created_at
+        if precision is None:
+            recorded_at_self = self.recorded_at
+            recorded_at_other = other.recorded_at
+        elif precision == 's':
+            recorded_at_self = self.recorded_at.replace(microsecond=0)
+            recorded_at_other = other.recorded_at.replace(microsecond=0)
+        elif precision == 'm':
+            recorded_at_self = self.recorded_at.replace(second=0, microsecond=0)
+            recorded_at_other = other.recorded_at.replace(
+                second=0, microsecond=0
+            )
+        elif precision == 'h':
+            recorded_at_self = self.recorded_at.replace(
+                minute=0, second=0, microsecond=0
+            )
+            recorded_at_other = other.recorded_at.replace(
+                minute=0, second=0, microsecond=0
+            )
+        elif precision == 'd':
+            recorded_at_self = self.recorded_at.date()
+            recorded_at_other = other.recorded_at.date()
+        else:
+            raise ValueError(
+                f"Invalid precision '{precision}'. "
+                f"Expected one of: 's', 'm', 'h', 'd'."
+            )
+        if recorded_at_self == recorded_at_other:
+            return None
+        return recorded_at_self > recorded_at_other
 
     def diff(self, other: Product, **kwargs: Any) -> Dict[str, FieldDiff]:
         """Compare this product with the other one to identify differences.
@@ -374,8 +424,8 @@ class Product(BaseModel):
 
         Examples:
             >>> now, td = datetime.now(), timedelta(seconds=1)
-            >>> product1 = Product(id_=1, quantity=10, created_at=now)
-            >>> product2 = Product(id_=1, quantity=5, created_at=now + td)
+            >>> product1 = Product(id_=1, quantity=10, recorded_at=now)
+            >>> product2 = Product(id_=1, quantity=5, recorded_at=now + td)
 
             >>> diff = product1.diff(product2)
             >>> print(diff)
@@ -390,10 +440,10 @@ class Product(BaseModel):
 
             >>> diff = product1.diff(product2, exclude={'quantity'})
             >>> print(diff)
-            {'created_at': FieldDiff(value_self=now, value_other=now + td)}
+            {'recorded_at': FieldDiff(value_self=now, value_other=now + td)}
 
             >>> diff = product1.diff(
-            ...     product2, exclude={'quantity', 'created_at'}
+            ...     product2, exclude={'quantity', 'recorded_at'}
             ... )
             >>> print(diff)
             {}
@@ -404,7 +454,7 @@ class Product(BaseModel):
         """
         # get self's and other's data, optionally remove the timestamps
         if not kwargs:
-            kwargs['exclude'] = {'created_at'}
+            kwargs['exclude'] = {'recorded_at'}
         self_asdict = self.model_dump(**kwargs)
         other_asdict = other.model_dump(**kwargs)
         # compare self to other
