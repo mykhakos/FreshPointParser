@@ -3,6 +3,7 @@ import json
 import logging
 import operator
 import re
+from datetime import datetime
 from typing import (
     Callable,
     Dict,
@@ -93,7 +94,7 @@ class ProductHTMLParser:
             raise ValueError(
                 f'Unexpected "{attr_name}" attribute parsing results: '
                 f'attribute value is expected to be a string '
-                f'(got type "{type(attr).__name__}").'
+                f'(got type "{type(attr)}").'
             )
         return attr.strip()
 
@@ -327,6 +328,7 @@ class ProductPageHTMLParser:
         self._bs4_parser = bs4.BeautifulSoup()
         self._product_page = ProductPage()
         self._all_products_found: bool = False
+        self._parse_datetime = datetime.now()
 
     def _find_product_data(self) -> bs4.ResultSet[bs4.Tag]:
         """Find all product data elements in the page HTML.
@@ -432,6 +434,7 @@ class ProductPageHTMLParser:
             info=ProductHTMLParser.find_info(data),
             pic_url=ProductHTMLParser.find_pic_url(data),
             location_id=self.location_id,
+            recorded_at=self._parse_datetime,
         )
 
     def _update_product_cache(self, product: Product) -> None:
@@ -560,6 +563,7 @@ class ProductPageHTMLParser:
             self._bs4_parser = bs4.BeautifulSoup(page_html, 'lxml')
             self._product_page = ProductPage(html_hash_sha1=html_hash_sha1)
             self._all_products_found = False
+            self._parse_datetime = datetime.now()
 
     def find_product_by_id(self, id_: Union[int, str]) -> Optional[Product]:
         """Find a single product based on the specified ID.
@@ -646,8 +650,9 @@ class ProductPageHTMLParser:
                 match, the first one is returned.
         """
         if not isinstance(name, str):
-            type_ = type(name).__name__
-            raise TypeError(f'Product name must be a string (got {type_}).')
+            raise TypeError(
+                f'Product name must be a string (got {type(name)}).'
+            )
         op = operator.contains if partial_match else operator.eq
         product = self._product_page.find_product(
             lambda pr: op(normalize_text(pr.name), normalize_text(name))
@@ -707,15 +712,16 @@ class ProductPageHTMLParser:
                 are found, returns an empty list.
         """
         if not isinstance(name, str):
-            type_ = type(name).__name__
-            raise TypeError(f'Product name must be a string (got {type_}).')
+            raise TypeError(
+                f'Product name must be a string (got {type(name)}).'
+            )
         if self._all_products_found:  # use cache if all products are parsed
             op = operator.contains if partial_match else operator.eq
-            products = self._product_page.find_products(
+            iter_products = self._product_page.find_products(
                 lambda pr: op(normalize_text(pr.name), normalize_text(name))
             )
             # copy for cache immutability
-            return [product.model_copy(deep=True) for product in products]
+            return [product.model_copy(deep=True) for product in iter_products]
         products = []
         product_data_tags = self._find_product_data_by_name(name, partial_match)
         for product_data in product_data_tags:
@@ -784,18 +790,19 @@ class LocationPageHTMLParser:
         Returns:
             List[Dict]: A list of location data dictionaries.
         """
+        match_: Union[re.Match[str], re.Match[bytes], None]
         if isinstance(page_html, str):
-            match = re.search(self._RE_SEARCH_PATTERN_STR, page_html)
+            match_ = re.search(self._RE_SEARCH_PATTERN_STR, page_html)
         else:
-            match = re.search(self._RE_SEARCH_PATTERN_BYTES, page_html)
-        if not match:
+            match_ = re.search(self._RE_SEARCH_PATTERN_BYTES, page_html)
+        if not match_:
             raise ValueError(
                 'Unable to find the location data in the HTML '
                 '(regex pattern not matched).'
             )
         try:
             # double JSON parsing is required
-            data = json.loads(json.loads(match.group(1)))
+            data = json.loads(json.loads(match_.group(1)))
         except IndexError as e:
             raise ValueError(
                 'Unable to parse the location data in the HTML '
@@ -866,7 +873,7 @@ class LocationPageHTMLParser:
             self._location_page = self._parse_json(json_data)
             self._location_page.html_hash_sha1 = html_hash_sha1
 
-    def find_location_by_id(self, id_: int) -> Optional[Location]:
+    def find_location_by_id(self, id_: Union[int, str]) -> Optional[Location]:
         """Find a location by its unique identifier.
 
         Args:
@@ -876,47 +883,82 @@ class LocationPageHTMLParser:
             Optional[Location]: The location with the specified ID.
                 If the location is not found, returns None.
         """
+        id_ = validate_id(id_)
         try:
             location = self._location_page.locations[id_]
             return location.model_copy(deep=True)  # copy for cache immutability
         except KeyError:
             return None
 
-    def find_location_by_name(self, name: str) -> Optional[Location]:
+    def find_location_by_name(
+        self, name: str, partial_match: bool = True
+    ) -> Optional[Location]:
         """Find a location by its name. The match is case-insensitive
         and can be partial.
 
+        # TODO: add examples
+
         Args:
-            name (str): The name of the location to search for.
+            name (str): The name of the location to search for. Note that location
+                names are normalized to lowercase ASCII characters. The match
+                is case-insensitive and ignores diacritics regardless of the
+                `partial_match` value.
+            partial_match (bool): If True, the name match can be partial
+                (case-insensitive). If False, the name match must be exact
+                (case-insensitive).
+
+        Raises:
+            TypeError: If the location name is not a string.
 
         Returns:
-            Optional[Location]: The location with the specified name.
-                If the location is not found, returns None.
+            Optional[Location]: A location matching the specified name.
+                If no location is found, returns None. If multiple locations
+                match, the first one is returned.
         """
+        if not isinstance(name, str):
+            raise TypeError(
+                f'Location name must be a string (got {type(name)}).'
+            )
         # wrapper over `LocationPage.find_location` method
+        op = operator.contains if partial_match else operator.eq
         location = self._location_page.find_location(
-            lambda location: normalize_text(name)
-            in normalize_text(location.name)
+            lambda loc: op(normalize_text(loc.name), normalize_text(name))
         )
         if location is None:
             return None
         return location.model_copy(deep=True)  # copy for cache immutability
 
-    def find_locations_by_name(self, name: str) -> List[Location]:
+    def find_locations_by_name(
+        self, name: str, partial_match: bool = True
+    ) -> List[Location]:
         """Find locations by their name. The match is case-insensitive
         and can be partial.
 
+        # TODO: add examples
+
         Args:
-            name (str): The name of the locations to search for.
+            name (str): The name of the location to filter by. Note that location
+                names are normalized to lowercase ASCII characters. The match
+                is case-insensitive and ignores diacritics regardless of the
+                `partial_match` value.
+            partial_match (bool): If True, the name match can be partial.
+                If False, the name match must be exact. Defaults to True.
+
+        Raises:
+            TypeError: If the location name is not a string.
 
         Returns:
-            List[Location]: Locations with the specified name.
-                If no locations are found, an empty list is returned.
+            List[Location]: Locations matching the specified name.
+                If no locations are found, returns an empty list.
         """
+        if not isinstance(name, str):
+            raise TypeError(
+                f'Location name must be a string (got {type(name)}).'
+            )
         # wrapper over `LocationPage.find_locations` method
+        op = operator.contains if partial_match else operator.eq
         locations = self._location_page.find_locations(
-            lambda location: normalize_text(name)
-            in normalize_text(location.name)
+            lambda loc: op(normalize_text(loc.name), normalize_text(name))
         )
         # copy for cache immutability
         return [location.model_copy(deep=True) for location in locations]
