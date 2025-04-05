@@ -1,10 +1,40 @@
+from __future__ import annotations
+
 import hashlib
 from functools import lru_cache
-from typing import Union
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Iterator,
+    Mapping,
+    TypeVar,
+    Union,
+)
 
 from unidecode import unidecode
 
+T = TypeVar('T')
+
 LOCATION_PAGE_URL = 'https://my.freshpoint.cz'
+
+
+def validate_str(text: object) -> str:
+    """Validate the given object as a string. If the object is not a string,
+    it raises a TypeError. If the object is a string, it is returned as-is.
+
+    Args:
+        text (object): The object to be validated as a string.
+
+    Raises:
+        TypeError: If the object is not a string.
+
+    Returns:
+        str: The validated string.
+    """
+    if not isinstance(text, str):
+        raise TypeError(f'Expected a string, got {type(text)}.')
+    return text
 
 
 @lru_cache(maxsize=1024)
@@ -36,8 +66,7 @@ def validate_id(id_: object) -> int:
                 f'integer (got "{id_}").'
             )
     if not isinstance(id_, int):
-        type_ = type(id_).__name__
-        raise TypeError(f'ID must be an integer (got {type_}).')
+        raise TypeError(f'ID must be an integer (got {type(id_)}).')
     if id_ < 0:
         raise ValueError('ID must be a non-negative integer.')
     return id_
@@ -93,4 +122,40 @@ def hash_text_sha1(text: Union[str, bytes, bytearray]) -> str:
     """
     if isinstance(text, str):
         text = text.encode('utf-8')
-    return hashlib.sha1(text, usedforsecurity=False).hexdigest()
+    return hashlib.sha1(text).hexdigest()  # noqa: S324
+
+
+def filter_by_constraint(
+    constraint: Union[Mapping[str, Any], Callable[[T], bool]],
+    items: Iterable[T],
+) -> Iterator[T]:
+    """Find all values in a dictionary that match a constraint.
+
+    Args:
+        constraint (Union[Mapping[str, Any], Callable[[T], bool]]): Either
+            a function that receives a data item and returns True if the
+            item meets the constraint, or a mapping where each key is
+            an attribute (or property) name of the data item and its value
+            is the expected value.
+        items (Iterable[T]): Data items to be filtered.
+
+    Returns:
+        Iterator[T]: A lazy iterator over all data items that match the
+            given constraint.
+    """
+    if callable(constraint):
+        return filter(constraint, items)
+
+    if isinstance(constraint, Mapping):
+        return filter(
+            lambda data_item: all(
+                getattr(data_item, attr) == value
+                for attr, value in constraint.items()
+            ),
+            items,
+        )
+
+    raise TypeError(
+        f'Constraint must be either a dictionary or a callable function. '
+        f"Got type '{type(constraint)}' instead."
+    )
