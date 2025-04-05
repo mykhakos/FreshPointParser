@@ -16,7 +16,7 @@ from typing import (
 
 import bs4
 
-from .._utils import hash_text_sha1, normalize_text, validate_id
+from .._utils import hash_text_sha1, normalize_text, validate_id, validate_str
 from ..models._models import (
     Location,
     LocationPage,
@@ -291,7 +291,62 @@ class ProductHTMLParser:
         )
 
 
-class ProductPageHTMLParser:
+class BasePageHTMLParser:
+    """Base class for parsing HTML contents of FreshPoint.cz pages.
+
+    This class provides common functionality for parsing HTML content.
+    It is not intended to be used directly but serves as a base class
+    for more specific parsers.
+    """
+
+    def __init__(self) -> None:
+        """Initialize a BasePageHTMLParser instance with an empty state."""
+        self._parse_datetime = datetime.now()
+        self._html_hash_sha1 = ''
+
+    @staticmethod
+    def _match_strings(needle: str, haystack: str, partial_match: bool) -> bool:
+        """Check if the needle string is contained in the haystack string
+        ignoring case and diacritics.
+
+        Args:
+            needle (str): String to search for.
+            haystack (str): String to search in.
+            partial_match (bool): If True, checks if `needle` is a substring of
+                `haystack` (`needle in haystack`). If False, checks for exact
+                match (`needle == haystack`). In both cases, the match is
+                case-insensitive and ignores diacritics.
+
+        Returns:
+            bool: True if the needle is found in the haystack, False otherwise.
+        """
+        op = operator.contains if partial_match else operator.eq
+        return op(normalize_text(haystack), normalize_text(needle))
+
+    def _update_html_hash(
+        self, page_html: Union[str, bytes, bytearray], force: bool
+    ) -> bool:
+        """Update the HTML hash if the page HTML has changed.
+
+        Args:
+            page_html (Union[str, bytes, bytearray]): The HTML contents of
+                the page.
+            force (bool): If True, forces the parser to re-parse the HTML
+                contents even if the hash of the contents matches the previous
+                hash.
+
+        Returns:
+            bool: True if the HTML hash was updated, False otherwise.
+        """
+        html_hash_sha1 = hash_text_sha1(page_html)
+        if force or html_hash_sha1 != self._html_hash_sha1:
+            self._html_hash_sha1 = html_hash_sha1
+            self._parse_datetime = datetime.now()
+            return True
+        return False
+
+
+class ProductPageHTMLParser(BasePageHTMLParser):
     """Parses HTML contents of a FreshPoint.cz product web page
     (`my.freshpoint.cz/device/product-list/<pageId>`). Allows extracting
     the product page data and searching for products by name or ID.
@@ -325,10 +380,10 @@ class ProductPageHTMLParser:
 
     def __init__(self) -> None:
         """Initialize a ProductPageHTMLParser instance with an empty state."""
+        super().__init__()
         self._bs4_parser = bs4.BeautifulSoup()
         self._product_page = ProductPage()
         self._all_products_found: bool = False
-        self._parse_datetime = datetime.now()
 
     def _find_product_data(self) -> bs4.ResultSet[bs4.Tag]:
         """Find all product data elements in the page HTML.
@@ -396,8 +451,7 @@ class ProductPageHTMLParser:
             if not value:
                 return False
             try:
-                op = operator.contains if partial_match else operator.eq
-                return op(normalize_text(value), normalize_text(name))
+                return self._match_strings(name, value, partial_match)
             except Exception as e:
                 raise ValueError(
                     f'Unable to parse the product name "{value}".'
@@ -534,7 +588,6 @@ class ProductPageHTMLParser:
         changes. If the data cannot be parsed, a ValueError is raised.
         """
         return ProductPage(
-            html_hash_sha1=self._product_page.html_hash_sha1,
             location_id=self.location_id,
             location_name=self.location_name,
             products={product.id_: product for product in self.products},
@@ -558,12 +611,10 @@ class ProductPageHTMLParser:
                 hash. If False, the parser will only re-parse the contents if
                 the hash has changed.
         """
-        html_hash_sha1 = hash_text_sha1(page_html)
-        if force or html_hash_sha1 != self._product_page.html_hash_sha1:
+        if self._update_html_hash(page_html, force):
             self._bs4_parser = bs4.BeautifulSoup(page_html, 'lxml')
-            self._product_page = ProductPage(html_hash_sha1=html_hash_sha1)
+            self._product_page = ProductPage()
             self._all_products_found = False
-            self._parse_datetime = datetime.now()
 
     def find_product_by_id(self, id_: Union[int, str]) -> Optional[Product]:
         """Find a single product based on the specified ID.
@@ -649,13 +700,9 @@ class ProductPageHTMLParser:
                 If no product is found, returns None. If multiple products
                 match, the first one is returned.
         """
-        if not isinstance(name, str):
-            raise TypeError(
-                f'Product name must be a string (got {type(name)}).'
-            )
-        op = operator.contains if partial_match else operator.eq
+        validate_str(name)
         product = self._product_page.find_product(
-            lambda pr: op(normalize_text(pr.name), normalize_text(name))
+            lambda pr: self._match_strings(name, pr.name, partial_match)
         )
         if product is not None:  # found in cache
             return product.model_copy(deep=True)  # copy for cache immutability
@@ -711,14 +758,10 @@ class ProductPageHTMLParser:
             List[Product]: Products matching the specified name. If no products
                 are found, returns an empty list.
         """
-        if not isinstance(name, str):
-            raise TypeError(
-                f'Product name must be a string (got {type(name)}).'
-            )
+        validate_str(name)
         if self._all_products_found:  # use cache if all products are parsed
-            op = operator.contains if partial_match else operator.eq
             iter_products = self._product_page.find_products(
-                lambda pr: op(normalize_text(pr.name), normalize_text(name))
+                lambda pr: self._match_strings(name, pr.name, partial_match)
             )
             # copy for cache immutability
             return [product.model_copy(deep=True) for product in iter_products]
@@ -748,27 +791,10 @@ def parse_product_page(page_html: Union[str, bytes, bytearray]) -> ProductPage:
     return parser.product_page
 
 
-class LocationPageHTMLParser:
-    """Parses HTML contents of a FreshPoint.cz location web page
-    (`my.freshpoint.cz`). Allows extracting the location page data and searching
-    for locations by name or ID.
-
-    Example:
-    ```python
-    parser = LocationPageHTMLParser()  # create a new parser instance
-
-    parser.parse(page_html=...)  # parse the HTML contents
-
-    location = parser.find_location_by_id(296)  # find a location by ID number
-    print(location)  # print the found location data
-
-    locations = parser.find_locations_by_name('praha')  # find locations by name
-    for location in locations:
-        print(location)
-
-    page = parser.location_page  # get the parsed location page data
-    print(len(page.locations))  # print the number of locations on the page
-    ```
+class LocationPageHTMLParser(BasePageHTMLParser):
+    """Parses HTML contents of a FreshPoint.cz `my.freshpoint.cz` location web
+    page. Allows extracting the location page data and searching for locations
+    by name or ID.
     """
 
     _RE_SEARCH_PATTERN_STR = re.compile(r'devices\s*=\s*("\[.*\]");')
@@ -776,6 +802,7 @@ class LocationPageHTMLParser:
 
     def __init__(self) -> None:
         """Initialize a LocationPageHTMLParser instance with an empty state."""
+        super().__init__()
         self._location_page = LocationPage()
 
     def _load_json(self, page_html: Union[str, bytes, bytearray]) -> List[Dict]:
@@ -820,8 +847,7 @@ class LocationPageHTMLParser:
             )
         return data
 
-    @staticmethod
-    def _parse_json(data: List[Dict]) -> LocationPage:
+    def _parse_json(self, data: List[Dict]) -> LocationPage:
         """Convert the extracted JSON data into a structured LocationPage model.
 
         Args:
@@ -830,10 +856,14 @@ class LocationPageHTMLParser:
         Returns:
             LocationPage: The structured location page model.
         """
-        data_processed = {
-            'locations': {item['prop']['id']: item['prop'] for item in data}
-        }
-        return LocationPage.model_validate(data_processed)
+        locations = {}
+        for item in data:
+            item['prop']['recordedAt'] = self._parse_datetime
+            locations[item['prop']['id']] = item['prop']
+        return LocationPage.model_validate({
+            'locations': locations,
+            'recordedAt': self._parse_datetime,
+        })
 
     @property
     def locations(self) -> List[Location]:
@@ -855,48 +885,23 @@ class LocationPageHTMLParser:
     ) -> None:
         """Parse HTML contents of a location page.
 
-        After parsing, the location data can be accessed using:
-        - `find_location_by_xx` parser methods;
-        - `locations` and `location_page` parser properties.
-
         Args:
             page_html (Union[str, bytes, bytearray]): HTML contents of
-                the location page.
+                the location page to be parsed.
             force (bool): If True, forces the parser to re-parse the HTML
                 contents even if the hash of the contents matches the previous
                 hash. If False, the parser will only re-parse the contents if
-                the hash has changed.
+                the hash has changed. Defaults to False.
         """
-        html_hash_sha1 = hash_text_sha1(page_html)
-        if force or html_hash_sha1 != self._location_page.html_hash_sha1:
+        if self._update_html_hash(page_html, force):
             json_data = self._load_json(page_html)
             self._location_page = self._parse_json(json_data)
-            self._location_page.html_hash_sha1 = html_hash_sha1
-
-    def find_location_by_id(self, id_: Union[int, str]) -> Optional[Location]:
-        """Find a location by its unique identifier.
-
-        Args:
-            id_ (int): The unique ID of the location.
-
-        Returns:
-            Optional[Location]: The location with the specified ID.
-                If the location is not found, returns None.
-        """
-        id_ = validate_id(id_)
-        try:
-            location = self._location_page.locations[id_]
-            return location.model_copy(deep=True)  # copy for cache immutability
-        except KeyError:
-            return None
 
     def find_location_by_name(
         self, name: str, partial_match: bool = True
     ) -> Optional[Location]:
         """Find a location by its name. The match is case-insensitive
         and can be partial.
-
-        # TODO: add examples
 
         Args:
             name (str): The name of the location to search for. Note that location
@@ -905,7 +910,7 @@ class LocationPageHTMLParser:
                 `partial_match` value.
             partial_match (bool): If True, the name match can be partial
                 (case-insensitive). If False, the name match must be exact
-                (case-insensitive).
+                (case-insensitive). Defaults to True.
 
         Raises:
             TypeError: If the location name is not a string.
@@ -915,26 +920,16 @@ class LocationPageHTMLParser:
                 If no location is found, returns None. If multiple locations
                 match, the first one is returned.
         """
-        if not isinstance(name, str):
-            raise TypeError(
-                f'Location name must be a string (got {type(name)}).'
-            )
-        # wrapper over `LocationPage.find_location` method
-        op = operator.contains if partial_match else operator.eq
-        location = self._location_page.find_location(
-            lambda loc: op(normalize_text(loc.name), normalize_text(name))
-        )
-        if location is None:
+        try:
+            return self.find_locations_by_name(name, partial_match)[0]
+        except IndexError:
             return None
-        return location.model_copy(deep=True)  # copy for cache immutability
 
     def find_locations_by_name(
         self, name: str, partial_match: bool = True
     ) -> List[Location]:
         """Find locations by their name. The match is case-insensitive
         and can be partial.
-
-        # TODO: add examples
 
         Args:
             name (str): The name of the location to filter by. Note that location
@@ -951,14 +946,10 @@ class LocationPageHTMLParser:
             List[Location]: Locations matching the specified name.
                 If no locations are found, returns an empty list.
         """
-        if not isinstance(name, str):
-            raise TypeError(
-                f'Location name must be a string (got {type(name)}).'
-            )
+        validate_str(name)
         # wrapper over `LocationPage.find_locations` method
-        op = operator.contains if partial_match else operator.eq
         locations = self._location_page.find_locations(
-            lambda loc: op(normalize_text(loc.name), normalize_text(name))
+            lambda loc: self._match_strings(name, loc.name, partial_match)
         )
         # copy for cache immutability
         return [location.model_copy(deep=True) for location in locations]

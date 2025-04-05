@@ -678,15 +678,6 @@ class BasePage(BaseModel):
 
     model_config = MODEL_CONFIG
 
-    html_hash_sha1: str = Field(
-        default='',
-        title='SHA-1 HTML Hash',
-        description=(
-            'Hexadecimal representation of the SHA-1 hash of the page HTML.'
-        ),
-    )
-    """Hexadecimal representation of the SHA-1 hash of the page HTML."""
-
     @staticmethod
     def _find_all_with_constraint(
         constraint: Union[Mapping[str, Any], Callable[[TBaseModel], bool]],
@@ -724,8 +715,9 @@ class BasePage(BaseModel):
             f"Got type '{type(constraint)}' instead."
         )
 
-    @staticmethod
+    @classmethod
     def _find_first_with_constraint(
+        cls,
         constraint: Union[Mapping[str, Any], Callable[[TBaseModel], bool]],
         data_items: Dict[int, TBaseModel],
     ) -> Optional[TBaseModel]:
@@ -744,9 +736,7 @@ class BasePage(BaseModel):
             Optional[TBaseModel]: The first data item that matches the given constraint,
                 or None if no such data item is found.
         """
-        return next(
-            BasePage._find_all_with_constraint(constraint, data_items), None
-        )
+        return next(cls._find_all_with_constraint(constraint, data_items), None)
 
 
 class ProductPage(BasePage):
