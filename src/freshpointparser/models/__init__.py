@@ -1,27 +1,33 @@
 """Pydantic models and other data containers of the `freshpointparser` package."""
 
-from ._models import (
-    DEFAULT_PRODUCT_PIC_URL,
+from ._base import logger
+from ._location import (
     Location,
-    LocationAttrs,
+    LocationAttrMapping,
     LocationCoordinates,
+    LocationField,
     LocationPage,
+)
+from ._product import (
+    DEFAULT_PRODUCT_PIC_URL,
     Product,
-    ProductAttrs,
+    ProductAttrMapping,
+    ProductField,
     ProductPage,
     ProductPriceUpdateInfo,
     ProductQuantityUpdateInfo,
-    logger,
 )
 
 __all__ = [
     'DEFAULT_PRODUCT_PIC_URL',
     'Location',
-    'LocationAttrs',
+    'LocationAttrMapping',
     'LocationCoordinates',
+    'LocationField',
     'LocationPage',
     'Product',
-    'ProductAttrs',
+    'ProductAttrMapping',
+    'ProductField',
     'ProductPage',
     'ProductPriceUpdateInfo',
     'ProductQuantityUpdateInfo',

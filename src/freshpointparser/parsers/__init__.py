@@ -1,10 +1,12 @@
-"""HTML product and location webpage parsers of the `freshpointparser` package."""
+"""FreshPoint webpage HTML parsers of the `freshpointparser` package."""
 
-from ._parsers import (
+from ._base import logger
+from ._location import (
     LocationPageHTMLParser,
-    ProductPageHTMLParser,
-    logger,
     parse_location_page,
+)
+from ._product import (
+    ProductPageHTMLParser,
     parse_product_page,
 )
 
