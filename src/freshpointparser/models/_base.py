@@ -79,7 +79,7 @@ class BaseRecord(BaseModel):
     recorded_at: datetime = Field(
         default_factory=datetime.now,
         title='Recorded At',
-        description='Datetime when the data has been recorded',
+        description='Datetime when the data has been recorded.',
     )
     """Datetime when the data has been recorded."""
 
@@ -244,7 +244,7 @@ TItemField = TypeVar(
 
 
 _NO_DEFAULT = object()
-"""Default value for the `default` argument in `collect_item_attr`."""
+"""Sentinel value for the ``default`` argument in ``getattr()``."""
 
 
 class BasePage(BaseRecord, Generic[TItem, TItemAttrMapping, TItemField]):
@@ -283,7 +283,7 @@ class BasePage(BaseRecord, Generic[TItem, TItemAttrMapping, TItemField]):
         with optional default fallback and optional uniqueness filtering.
 
         Tip: To convert the result from an iterator to a list, use
-        `list(page.iter_item_attr(...))`.
+        ``list(page.iter_item_attr(...))``.
 
         Args:
             attr (TItemField): String name of the attribute to retrieve from
@@ -321,17 +321,34 @@ class BasePage(BaseRecord, Generic[TItem, TItemAttrMapping, TItemField]):
         """Find a single item on the page that matches a constraint. If more
         than one item matches the constraint, the first one found is returned.
 
-        Note: `find_item(...)` is equivalent to `next(find_items(...), None)`.
+        Note: ``page.find_item(...)`` is equivalent to
+        ``next(page.find_items(...), None)``.
 
         Args:
             constraint (Union[TItemAttrs, Mapping[str, Any], Callable[[TBaseItem], bool]]):
-                Either a mapping where each key is an attribute (or property)
-                name of the item model and its value is the expected value, or
-                a callable that receives an item and returns True if it meets
-                the constraint.
+                One of the following.
+
+                - Mapping of string keys to arbitrary values.
+
+                The mapping should be a dictionary-like object where each key is
+                an attribute (or property) name of the item model and its value
+                is the expected value. If a key is not present in the item, this
+                item is skipped.
+
+                Example: ``{'name': 'foo'}`` will match items where
+                the `name` attribute of the item is equal to `'foo'`.
+
+                - Callable that receives an item instance and returns a boolean.
+
+                The callable, for example a function, should accept a single
+                argument, which is an instance of the item model, and return
+                a boolean value indicating whether the item meets the constraint.
+
+                Example: ``lambda item: 'foo' in item.name`` will match items
+                where the `name` attribute of the item contains the string
+                `'foo'`.
 
         Raises:
-            AttributeError: If an item attribute name is invalid.
             TypeError: If the constraint is invalid.
 
         Returns:
@@ -349,17 +366,33 @@ class BasePage(BaseRecord, Generic[TItem, TItemAttrMapping, TItemField]):
         """Find all items on the page that match a constraint.
 
         Tip: To convert the result from an iterator to a list, use
-        `list(page.find_items(...))`.
+        ``list(page.find_items(...))``.
 
         Args:
             constraint (Union[TItemAttrs, Mapping[str, Any], Callable[[TBaseItem], bool]]):
-                Either a mapping where each key is an attribute (or property)
-                name of the item model and its value is the expected value, or
-                a callable that receives an item and returns True if it meets
-                the constraint.
+                One of the following.
+
+                - Mapping of string keys to arbitrary values.
+
+                The mapping should be a dictionary-like object where each key is
+                an attribute (or property) name of the item model and its value
+                is the expected value. If a key is not present in the item, this
+                item is skipped.
+
+                Example: ``{'name': 'foo'}`` will match items where
+                the `name` attribute of the item is equal to `'foo'`.
+
+                - Callable that receives an item instance and returns a boolean.
+
+                The callable, for example a function, should accept a single
+                argument, which is an instance of the item model, and return
+                a boolean value indicating whether the item meets the constraint.
+
+                Example: ``lambda item: 'foo' in item.name`` will match items
+                where the `name` attribute of the item contains the string
+                `'foo'`.
 
         Raises:
-            AttributeError: If an item attribute name is invalid.
             TypeError: If the constraint is invalid.
 
         Returns:
@@ -371,8 +404,8 @@ class BasePage(BaseRecord, Generic[TItem, TItemAttrMapping, TItemField]):
 
         if isinstance(constraint, Mapping):
             return filter(
-                lambda data_item: all(
-                    getattr(data_item, attr) == value
+                lambda item: all(
+                    getattr(item, attr, _NO_DEFAULT) == value
                     for attr, value in constraint.items()
                 ),
                 self.items.values(),
