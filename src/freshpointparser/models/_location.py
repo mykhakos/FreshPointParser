@@ -12,27 +12,12 @@ from .._utils import (
     LOCATION_PAGE_URL,
     normalize_text,
 )
-from ._base import BaseItem, BaseItemAttrMapping, BaseItemField, BasePage
+from ._base import BaseItem, BaseItemField, BaseItemFieldMapping, BasePage
 
 if sys.version_info >= (3, 11):
     from typing import NamedTuple
 else:
     from typing_extensions import NamedTuple
-
-
-class LocationAttrMapping(BaseItemAttrMapping):
-    """Provides key names and types for location attributes."""
-
-    name: str
-    address: str
-    latitude: float
-    longitude: float
-    discount_rate: float
-    is_active: bool
-    is_suspended: bool
-    name_lowercase_ascii: str
-    address_lowercase_ascii: str
-    coordinates: Tuple[float, float]
 
 
 LocationField = Union[
@@ -52,6 +37,21 @@ LocationField = Union[
 ]
 
 
+class LocationFieldMapping(BaseItemFieldMapping):
+    """Provides key names and types for location attributes."""
+
+    name: str
+    address: str
+    latitude: float
+    longitude: float
+    discount_rate: float
+    is_active: bool
+    is_suspended: bool
+    name_lowercase_ascii: str
+    address_lowercase_ascii: str
+    coordinates: Tuple[float, float]
+
+
 class LocationCoordinates(NamedTuple):
     """Holds the latitude and longitude of a location as a pair of floats.
     Latitude is the first value in the pair, and longitude is the second
@@ -64,7 +64,7 @@ class LocationCoordinates(NamedTuple):
     """Longitude of the location."""
 
 
-class Location(BaseItem):
+class Location(BaseItem[LocationField]):
     """Data model of a FreshPoint location."""
 
     name: str = Field(
@@ -132,7 +132,7 @@ class Location(BaseItem):
         return LocationCoordinates(self.latitude, self.longitude)
 
 
-class LocationPage(BasePage[Location, LocationAttrMapping, LocationField]):
+class LocationPage(BasePage[Location, LocationField, LocationFieldMapping]):
     """Data model of a FreshPoint location webpage."""
 
     @property

@@ -35,22 +35,37 @@ else:
 logger = logging.getLogger('freshpointparser.models')
 """Logger of the `freshpointparser.models` package."""
 
+
+# default values for the type variables are only available in pydantic>=2.11,
+# https://github.com/pydantic/pydantic/pull/10789
+
+
 T = TypeVar('T')
+"""Type variable to annotate generic types."""
 
 
-class FieldDiff(NamedTuple):
-    """Holds a pair of differing attribute values between two models.
+TField = TypeVar(
+    'TField',
+    bound=str,
+    # default=str,
+)
+"""Type variable to annotate attribute names (e.g., a Literal string)."""
 
-    The first value `value_self` is the attribute value of the model that is
-    being compared to the other model, or None if the attribute is not present
-    in the model. The second value `value_other` is the attribute value of the
-    other model, or None if the attribute is not present in the other model.
-    """
 
-    value_self: Any
-    """Value of the attribute in the model being compared."""
-    value_other: Any
-    """Value of the attribute in the other model."""
+TFieldMapping = TypeVar(
+    'TFieldMapping',
+    bound=Mapping[str, Any],
+    # default=dict,
+)
+"""Type variable to annotate attribute mappings (e.g, a TypedDict)."""
+
+
+# region BaseRecord
+
+
+# str must be used here to allow using stings that are not specified as literals
+BaseRecordField: TypeAlias = Union[str, Literal['recorded_at']]
+"""Field names of the base record class."""
 
 
 class HasRecordedAt(Protocol):
@@ -60,15 +75,11 @@ class HasRecordedAt(Protocol):
     """Datetime when the data has been recorded."""
 
 
-class BaseRecordAttrMapping(TypedDict, total=False):
+class BaseRecordFieldMapping(TypedDict, total=False):
     """Provides key names and types for the base record class attributes."""
 
     recorded_at: datetime
     """Datetime when the data has been recorded."""
-
-
-BaseRecordField: TypeAlias = Union[str, Literal['recorded_at']]
-"""Field names of the base record class."""
 
 
 class BaseRecord(BaseModel):
@@ -147,17 +158,37 @@ class BaseRecord(BaseModel):
         return recorded_at_self > recorded_at_other
 
 
-class BaseItemAttrMapping(BaseRecordAttrMapping):
+# endregion BaseRecord
+
+# region BaseItem\
+
+
+BaseItemField: TypeAlias = Union[BaseRecordField, Literal['id_']]
+
+
+class BaseItemFieldMapping(BaseRecordFieldMapping):
     """Provides key names and types for the base item class attributes."""
 
     id_: int
     """Unique numeric identifier."""
 
 
-BaseItemField: TypeAlias = Union[BaseRecordField, Literal['id_']]
+class FieldDiff(NamedTuple):
+    """Holds a pair of differing attribute values between two models.
+
+    The first value `value_self` is the attribute value of the model that is
+    being compared to the other model, or None if the attribute is not present
+    in the model. The second value `value_other` is the attribute value of the
+    other model, or None if the attribute is not present in the other model.
+    """
+
+    value_self: Any
+    """Value of the attribute in the model being compared."""
+    value_other: Any
+    """Value of the attribute in the other model."""
 
 
-class BaseItem(BaseRecord):
+class BaseItem(BaseRecord, Generic[TField]):
     """Base data model of a FreshPoint item (listing)."""
 
     id_: int = Field(
@@ -169,7 +200,7 @@ class BaseItem(BaseRecord):
     )
     """Unique numeric identifier."""
 
-    def diff(self, other: BaseItem, **kwargs: Any) -> Dict[str, FieldDiff]:
+    def diff(self, other: BaseItem, **kwargs: Any) -> Dict[TField, FieldDiff]:
         """Compare this model with the other one to identify differences.
 
         This method compares the fields of this model with the fields of
@@ -195,7 +226,7 @@ class BaseItem(BaseRecord):
                 exclusion of the `recorded_at` field is suppressed.
 
         Returns:
-            Dict[str, DiffPair]: A dictionary with keys as field names and
+            Dict[TField, DiffPair]: A dictionary with string keys as field names and
                 values as namedtuples containing pairs of the differing values
                 between the two models. The first value is the one of this
                 model and is accessible as `value_self`, and the second value
@@ -209,7 +240,7 @@ class BaseItem(BaseRecord):
         self_asdict = self.model_dump(**kwargs)
         other_asdict = other.model_dump(**kwargs)
         # compare self to other
-        diff: Dict[str, FieldDiff] = {}
+        diff = {}
         for field, value_self in self_asdict.items():
             value_other = other_asdict.get(field, None)
             if value_self != value_other:
@@ -222,32 +253,22 @@ class BaseItem(BaseRecord):
         return diff
 
 
-# default values for the type variables are only available in pydantic>=2.11,
-# https://github.com/pydantic/pydantic/pull/10789
-
-
 TItem = TypeVar(
     'TItem',
     bound=BaseItem,
     # default=BaseItem,
 )
-TItemAttrMapping = TypeVar(
-    'TItemAttrMapping',
-    bound=BaseItemAttrMapping,
-    # default=BaseItemAttrMapping,
-)
-TItemField = TypeVar(
-    'TItemField',
-    bound=BaseItemField,
-    # default=BaseItemField,
-)
+
+# endregion BaseItem
+
+# region BasePage
 
 
 _NO_DEFAULT = object()
 """Sentinel value for the ``default`` argument in ``getattr()``."""
 
 
-class BasePage(BaseRecord, Generic[TItem, TItemAttrMapping, TItemField]):
+class BasePage(BaseRecord, Generic[TItem, TField, TFieldMapping]):
     """Base data model of a FreshPoint page."""
 
     items: Dict[int, TItem] = Field(
@@ -277,7 +298,7 @@ class BasePage(BaseRecord, Generic[TItem, TItemAttrMapping, TItemField]):
         return len(self.items)
 
     def iter_item_attr(
-        self, attr: TItemField, default: T = _NO_DEFAULT, unique: bool = True
+        self, attr: TField, default: T = _NO_DEFAULT, unique: bool = True
     ) -> Iterator[Union[Any, T]]:
         """Iterate over values of a specific attribute from the page's items,
         with optional default fallback and optional uniqueness filtering.
@@ -286,7 +307,7 @@ class BasePage(BaseRecord, Generic[TItem, TItemAttrMapping, TItemField]):
         ``list(page.iter_item_attr(...))``.
 
         Args:
-            attr (TItemField): String name of the attribute to retrieve from
+            attr (TField): String name of the attribute to retrieve from
                 each item on the page.
             default (T, optional): Value to use if the attribute is missing.
                 If not provided, missing attributes will raise AttributeError.
@@ -315,7 +336,7 @@ class BasePage(BaseRecord, Generic[TItem, TItemAttrMapping, TItemField]):
     def find_item(
         self,
         constraint: Union[
-            TItemAttrMapping, Mapping[str, Any], Callable[[TItem], bool]
+            TFieldMapping, Mapping[str, Any], Callable[[TItem], bool]
         ],
     ) -> Optional[TItem]:
         """Find a single item on the page that matches a constraint. If more
@@ -360,7 +381,7 @@ class BasePage(BaseRecord, Generic[TItem, TItemAttrMapping, TItemField]):
     def find_items(
         self,
         constraint: Union[
-            TItemAttrMapping, Mapping[str, Any], Callable[[TItem], bool]
+            TFieldMapping, Mapping[str, Any], Callable[[TItem], bool]
         ],
     ) -> Iterator[TItem]:
         """Find all items on the page that match a constraint.
@@ -415,3 +436,6 @@ class BasePage(BaseRecord, Generic[TItem, TItemAttrMapping, TItemField]):
             f'Constraint must be either a dictionary or a callable function. '
             f"Got type '{type(constraint)}' instead."
         )
+
+
+# endregion BasePage

@@ -17,7 +17,7 @@ from .._utils import (
     get_product_page_url,
     normalize_text,
 )
-from ._base import BaseItem, BaseItemAttrMapping, BaseItemField, BasePage
+from ._base import BaseItem, BaseItemField, BaseItemFieldMapping, BasePage
 
 DEFAULT_PRODUCT_PIC_URL = (
     r'https://images.weserv.nl/?url=http://freshpoint.freshserver.cz/'
@@ -98,29 +98,6 @@ class ProductPriceUpdateInfo:
     """
 
 
-class ProductAttrMapping(BaseItemAttrMapping):
-    """Provides key names and types for product attributes."""
-
-    name: str
-    category: str
-    is_vegetarian: bool
-    is_gluten_free: bool
-    is_promo: bool
-    quantity: int
-    price_full: float
-    price_curr: float
-    info: str
-    pic_url: str
-    location_id: int
-    name_lowercase_ascii: str
-    category_lowercase_ascii: str
-    discount_rate: float
-    is_on_sale: bool
-    is_available: bool
-    is_sold_out: bool
-    is_last_piece: bool
-
-
 ProductField = Union[
     BaseItemField,
     Literal[
@@ -146,7 +123,30 @@ ProductField = Union[
 ]
 
 
-class Product(BaseItem):
+class ProductFieldMapping(BaseItemFieldMapping):
+    """Provides key names and types for product attributes."""
+
+    name: str
+    category: str
+    is_vegetarian: bool
+    is_gluten_free: bool
+    is_promo: bool
+    quantity: int
+    price_full: float
+    price_curr: float
+    info: str
+    pic_url: str
+    location_id: int
+    name_lowercase_ascii: str
+    category_lowercase_ascii: str
+    discount_rate: float
+    is_on_sale: bool
+    is_available: bool
+    is_sold_out: bool
+    is_last_piece: bool
+
+
+class Product(BaseItem[ProductField]):
     """Data model of a FreshPoint product."""
 
     id_: int = Field(
@@ -222,9 +222,7 @@ class Product(BaseItem):
             'or nutritional values.'
         ),
     )
-    """Additional information about the product such as ingredients or
-    nutritional values.
-    """
+    """Additional information about the product such as ingredients or nutritional values."""
     pic_url: str = Field(
         default=DEFAULT_PRODUCT_PIC_URL,
         title='Illustrative Product Picture URL',
@@ -239,13 +237,13 @@ class Product(BaseItem):
             'the page ID or the device ID).'
         ),
     )
-    """Unique identifier or the product location (also known as the page ID
-    or the device ID).
-    """
+    """Unique identifier or the product location (also known as the page ID or the device ID)."""
 
     def model_post_init(self, __context: object) -> None:
         """Post-initialization hook for the product model. Do not call directly.
         Override with caution and call `super().model_post_init(__context)`.
+
+        :meta private:
 
         Args:
             __context (object): The context of the model instance.
@@ -396,7 +394,7 @@ class Product(BaseItem):
         )
 
 
-class ProductPage(BasePage[Product, ProductAttrMapping, ProductField]):
+class ProductPage(BasePage[Product, ProductField, ProductFieldMapping]):
     """Data model of a FreshPoint product webpage."""
 
     location_id: int = Field(
