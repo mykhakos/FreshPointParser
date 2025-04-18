@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import (
-    List,
     Literal,
     Union,
 )
@@ -424,29 +423,3 @@ class ProductPage(BasePage[Product, ProductField, ProductFieldMapping]):
     def location_name_lowercase_ascii(self) -> str:
         """Lowercase ASCII representation of the location name."""
         return normalize_text(self.location_name)
-
-    @property
-    def item_names(self) -> List[str]:
-        """Names of products listed on the page."""
-        return [pr.name for pr in self.items.values()]
-
-    @property
-    def item_names_lowercase_ascii(self) -> List[str]:
-        """Names of products listed on the page normalized to
-        lowercase ASCII.
-        """
-        return [pr.name_lowercase_ascii for pr in self.items.values()]
-
-    @property
-    def item_categories(self) -> List[str]:
-        """Unique product categories listed on the page."""
-        return list(set(pr.category for pr in self.items.values()))
-
-    @property
-    def item_categories_lowercase_ascii(self) -> List[str]:
-        """Unique product categories listed on the page normalized to
-        lowercase ASCII.
-        """
-        return list(
-            set(pr.category_lowercase_ascii for pr in self.items.values())
-        )
