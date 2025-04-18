@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
-import sys
+from collections.abc import Mapping
 from datetime import datetime
+from enum import Enum
 from typing import (
     Any,
     Callable,
@@ -11,7 +12,6 @@ from typing import (
     Iterator,
     List,
     Literal,
-    Mapping,
     Optional,
     Protocol,
     TypeAlias,
@@ -26,11 +26,6 @@ from pydantic import (
     Field,
 )
 from pydantic.alias_generators import to_camel
-
-if sys.version_info >= (3, 11):
-    from typing import NamedTuple
-else:
-    from typing_extensions import NamedTuple
 
 logger = logging.getLogger('freshpointparser.models')
 """Logger of the `freshpointparser.models` package."""
@@ -58,6 +53,126 @@ TFieldMapping = TypeVar(
     # default=dict,
 )
 """Type variable to annotate attribute mappings (e.g, a TypedDict)."""
+
+
+class DynamicFieldsModel(BaseModel):
+    """Wraps arbitrary fields in a model to capture unknown or unstructured
+    data.
+    """
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        extra='allow',
+        arbitrary_types_allowed=True,
+    )
+
+
+# region Diff
+
+
+class EDiffType(str, Enum):
+    """Enumeration of the types of differences between two items."""
+
+    CREATED = 'Created'
+    """The item has been created."""
+
+    UPDATED = 'Updated'
+    """The item has been updated."""
+
+    DELETED = 'Deleted'
+    """The item has been deleted."""
+
+
+TSelf = TypeVar('TSelf')
+TOther = TypeVar('TOther')
+
+
+class DiffValues(TypedDict, Generic[TSelf, TOther]):
+    left: TSelf
+    right: TOther
+
+
+class FieldDiff(TypedDict, Generic[TSelf, TOther]):
+    type: EDiffType
+    values: DiffValues[TSelf, TOther]
+
+
+FieldDiffMapping: TypeAlias = Dict[TField, FieldDiff[Any, Any]]
+
+
+class ModelDiff(TypedDict, Generic[TField]):
+    type: EDiffType
+    diff: FieldDiffMapping[TField]
+
+
+def model_diff(
+    left: BaseModel, right: BaseModel, **kwargs: Any
+) -> FieldDiffMapping[TField]:
+    """Compare this model with the other one to identify differences.
+
+    This method compares the fields of this model with the fields of
+    another model instance to identify which fields have different
+    values. If a field is not present in one of the models, it is considered
+    to have a value of None in that model.
+
+    By default, the `recorded_at` field is excluded from comparison. However,
+    if any keyword arguments (`kwargs`) are provided, *no default exclusions
+    are applied*, and the caller is responsible for specifying exclusions
+    explicitly. If you provide additional keyword arguments and still want
+    to exclude the `recorded_at` field, set `exclude={'recorded_at'}` or
+    equivalent in `kwargs`.
+
+    The data is serialized according to the models' configurations
+    using the `model_dump` method.
+
+    Args:
+        left (model): The model to compare from.
+        right (model): The model to compare to.
+        **kwargs: Additional keyword arguments to pass to the `model_dump`
+            calls to control the serialization process, such as 'exclude',
+            'include', 'by_alias', and others. If provided, the default
+            exclusion of the `recorded_at` field is suppressed.
+
+    Returns:
+        FieldDiffMapping: A dictionary with string keys as field names
+        and values as namedtuples containing pairs of the differing values
+        between the two models. The first value is the one of this
+        model and is accessible as `value_left`, and the second value
+        is the one of the other model and is accessible as `value_right`.
+        If a field is present in one model but not in the other,
+        the corresponding value in the namedtuple is set to None.
+    """
+    left_asdict = left.model_dump(**kwargs)
+    right_asdict = right.model_dump(**kwargs)
+    diff = {}
+    # compare left to right
+    for field, value_left in left_asdict.items():
+        if field in right_asdict:
+            diff_type = EDiffType.UPDATED
+            value_right = right_asdict[field]
+        else:
+            diff_type = EDiffType.DELETED
+            value_right = None
+        if value_left != value_right:
+            diff[field] = FieldDiff(
+                type=diff_type,
+                values=DiffValues(left=value_left, right=value_right),
+            )
+    # compare right to left
+    if right_asdict.keys() != left_asdict.keys():
+        for field, value_right in right_asdict.items():
+            if field not in left_asdict:
+                diff_type = EDiffType.CREATED
+                value_left = None
+                diff[field] = FieldDiff(
+                    type=diff_type,
+                    values=DiffValues(left=value_left, right=value_right),
+                )
+    return diff
+
+
+# endregion Diff
 
 
 # region BaseRecord
@@ -160,8 +275,7 @@ class BaseRecord(BaseModel):
 
 # endregion BaseRecord
 
-# region BaseItem\
-
+# region BaseItem
 
 BaseItemField: TypeAlias = Union[BaseRecordField, Literal['id_']]
 
@@ -171,21 +285,6 @@ class BaseItemFieldMapping(BaseRecordFieldMapping):
 
     id_: int
     """Unique numeric identifier."""
-
-
-class FieldDiff(NamedTuple):
-    """Holds a pair of differing attribute values between two models.
-
-    The first value `value_self` is the attribute value of the model that is
-    being compared to the other model, or None if the attribute is not present
-    in the model. The second value `value_other` is the attribute value of the
-    other model, or None if the attribute is not present in the other model.
-    """
-
-    value_self: Any
-    """Value of the attribute in the model being compared."""
-    value_other: Any
-    """Value of the attribute in the other model."""
 
 
 class BaseItem(BaseRecord, Generic[TField]):
@@ -200,7 +299,7 @@ class BaseItem(BaseRecord, Generic[TField]):
     )
     """Unique numeric identifier."""
 
-    def diff(self, other: BaseItem, **kwargs: Any) -> Dict[TField, FieldDiff]:
+    def diff(self, other: BaseItem, **kwargs: Any) -> FieldDiffMapping[TField]:
         """Compare this model with the other one to identify differences.
 
         This method compares the fields of this model with the fields of
@@ -226,31 +325,18 @@ class BaseItem(BaseRecord, Generic[TField]):
                 exclusion of the `recorded_at` field is suppressed.
 
         Returns:
-            Dict[TField, DiffPair]: A dictionary with string keys as field names and
-                values as namedtuples containing pairs of the differing values
-                between the two models. The first value is the one of this
-                model and is accessible as `value_self`, and the second value
-                is the one of the other model and is accessible as `value_other`.
-                If a field is present in one model but not in the other,
-                the corresponding value in the namedtuple is set to None.
+            FieldDiffMapping: A dictionary with string keys as field names
+            and values as namedtuples containing pairs of the differing values
+            between the two models. The first value is the one of this
+            model and is accessible as `value_left`, and the second value
+            is the one of the other model and is accessible as `value_right`.
+            If a field is present in one model but not in the other,
+            the corresponding value in the namedtuple is set to None.
         """
         # get self's and other's data, optionally remove the timestamps
         if not kwargs:
-            kwargs['exclude'] = {'recorded_at'}
-        self_asdict = self.model_dump(**kwargs)
-        other_asdict = other.model_dump(**kwargs)
-        # compare self to other
-        diff = {}
-        for field, value_self in self_asdict.items():
-            value_other = other_asdict.get(field, None)
-            if value_self != value_other:
-                diff[field] = FieldDiff(value_self, value_other)
-        # compare other to self (may be relevant for subclasses)
-        if other_asdict.keys() != self_asdict.keys():
-            for field, value_other in other_asdict.items():
-                if field not in self_asdict:
-                    diff[field] = FieldDiff(None, value_other)
-        return diff
+            kwargs['exclude'] = ('recorded_at',)
+        return model_diff(self, other, **kwargs)
 
 
 TItem = TypeVar(
@@ -296,6 +382,36 @@ class BasePage(BaseRecord, Generic[TItem, TField, TFieldMapping]):
     def item_count(self) -> int:
         """Total number of items on the page."""
         return len(self.items)
+
+    def item_diff(
+        self, other: BasePage, **kwargs: Any
+    ) -> Dict[int, ModelDiff[TField]]:
+        item_missing = DynamicFieldsModel()
+        diff = {}
+        # compare self to other
+        for item_id, item_self in self.items.items():
+            item_other = other.items.get(item_id, None)
+            if item_other is None:
+                diff[item_id] = ModelDiff(
+                    type=EDiffType.DELETED,
+                    diff=model_diff(item_self, item_missing, **kwargs),
+                )
+            else:
+                item_diff = model_diff(item_self, item_other, **kwargs)
+                if item_diff:
+                    diff[item_id] = ModelDiff(
+                        type=EDiffType.UPDATED,
+                        diff=item_diff,
+                    )
+        # compare other to self
+        if other.items.keys() != self.items.keys():
+            for item_id, item_other in other.items.items():
+                if item_id not in self.items:
+                    diff[item_id] = ModelDiff(
+                        type=EDiffType.CREATED,
+                        diff=model_diff(item_missing, item_other, **kwargs),
+                    )
+        return diff
 
     def iter_item_attr(
         self, attr: TField, default: T = _NO_DEFAULT, unique: bool = True
