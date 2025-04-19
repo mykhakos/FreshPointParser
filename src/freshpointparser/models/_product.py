@@ -1,22 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import (
-    Literal,
-    Union,
-)
 
-from pydantic import (
-    Field,
-    NonNegativeFloat,
-    NonNegativeInt,
-)
+from pydantic import Field, NonNegativeFloat, NonNegativeInt
 
-from .._utils import (
-    get_product_page_url,
-    normalize_text,
-)
-from ._base import BaseItem, BaseItemField, BaseItemFieldMapping, BasePage
+from .._utils import get_product_page_url, normalize_text
+from ._base import BaseItem, BasePage
 
 DEFAULT_PRODUCT_PIC_URL = (
     r'https://images.weserv.nl/?url=http://freshpoint.freshserver.cz/'
@@ -97,55 +86,7 @@ class ProductPriceUpdateInfo:
     """
 
 
-ProductField = Union[
-    BaseItemField,
-    Literal[
-        'name',
-        'category',
-        'is_vegetarian',
-        'is_gluten_free',
-        'is_promo',
-        'quantity',
-        'price_full',
-        'price_curr',
-        'info',
-        'pic_url',
-        'location_id',
-        'name_lowercase_ascii',
-        'category_lowercase_ascii',
-        'discount_rate',
-        'is_on_sale',
-        'is_available',
-        'is_sold_out',
-        'is_last_piece',
-    ],
-]
-
-
-class ProductFieldMapping(BaseItemFieldMapping):
-    """Provides key names and types for product attributes."""
-
-    name: str
-    category: str
-    is_vegetarian: bool
-    is_gluten_free: bool
-    is_promo: bool
-    quantity: int
-    price_full: float
-    price_curr: float
-    info: str
-    pic_url: str
-    location_id: int
-    name_lowercase_ascii: str
-    category_lowercase_ascii: str
-    discount_rate: float
-    is_on_sale: bool
-    is_available: bool
-    is_sold_out: bool
-    is_last_piece: bool
-
-
-class Product(BaseItem[ProductField]):
+class Product(BaseItem):
     """Data model of a FreshPoint product."""
 
     id_: int = Field(
@@ -393,7 +334,7 @@ class Product(BaseItem[ProductField]):
         )
 
 
-class ProductPage(BasePage[Product, ProductField, ProductFieldMapping]):
+class ProductPage(BasePage[Product]):
     """Data model of a FreshPoint product webpage."""
 
     location_id: int = Field(

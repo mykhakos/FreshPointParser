@@ -1,55 +1,16 @@
 from __future__ import annotations
 
 import sys
-from typing import Literal, Tuple, Union
 
-from pydantic import (
-    AliasChoices,
-    Field,
-)
+from pydantic import AliasChoices, Field
 
-from .._utils import (
-    LOCATION_PAGE_URL,
-    normalize_text,
-)
-from ._base import BaseItem, BaseItemField, BaseItemFieldMapping, BasePage
+from .._utils import LOCATION_PAGE_URL, normalize_text
+from ._base import BaseItem, BasePage
 
 if sys.version_info >= (3, 11):
     from typing import NamedTuple
 else:
     from typing_extensions import NamedTuple
-
-
-LocationField = Union[
-    BaseItemField,
-    Literal[
-        'name',
-        'address',
-        'latitude',
-        'longitude',
-        'discount_rate',
-        'is_active',
-        'is_suspended',
-        'name_lowercase_ascii',
-        'address_lowercase_ascii',
-        'coordinates',
-    ],
-]
-
-
-class LocationFieldMapping(BaseItemFieldMapping):
-    """Provides key names and types for location attributes."""
-
-    name: str
-    address: str
-    latitude: float
-    longitude: float
-    discount_rate: float
-    is_active: bool
-    is_suspended: bool
-    name_lowercase_ascii: str
-    address_lowercase_ascii: str
-    coordinates: Tuple[float, float]
 
 
 class LocationCoordinates(NamedTuple):
@@ -64,7 +25,7 @@ class LocationCoordinates(NamedTuple):
     """Longitude of the location."""
 
 
-class Location(BaseItem[LocationField]):
+class Location(BaseItem):
     """Data model of a FreshPoint location."""
 
     name: str = Field(
@@ -132,7 +93,7 @@ class Location(BaseItem[LocationField]):
         return LocationCoordinates(self.latitude, self.longitude)
 
 
-class LocationPage(BasePage[Location, LocationField, LocationFieldMapping]):
+class LocationPage(BasePage[Location]):
     """Data model of a FreshPoint location webpage."""
 
     @property
