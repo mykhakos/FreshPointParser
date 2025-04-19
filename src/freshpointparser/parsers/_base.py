@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import operator
+from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import (
     Union,
@@ -12,7 +13,7 @@ logger = logging.getLogger('freshpointparser.parsers')
 """Logger of the `freshpointparser.parsers` package."""
 
 
-class BasePageHTMLParser:
+class BasePageHTMLParser(ABC):
     """Base class for parsing HTML content of FreshPoint.cz pages.
 
     This class provides common functionality for parsing HTML content.
@@ -50,12 +51,12 @@ class BasePageHTMLParser:
         return op(normalize_text(haystack), normalize_text(needle))
 
     @staticmethod
-    def _hash_html_sha1(page_html: Union[str, bytes, bytearray]) -> str:
+    def _hash_html_sha1(page_html: Union[str, bytes]) -> str:
         """Hash the given text using the SHA-1 algorithm and return the
         hexadecimal representation of the hash.
 
         Args:
-            page_html (Union[str, bytes, bytearray]): The text to be hashed.
+            page_html (Union[str, bytes]): The text to be hashed.
 
         Returns:
             str: The hexadecimal representation of the SHA-1 hash of the text.
@@ -65,12 +66,12 @@ class BasePageHTMLParser:
         return hashlib.sha1(page_html).hexdigest()  # noqa: S324
 
     def _update_html_hash(
-        self, page_html: Union[str, bytes, bytearray], force: bool
+        self, page_html: Union[str, bytes], force: bool
     ) -> bool:
         """Update the HTML hash if the page HTML has changed.
 
         Args:
-            page_html (Union[str, bytes, bytearray]): The HTML content of
+            page_html (Union[str, bytes]): The HTML content of
                 the page.
             force (bool): If True, forces the parser to re-parse the HTML
                 content even if the hash of the content matches the previous
@@ -86,3 +87,25 @@ class BasePageHTMLParser:
             logger.debug('HTML hash updated: %s', html_hash_sha1)
             return True
         return False
+
+    @abstractmethod
+    def _parse_page_html(self, page_html: Union[str, bytes]) -> None:
+        """Parse the HTML content of the page.
+
+        Args:
+            page_html (Union[str, bytes]): HTML content of the page.
+        """
+        pass
+
+    def parse(self, page_html: Union[str, bytes], force: bool = False) -> None:
+        """Parse page HTML content.
+
+        Args:
+            page_html (Union[str, bytes]): HTML content of the page to parse.
+            force (bool): If True, forces the parser to re-parse the HTML
+                content even if the hash of the content matches the previous
+                hash. If False, the parser will only re-parse the content if
+                the hash has changed. Defaults to False.
+        """
+        if self._update_html_hash(page_html, force):
+            self._parse_page_html(page_html)

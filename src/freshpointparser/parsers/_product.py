@@ -305,6 +305,20 @@ class ProductPageHTMLParser(BasePageHTMLParser):
         self._page = ProductPage()
         self._all_products_found: bool = False
 
+    def _parse_page_html(self, page_html: Union[str, bytes]) -> None:
+        """Parse HTML content of a product page.
+
+        This method initializes the BeautifulSoup parser with the provided
+        HTML content and invalidates the cached page data.
+
+        Args:
+            page_html (Union[str, bytes]): HTML content of
+                the product page to parse.
+        """
+        self._bs4_parser = bs4.BeautifulSoup(page_html, 'lxml')
+        self._page = ProductPage()
+        self._all_products_found = False
+
     def _find_product_data(self) -> bs4.ResultSet[bs4.Tag]:
         """Find all product data elements in the page HTML.
 
@@ -392,7 +406,7 @@ class ProductPageHTMLParser(BasePageHTMLParser):
 
         Returns:
             Product: An instance of the Product model
-                containitng the parsed and validated data.
+                containing the parsed and validated data.
         """
         price_full, price_curr = ProductHTMLParser.find_price(data)
         return Product(
@@ -515,24 +529,6 @@ class ProductPageHTMLParser(BasePageHTMLParser):
             location_name=self.location_name,
         )
 
-    def parse(
-        self, page_html: Union[str, bytes, bytearray], force: bool = False
-    ) -> None:
-        """Parse HTML content of a product page.
-
-        Args:
-            page_html (Union[str, bytes, bytearray]): HTML content of
-                the product page to parse.
-            force (bool): If True, forces the parser to re-parse the HTML
-                content even if the hash of the content matches the previous
-                hash. If False, the parser will only re-parse the content if
-                the hash has changed. Defaults to False.
-        """
-        if self._update_html_hash(page_html, force):
-            self._bs4_parser = bs4.BeautifulSoup(page_html, 'lxml')
-            self._page = ProductPage()
-            self._all_products_found = False
-
     def find_product_by_id(self, id_: Union[int, str]) -> Optional[Product]:
         """Find a single product based on the specified ID.
 
@@ -635,14 +631,13 @@ class ProductPageHTMLParser(BasePageHTMLParser):
         return products
 
 
-def parse_product_page(page_html: Union[str, bytes, bytearray]) -> ProductPage:
+def parse_product_page(page_html: Union[str, bytes]) -> ProductPage:
     """Parse the HTML content of a FreshPoint product webpage
     `my.freshpoint.cz/device/product-list/<pageId>` to a structured
     ProductPage model.
 
     Args:
-        page_html (Union[str, bytes, bytearray]): HTML content of the product
-            page to parse.
+        page_html (Union[str, bytes]): HTML content of the product page to parse.
 
     Returns:
         ProductPage: Parsed and validated product page data.

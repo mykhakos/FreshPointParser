@@ -32,7 +32,7 @@ class LocationPageHTMLParser(BasePageHTMLParser):
         super().__init__()
         self._page = LocationPage()
 
-    def _load_json(self, page_html: Union[str, bytes, bytearray]) -> List[Dict]:
+    def _load_json(self, page_html: Union[str, bytes]) -> List[Dict]:
         r"""Extract and parse the JSON location data embedded in the HTML.
 
         The location data is stored in the page HTML as a JavaScript string
@@ -44,7 +44,7 @@ class LocationPageHTMLParser(BasePageHTMLParser):
         (a JSON string within a JavaScript string).
 
         Args:
-            page_html (Union[str, bytes, bytearray]): The HTML content of the
+            page_html (Union[str, bytes]): The HTML content of the
                 location page.
 
         Raises:
@@ -116,6 +116,19 @@ class LocationPageHTMLParser(BasePageHTMLParser):
             'items': locations,
         })
 
+    def _parse_page_html(self, page_html: Union[str, bytes]) -> None:
+        """Parse HTML content of a location page.
+
+        This method is fully parses the HTML content to a structured
+        LocationPage model.
+
+        Args:
+            page_html (Union[str, bytes]): HTML content of
+                the location page to parse.
+        """
+        json_data = self._load_json(page_html)
+        self._page = self._parse_json(json_data)
+
     @property
     def locations(self) -> List[Location]:
         """All locations parsed from the page HTML content."""
@@ -127,23 +140,6 @@ class LocationPageHTMLParser(BasePageHTMLParser):
         """The location page data parsed from the HTML content."""
         # page is fully parsed on `parse` call. Copy for cache immutability
         return self._page.model_copy(deep=True)
-
-    def parse(
-        self, page_html: Union[str, bytes, bytearray], force: bool = False
-    ) -> None:
-        """Parse HTML content of a location page.
-
-        Args:
-            page_html (Union[str, bytes, bytearray]): HTML content of
-                the location page to parse.
-            force (bool): If True, forces the parser to re-parse the HTML
-                content even if the hash of the content matches the previous
-                hash. If False, the parser will only re-parse the content if
-                the hash has changed. Defaults to False.
-        """
-        if self._update_html_hash(page_html, force):
-            json_data = self._load_json(page_html)
-            self._page = self._parse_json(json_data)
 
     def find_location_by_id(self, id_: Union[int, str]) -> Optional[Location]:
         """Find a single location based on the specified ID.
@@ -227,15 +223,12 @@ class LocationPageHTMLParser(BasePageHTMLParser):
         return [location.model_copy(deep=True) for location in locations]
 
 
-def parse_location_page(
-    page_html: Union[str, bytes, bytearray],
-) -> LocationPage:
+def parse_location_page(page_html: Union[str, bytes]) -> LocationPage:
     """Parse the HTML content of a FreshPoint location webpage
     `my.freshpoint.cz` to a structured LocationPage model.
 
     Args:
-        page_html (Union[str, bytes, bytearray]): HTML content of the location
-            page to parse.
+        page_html (Union[str, bytes]): HTML content of the location page to parse.
 
     Returns:
         LocationPage: Parsed and validated location page data.
