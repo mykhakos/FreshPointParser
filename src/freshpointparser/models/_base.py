@@ -71,77 +71,80 @@ class DynamicFieldsModel(BaseModel):
 # region Diff
 
 
-class EDiffType(str, Enum):
-    """Enumeration of the types of differences between two items."""
+class DiffType(str, Enum):
+    """String enumeration of the types of differences between two items."""
 
     CREATED = 'Created'
-    """The item has been created."""
+    """The left item is missing"""
 
     UPDATED = 'Updated'
     """The item has been updated."""
 
     DELETED = 'Deleted'
-    """The item has been deleted."""
+    """The right item is missing."""
 
 
-TSelf = TypeVar('TSelf')
-TOther = TypeVar('TOther')
+TLeft = TypeVar('TLeft')
+"""Type variable to annotate the left value in a difference."""
+TRight = TypeVar('TRight')
+"""Type variable to annotate the right value in a difference."""
 
 
-class DiffValues(TypedDict, Generic[TSelf, TOther]):
-    left: TSelf
-    right: TOther
+class DiffValues(TypedDict, Generic[TLeft, TRight]):
+    """Typed dictionary to represent the left and the right value in
+    a difference comparison.
+    """
+
+    left: TLeft
+    right: TRight
 
 
-class FieldDiff(TypedDict, Generic[TSelf, TOther]):
-    type: EDiffType
-    values: DiffValues[TSelf, TOther]
+class FieldDiff(TypedDict, Generic[TLeft, TRight]):
+    """Typed dictionary to represent the difference between two fields
+    in a model comparison.
+    """
+
+    type: DiffType
+    values: DiffValues[TLeft, TRight]
 
 
 FieldDiffMapping: TypeAlias = Dict[TField, FieldDiff[Any, Any]]
+"""Mapping of field names to their differences."""
 
 
 class ModelDiff(TypedDict, Generic[TField]):
-    type: EDiffType
+    """Typed dictionary to represent the difference between two models
+    in a model comparison.
+    """
+
+    type: DiffType
     diff: FieldDiffMapping[TField]
+
+
+ModelDiffMapping: TypeAlias = Dict[int, ModelDiff[TField]]
+"""Mapping of item IDs to their differences."""
 
 
 def model_diff(
     left: BaseModel, right: BaseModel, **kwargs: Any
 ) -> FieldDiffMapping[TField]:
-    """Compare this model with the other one to identify differences.
+    """Compare left model with the right model to identify which model fields
+    have different values. If a field is not present in one of the models,
+    its value is considered to be None in that model.
 
-    This method compares the fields of this model with the fields of
-    another model instance to identify which fields have different
-    values. If a field is not present in one of the models, it is considered
-    to have a value of None in that model.
-
-    By default, the `recorded_at` field is excluded from comparison. However,
-    if any keyword arguments (`kwargs`) are provided, *no default exclusions
-    are applied*, and the caller is responsible for specifying exclusions
-    explicitly. If you provide additional keyword arguments and still want
-    to exclude the `recorded_at` field, set `exclude={'recorded_at'}` or
-    equivalent in `kwargs`.
-
-    The data is serialized according to the models' configurations
-    using the `model_dump` method.
+    The data is serialized according to the models' configurations by calling
+    the `model_dump` method on both models.
 
     Args:
         left (model): The model to compare from.
         right (model): The model to compare to.
         **kwargs: Additional keyword arguments to pass to the `model_dump`
             calls to control the serialization process, such as 'exclude',
-            'include', 'by_alias', and others. If provided, the default
-            exclusion of the `recorded_at` field is suppressed.
+            'include', 'by_alias', and others.
 
     Returns:
-        FieldDiffMapping: A dictionary with string keys as field names
-        and values as namedtuples containing pairs of the differing values
-        between the two models. The first value is the one of this
-        model and is accessible as `value_left`, and the second value
-        is the one of the other model and is accessible as `value_right`.
-        If a field is present in one model but not in the other,
-        the corresponding value in the namedtuple is set to None.
+        FieldDiffMapping: A dictionary mapping field names to their differences,
+        each containing the diff type and a pair of left/right values.
     """
     left_asdict = left.model_dump(**kwargs)
     right_asdict = right.model_dump(**kwargs)
@@ -149,10 +152,10 @@ def model_diff(
     # compare left to right
     for field, value_left in left_asdict.items():
         if field in right_asdict:
-            diff_type = EDiffType.UPDATED
+            diff_type = DiffType.UPDATED
             value_right = right_asdict[field]
         else:
-            diff_type = EDiffType.DELETED
+            diff_type = DiffType.DELETED
             value_right = None
         if value_left != value_right:
             diff[field] = FieldDiff(
@@ -163,7 +166,7 @@ def model_diff(
     if right_asdict.keys() != left_asdict.keys():
         for field, value_right in right_asdict.items():
             if field not in left_asdict:
-                diff_type = EDiffType.CREATED
+                diff_type = DiffType.CREATED
                 value_left = None
                 diff[field] = FieldDiff(
                     type=diff_type,
@@ -300,40 +303,65 @@ class BaseItem(BaseRecord, Generic[TField]):
     """Unique numeric identifier."""
 
     def diff(self, other: BaseItem, **kwargs: Any) -> FieldDiffMapping[TField]:
-        """Compare this model with the other one to identify differences.
+        """Compare this item with another one to identify which item fields
+        have different values.
 
-        This method compares the fields of this model with the fields of
-        another model instance to identify which fields have different
-        values. If a field is not present in one of the models, it is considered
-        to have a value of None in that model.
+        If a field exists in both items but its values differ, it is
+        marked as *Updated*. If the field is missing in this item, it is
+        considered to be *Created*, and if it is missing in the other item, it
+        is considered to be *Deleted*. If the field is not present in any of
+        the items, its value is considered to be ``None``.
 
-        By default, the `recorded_at` field is excluded from comparison. However,
-        if any keyword arguments (`kwargs`) are provided, *no default exclusions
-        are applied*, and the caller is responsible for specifying exclusions
+        By default, the `recorded_at` field is excluded from comparison.
+        However, **if any keyword arguments are provided, no default exclusions
+        are applied**, and the caller is responsible for specifying exclusions
         explicitly. If you provide additional keyword arguments and still want
-        to exclude the `recorded_at` field, set `exclude={'recorded_at'}` or
-        equivalent in `kwargs`.
+        to exclude the `recorded_at` field, set ``exclude={'recorded_at'}`` or
+        equivalent in ``kwargs``.
 
-        The data is serialized according to the models' configurations
-        using the `model_dump` method.
+        The data is serialized according to the item models' configurations
+        using ``model_dump``.
 
         Args:
-            other (model): The model to compare against.
-            **kwargs: Additional keyword arguments to pass to the `model_dump`
-                calls to control the serialization process, such as 'exclude',
-                'include', 'by_alias', and others. If provided, the default
-                exclusion of the `recorded_at` field is suppressed.
+            other (BaseItem): The item to compare against.
+            **kwargs: Additional keyword arguments passed to each item model's
+                ``model_dump`` call, such as `exclude`, `include`,
+                `by_alias`, and others. If provided, the default
+                exclusion of the `recorded_at` field is suppressed!
 
         Returns:
-            FieldDiffMapping: A dictionary with string keys as field names
-            and values as namedtuples containing pairs of the differing values
-            between the two models. The first value is the one of this
-            model and is accessible as `value_left`, and the second value
-            is the one of the other model and is accessible as `value_right`.
-            If a field is present in one model but not in the other,
-            the corresponding value in the namedtuple is set to None.
+            FieldDiffMapping[TField]: A dictionary mapping field names to their
+            corresponding differences.
+
+            Each dictionary value is a dictionary (FieldDiff) containing
+            the `type` and `values` keys.
+
+            - `type` (DiffType): An enumeration value indicating the type of \
+            the difference (`Created`, `Updated`, or `Deleted`).
+
+            - `values` (DiffValues): A pair of values - `left` from this model \
+            and `right` from the other model. If a field is missing in one model, \
+            its value will be ``None``.
+
+            FieldDiffMapping structure example:
+
+            >>> from freshpointparser.models.annotations import DiffType
+            >>> {
+            ...     'field_common': {
+            ...         'type': DiffType.UPDATED,
+            ...         'values': {'left': 12.5, 'right': 15.0},
+            ...     },
+            ...     'field_only_in_this': {
+            ...         'type': DiffType.CREATED,
+            ...         'values': {'left': 'foo', 'right': None},
+            ...     },
+            ...     'field_only_in_other': {
+            ...         'type': DiffType.DELETED,
+            ...         'values': {'left': None, 'right': 'bar'},
+            ...     },
+            ... }
+
         """
-        # get self's and other's data, optionally remove the timestamps
         if not kwargs:
             kwargs['exclude'] = ('recorded_at',)
         return model_diff(self, other, **kwargs)
@@ -383,9 +411,79 @@ class BasePage(BaseRecord, Generic[TItem, TField, TFieldMapping]):
         """Total number of items on the page."""
         return len(self.items)
 
-    def item_diff(
-        self, other: BasePage, **kwargs: Any
-    ) -> Dict[int, ModelDiff[TField]]:
+    def item_diff(self, other: BasePage, **kwargs: Any) -> ModelDiffMapping:
+        """Compare items between this page and another one to identify which
+        items differ. Items are matched by their ID.
+
+        If an item exists in both pages but its field values differ, it is
+        marked as *Updated*. If the item is missing in this page, it is
+        considered to be *Created*, and if it is missing in the other page, it
+        is considered to be *Deleted*. If the item is not present in any of
+        the pages, its fields are considered to be ``None``.
+
+        By default, the `recorded_at` field is excluded from comparison.
+        However, **if any keyword arguments are provided, no default exclusions
+        are applied**, and the caller is responsible for specifying exclusions
+        explicitly. If you provide additional keyword arguments and still want
+        to exclude the `recorded_at` field, set ``exclude={'recorded_at'}`` or
+        equivalent in ``kwargs``.
+
+        The data is serialized according to the item models' configurations
+        using ``model_dump``.
+
+        Args:
+            other (BasePage): The page to compare against.
+            **kwargs: Additional keyword arguments passed to each item model's
+                ``model_dump`` call, such as `exclude`, `include`,
+                `by_alias`, and others. If provided, the default
+                exclusion of the `recorded_at` field is suppressed!
+
+        Returns:
+            ModelDiffMapping: A dictionary mapping numeric item IDs to their
+            corresponding differences.
+
+            Each dictionary value is a dictionary (ModelDiff) containing
+            the `type` and `diff` keys.
+
+            - `type` (DiffType): An enumeration value indicating the type of \
+            the difference (`Created`, `Updated`, or `Deleted`).
+
+            - `diff` (FieldDiffMapping): A dictionary mapping field names to \
+            `FieldDiff` entries, as described in `BaseItem.diff()`.
+
+            ModelDiff structure example:
+
+            >>> from freshpointparser.models.annotations import DiffType
+            >>> {
+            ...     1001: {
+            ...         'type': DiffType.UPDATED,
+            ...         'diff': {
+            ...             'field_common': {
+            ...                 'type': DiffType.UPDATED,
+            ...                 'values': {'left': 12.5, 'right': 15.0},
+            ...             },
+            ...         },
+            ...     },
+            ...     1002: {
+            ...         'type': DiffType.DELETED,
+            ...         'diff': {
+            ...             'field_only_in_this': {
+            ...                 'type': DiffType.DELETED,
+            ...                 'values': {'left': 'foo', 'right': None},
+            ...             },
+            ...         },
+            ...     },
+            ...     1003: {
+            ...         'type': DiffType.CREATED,
+            ...         'diff': {
+            ...             'field_only_in_other': {
+            ...                 'type': DiffType.CREATED,
+            ...                 'values': {'left': None, 'right': 'bar'},
+            ...             },
+            ...         },
+            ...     },
+            ... }
+        """
         item_missing = DynamicFieldsModel()
         diff = {}
         # compare self to other
@@ -393,14 +491,14 @@ class BasePage(BaseRecord, Generic[TItem, TField, TFieldMapping]):
             item_other = other.items.get(item_id, None)
             if item_other is None:
                 diff[item_id] = ModelDiff(
-                    type=EDiffType.DELETED,
+                    type=DiffType.DELETED,
                     diff=model_diff(item_self, item_missing, **kwargs),
                 )
             else:
                 item_diff = model_diff(item_self, item_other, **kwargs)
                 if item_diff:
                     diff[item_id] = ModelDiff(
-                        type=EDiffType.UPDATED,
+                        type=DiffType.UPDATED,
                         diff=item_diff,
                     )
         # compare other to self
@@ -408,7 +506,7 @@ class BasePage(BaseRecord, Generic[TItem, TField, TFieldMapping]):
             for item_id, item_other in other.items.items():
                 if item_id not in self.items:
                     diff[item_id] = ModelDiff(
-                        type=EDiffType.CREATED,
+                        type=DiffType.CREATED,
                         diff=model_diff(item_missing, item_other, **kwargs),
                     )
         return diff
