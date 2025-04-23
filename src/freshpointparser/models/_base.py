@@ -18,6 +18,7 @@ from typing import (
     TypedDict,
     TypeVar,
     Union,
+    overload,
 )
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -28,20 +29,28 @@ logger = logging.getLogger('freshpointparser.models')
 
 
 _NO_DEFAULT = object()
-"""Sentinel value for the ``default`` argument in ``getattr()``."""
+"""Sentinel value for the ``default`` argument of ``getattr()``."""
 
 
 T = TypeVar('T')
-"""Type variable to annotate generic types."""
+"""Type variable to annotate arbitrary generic types."""
+
+
+class ToCamel:
+    """Alias for the ``to_camel`` function from ``pydantic.alias_generators``."""
+
+    def __repr__(self) -> str:  # nicer formatting for Sphinx docs
+        return 'to_camel'
+
+    def __call__(self, string: str) -> str:
+        return to_camel(string)
 
 
 class DynamicFieldsModel(BaseModel):
-    """Wraps arbitrary fields in a model to capture unknown or unstructured
-    data.
-    """
+    """Wraps arbitrary fields in a model to capture unknown or unstructured data."""
 
     model_config = ConfigDict(
-        alias_generator=to_camel,
+        alias_generator=ToCamel(),
         populate_by_name=True,
         extra='allow',
         arbitrary_types_allowed=True,
@@ -58,37 +67,35 @@ class DiffType(str, Enum):
     """The left item is missing"""
 
     UPDATED = 'Updated'
-    """The item has been updated."""
+    """The right item is different from the left item."""
 
     DELETED = 'Deleted'
     """The right item is missing."""
 
 
-TLeft = TypeVar('TLeft')
-"""Type variable to annotate the left value in a difference."""
-TRight = TypeVar('TRight')
-"""Type variable to annotate the right value in a difference."""
-
-
-class DiffValues(TypedDict, Generic[TLeft, TRight]):
+class DiffValues(TypedDict):
     """Typed dictionary to represent the left and the right value in
     a difference comparison.
     """
 
-    left: TLeft
-    right: TRight
+    left: Any
+    """The left value in the pair."""
+    right: Any
+    """The right value in the pair."""
 
 
-class FieldDiff(TypedDict, Generic[TLeft, TRight]):
+class FieldDiff(TypedDict):
     """Typed dictionary to represent the difference between two fields
     in a model comparison.
     """
 
     type: DiffType
-    values: DiffValues[TLeft, TRight]
+    """The type of the difference."""
+    values: DiffValues
+    """The left and the right values in the difference comparison."""
 
 
-FieldDiffMapping: TypeAlias = Dict[str, FieldDiff[Any, Any]]
+FieldDiffMapping: TypeAlias = Dict[str, FieldDiff]
 """Mapping of field names to their differences."""
 
 
@@ -98,7 +105,9 @@ class ModelDiff(TypedDict):
     """
 
     type: DiffType
+    """The type of the difference."""
     diff: FieldDiffMapping
+    """Mapping of field names to their differences."""
 
 
 ModelDiffMapping: TypeAlias = Dict[int, ModelDiff]
@@ -108,19 +117,24 @@ ModelDiffMapping: TypeAlias = Dict[int, ModelDiff]
 def model_diff(
     left: BaseModel, right: BaseModel, **kwargs: Any
 ) -> FieldDiffMapping:
-    """Compare left model with the right model to identify which model fields
-    have different values. If a field is not present in one of the models,
-    its value is considered to be None in that model.
+    """Compare the left model with the right model to identify which model
+    fields have different values.
 
-    The data is serialized according to the models' configurations by calling
-    the `model_dump` method on both models.
+    If a field exists in both items but its values differ, it is
+    marked as *Updated*. If the field is missing in this item, it is
+    considered to be *Created*, and if it is missing in the other item, it
+    is considered to be *Deleted*. If the field is not present in any of
+    the items, its value is considered to be ``None``.
+
+    The data is serialized according to the item models' configurations
+    using ``model_dump``.
 
     Args:
-        left (model): The model to compare from.
-        right (model): The model to compare to.
-        **kwargs: Additional keyword arguments to pass to the `model_dump`
-            calls to control the serialization process, such as 'exclude',
-            'include', 'by_alias', and others.
+        left (model): The model to compare.
+        right (model): The model to compare with.
+        **kwargs: Additional keyword arguments to pass to the ``model_dump``
+            calls to control the serialization process, such as `exclude`,
+            `include`, `by_alias`, and others.
 
     Returns:
         FieldDiffMapping: A dictionary mapping field names to their differences,
@@ -162,16 +176,16 @@ def model_diff(
 
 
 class HasRecordedAt(Protocol):
-    """Protocol for classes that have a `recorded_at` datetime attribute."""
+    """Protocol for classes that have the `recorded_at` datetime attribute."""
 
     recorded_at: datetime
     """Datetime when the data has been recorded."""
 
 
 class BaseRecord(BaseModel):
-    """Base data model of a FreshPoint record."""
+    """Base model of a FreshPoint record."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    model_config = ConfigDict(alias_generator=ToCamel(), populate_by_name=True)
 
     recorded_at: datetime = Field(
         default_factory=datetime.now,
@@ -185,24 +199,23 @@ class BaseRecord(BaseModel):
         other: HasRecordedAt,
         precision: Optional[Literal['s', 'm', 'h', 'd']] = None,
     ) -> Optional[bool]:
-        """Check if the record datetime of this instance is newer than another's.
+        """Check if this record is newer than another one by comparing
+        their `recorded_at` fields at the specified precision.
 
-        Compares the `recorded_at` datetime of this instance with another
-        instance, considering the specified precision. Note that precision here
-        means truncating the datetime to the desired level (e.g., cutting off
-        seconds, minutes, etc.), not rounding it.
+        Note that precision here means truncating the datetime to the desired
+        level (e.g., cutting off seconds, minutes, etc.), not rounding it.
 
         Args:
-            other (BaseRecord): The record to compare against. Must contain a
-                `recorded_at` datetime attribute.
+            other (HasRecordedAt): The record to compare against. Must contain
+                the `recorded_at` datetime attribute.
             precision (Optional[Literal['s', 'm', 'h', 'd']]): The level of
                 precision for the comparison. Supported values:
 
-                - None: full precision (microseconds) (default)
-                - 's': second precision
-                - 'm': minute precision
-                - 'h': hour precision
-                - 'd': date precision
+                - `None`: full precision (microsecond) (default)
+                - `s`: second precision
+                - `m`: minute precision
+                - `h`: hour precision
+                - `d`: date precision
 
         Raises:
             ValueError: If the precision is not one of the supported values.
@@ -250,12 +263,12 @@ class BaseRecord(BaseModel):
 
 
 class BaseItem(BaseRecord):
-    """Base data model of a FreshPoint item (listing)."""
+    """Base model of a FreshPoint item."""
 
     id_: int = Field(
         default=0,
-        serialization_alias='id',
-        validation_alias='id',
+        serialization_alias='id',  # not using 'alias' to bypass
+        validation_alias='id',  # Pyright / Pylance limitations
         title='ID',
         description='Unique numeric identifier.',
     )
@@ -289,18 +302,19 @@ class BaseItem(BaseRecord):
                 exclusion of the `recorded_at` field is suppressed!
 
         Returns:
-            FieldDiffMapping[str]: A dictionary mapping field names to their
+            FieldDiffMapping: A dictionary mapping field names to their
             corresponding differences.
 
-            Each dictionary value is a dictionary (FieldDiff) containing
+            Each field difference is a dictionary
+            (:class:`~freshpointparser.models.annotations.FieldDiff`) containing
             the `type` and `values` keys.
 
-            - `type` (DiffType): An enumeration value indicating the type of \
-            the difference (`Created`, `Updated`, or `Deleted`).
+            - `type` (:class:`~freshpointparser.models.annotations.DiffType`): \
+            An enumeration value indicating the type of the difference.
 
-            - `values` (DiffValues): A pair of values - `left` from this model \
-            and `right` from the other model. If a field is missing in one model, \
-            its value will be ``None``.
+            - `values` (:class:`~freshpointparser.models.annotations.DiffValues`): \
+            A pair of values - `left` from this model and `right` from the other \
+            model. If a field is missing in one model, its value will be ``None``.
 
             FieldDiffMapping structure example:
 
@@ -469,6 +483,14 @@ class BasePage(BaseRecord, Generic[TItem]):
                     )
         return diff
 
+    @overload
+    def iter_item_attr(self, attr: str) -> Iterator[Any]: ...
+
+    @overload
+    def iter_item_attr(
+        self, attr: str, default: T
+    ) -> Iterator[Union[Any, T]]: ...
+
     def iter_item_attr(
         self, attr: str, default: T = _NO_DEFAULT, unique: bool = True
     ) -> Iterator[Union[Any, T]]:
@@ -515,7 +537,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         ``next(page.find_items(...), None)``.
 
         Args:
-            constraint (Union[TItemAttrs, Mapping[str, Any], Callable[[TBaseItem], bool]]):
+            constraint (Union[Mapping[str, Any], Callable[[TBaseItem], bool]]):
                 One of the following.
 
                 - Mapping of string keys to arbitrary values.
@@ -556,7 +578,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         ``list(page.find_items(...))``.
 
         Args:
-            constraint (Union[TItemAttrs, Mapping[str, Any], Callable[[TBaseItem], bool]]):
+            constraint (Union[Mapping[str, Any], Callable[[TBaseItem], bool]]):
                 One of the following.
 
                 - Mapping of string keys to arbitrary values.
@@ -599,7 +621,7 @@ class BasePage(BaseRecord, Generic[TItem]):
             )
 
         raise TypeError(
-            f'Constraint must be either a dictionary or a callable function. '
+            f'Constraint must be either a Mapping or a Callable. '
             f"Got type '{type(constraint)}' instead."
         )
 
