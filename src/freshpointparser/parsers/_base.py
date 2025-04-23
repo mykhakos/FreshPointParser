@@ -22,7 +22,7 @@ class BasePageHTMLParser(ABC):
     """
 
     def __init__(self) -> None:
-        """Initialize a BasePageHTMLParser instance with an empty state."""
+        """Initialize a parser instance with an empty state."""
         self._parse_datetime = datetime.now()
         self._html_hash_sha1 = self._hash_html_sha1('')
 
@@ -97,15 +97,21 @@ class BasePageHTMLParser(ABC):
         """
         pass
 
-    def parse(self, page_html: Union[str, bytes], force: bool = False) -> None:
+    def parse(self, page_html: Union[str, bytes], force: bool = False) -> bool:
         """Parse page HTML content.
 
         Args:
             page_html (Union[str, bytes]): HTML content of the page to parse.
             force (bool): If True, forces the parser to re-parse the HTML
-                content even if the hash of the content matches the previous
-                hash. If False, the parser will only re-parse the content if
-                the hash has changed. Defaults to False.
+                content even if the hash of the content matches the hash of the
+                previous content. If False, the parser will only re-parse the
+                content if the hash has changed. Defaults to False.
+
+        Returns:
+            bool: True if the HTML content differed from the previous content
+            and was parsed or was forced to be re-parsed, False otherwise.
         """
         if self._update_html_hash(page_html, force):
             self._parse_page_html(page_html)
+            return True
+        return False
