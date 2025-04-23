@@ -89,14 +89,6 @@ class ProductPriceUpdateInfo:
 class Product(BaseItem):
     """Data model of a FreshPoint product."""
 
-    id_: int = Field(
-        default=0,
-        serialization_alias='id',
-        validation_alias='id',
-        title='ID',
-        description='Unique identifier or the product.',
-    )
-    """Unique identifier or the product."""
     name: str = Field(
         default='',
         title='Name',
@@ -341,13 +333,11 @@ class ProductPage(BasePage[Product]):
         default=0,
         title='Location ID',
         description=(
-            'Unique identifier or the product location (also known as '
-            'the page ID or the device ID).'
+            'Unique identifier or the product location '
+            '(also known as the page ID or the device ID).'
         ),
     )
-    """Unique identifier or the product location (also known as the page ID
-    or the device ID).
-    """
+    """Unique identifier or the product location (also known as the page ID or the device ID)."""
     location_name: str = Field(
         default='',
         title='Location Name',
