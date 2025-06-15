@@ -289,7 +289,7 @@ class ProductHTMLParser:
         )
 
 
-class ProductPageHTMLParser(BasePageHTMLParser):
+class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
     """Parses HTML content of a FreshPoint product webpage
     `my.freshpoint.cz/device/product-list/<pageId>`. Allows accessing
     the parsed webpage data and searching for products by name or ID.
@@ -318,6 +318,23 @@ class ProductPageHTMLParser(BasePageHTMLParser):
         self._bs4_parser = bs4.BeautifulSoup(page_html, 'lxml')
         self._page = ProductPage()
         self._all_products_found = False
+
+    def _construct_page(self) -> ProductPage:
+        """The product page data parsed and validated from the HTML content.
+
+        The data is cached after the first extraction until the page HTML
+        changes. If the data cannot be parsed, a ValueError is raised.
+
+        Returns:
+            ProductPage: An instance of the ProductPage model
+                containing the parsed and validated data.
+        """
+        return ProductPage(
+            recorded_at=self._parse_datetime,
+            items={product.id_: product for product in self.products},
+            location_id=self.location_id,
+            location_name=self.location_name,
+        )
 
     def _find_product_data(self) -> bs4.ResultSet[bs4.Tag]:
         """Find all product data elements in the page HTML.
@@ -515,20 +532,6 @@ class ProductPageHTMLParser(BasePageHTMLParser):
         self._all_products_found = True
         return products
 
-    @property
-    def product_page(self) -> ProductPage:
-        """The product page data parsed and validated from the HTML content.
-
-        The data is cached after the first extraction until the page HTML
-        changes. If the data cannot be parsed, a ValueError is raised.
-        """
-        return ProductPage(
-            recorded_at=self._parse_datetime,
-            items={product.id_: product for product in self.products},
-            location_id=self.location_id,
-            location_name=self.location_name,
-        )
-
     def find_product_by_id(self, id_: Union[int, str]) -> Optional[Product]:
         """Find a single product based on the specified ID.
 
@@ -644,4 +647,4 @@ def parse_product_page(page_html: Union[str, bytes]) -> ProductPage:
     """
     parser = ProductPageHTMLParser()
     parser.parse(page_html)
-    return parser.product_page
+    return parser.page

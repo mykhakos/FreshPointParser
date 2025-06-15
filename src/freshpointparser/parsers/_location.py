@@ -16,7 +16,7 @@ from ..models import (
 from ._base import BasePageHTMLParser
 
 
-class LocationPageHTMLParser(BasePageHTMLParser):
+class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
     """Parses HTML content of a FreshPoint location webpage `my.freshpoint.cz`.
     Allows accessing the parsed webpage data and searching for locations by name
     or ID.
@@ -129,17 +129,21 @@ class LocationPageHTMLParser(BasePageHTMLParser):
         json_data = self._load_json(page_html)
         self._page = self._parse_json(json_data)
 
+    def _construct_page(self) -> LocationPage:
+        """Get he location page data parsed from the HTML content.
+
+        Returns:
+            LocationPage: A LocationPage model containing all parsed
+                locations and metadata from the HTML content.
+        """
+        # page is fully parsed on `parse` call. Copy for cache immutability
+        return self._page.model_copy(deep=True)
+
     @property
     def locations(self) -> List[Location]:
         """All locations parsed from the page HTML content."""
         # page is fully parsed on `parse` call. Copy for cache immutability
         return [loc.model_copy(deep=True) for loc in self._page.items.values()]
-
-    @property
-    def location_page(self) -> LocationPage:
-        """The location page data parsed from the HTML content."""
-        # page is fully parsed on `parse` call. Copy for cache immutability
-        return self._page.model_copy(deep=True)
 
     def find_location_by_id(self, id_: Union[int, str]) -> Optional[Location]:
         """Find a single location based on the specified ID.
@@ -235,4 +239,4 @@ def parse_location_page(page_html: Union[str, bytes]) -> LocationPage:
     """
     parser = LocationPageHTMLParser()
     parser.parse(page_html)
-    return parser.location_page
+    return parser.page

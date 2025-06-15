@@ -3,17 +3,18 @@ import logging
 import operator
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import (
-    Union,
-)
+from typing import Generic, TypeVar, Union
 
 from .._utils import normalize_text
+from ..models import BasePage
 
 logger = logging.getLogger('freshpointparser.parsers')
 """Logger of the `freshpointparser.parsers` package."""
 
+TPage = TypeVar('TPage', bound=BasePage)
 
-class BasePageHTMLParser(ABC):
+
+class BasePageHTMLParser(ABC, Generic[TPage]):
     """Base class for parsing HTML content of FreshPoint.cz pages.
 
     This class provides common functionality for parsing HTML content.
@@ -96,6 +97,20 @@ class BasePageHTMLParser(ABC):
             page_html (Union[str, bytes]): HTML content of the page.
         """
         pass
+
+    @abstractmethod
+    def _construct_page(self) -> TPage:
+        """Construct a page model from the parsed HTML content.
+
+        Returns:
+            TPage: An instance of the page model containing the parsed data.
+        """
+        pass
+
+    @property
+    def page(self) -> TPage:
+        """Page model containing all parsed HTML data."""
+        return self._construct_page()
 
     def parse(self, page_html: Union[str, bytes], force: bool = False) -> bool:
         """Parse page HTML content.
