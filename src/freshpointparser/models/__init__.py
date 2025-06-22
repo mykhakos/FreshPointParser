@@ -13,9 +13,6 @@ from ._product import (
     ProductPage,
 )
 
-__all__ = []
-
-
 __all__ = [
     'BaseItem',
     'BasePage',
