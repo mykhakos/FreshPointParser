@@ -21,7 +21,13 @@ from typing import (
     overload,
 )
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializationInfo,
+    field_serializer,
+)
 from pydantic.alias_generators import to_camel
 
 logger = logging.getLogger('freshpointparser.models')
@@ -274,7 +280,35 @@ class BaseItem(BaseRecord):
     )
     """Unique numeric identifier."""
 
-    def diff(self, other: BaseItem, **kwargs: Any) -> FieldDiffMapping:
+    @field_serializer('recorded_at')
+    def _serialize_recorded_at(  # noqa: PLR6301
+        self, value: datetime, info: SerializationInfo
+    ) -> Optional[datetime]:
+        """Exclude the ``recorded_at`` field from serialization if the context indicates
+        that it should not be recorded.
+        """
+        # This method could be a part of the BaseRecord class, but at the moment
+        # there are no use cases to exclude the `recorded_at` field there.
+        if not info.context:
+            return value
+        try:
+            if info.context.get('__exclude_recorded_at__'):
+                return None
+        except AttributeError:
+            logger.debug(
+                "Could not determine if 'recorded_at' should be excluded "
+                'from serialization. Returning the value as is.'
+            )
+            return value
+        return value
+
+    def diff(
+        self,
+        other: BaseItem,
+        *,
+        exclude_recorded_at: bool = True,
+        **kwargs: Any,
+    ) -> FieldDiffMapping:
         """Compare this item with another one to identify which item fields
         have different values.
 
@@ -284,22 +318,20 @@ class BaseItem(BaseRecord):
         is considered to be *Deleted*. If the field is not present in any of
         the items, its value is considered to be ``None``.
 
-        By default, the `recorded_at` field is excluded from comparison.
-        However, **if any keyword arguments are provided, no default exclusions
-        are applied**, and the caller is responsible for specifying exclusions
-        explicitly. If you provide additional keyword arguments and still want
-        to exclude the `recorded_at` field, set ``exclude={'recorded_at'}`` or
-        equivalent in ``kwargs``.
+        By default, the ``recorded_at`` field is excluded from comparison with
+        the ``exclude_recorded_at`` argument set to ``True``. This argument acts
+        similar to the standard ``exclude_xx`` Pydantic serialization flags.
 
         The data is serialized according to the item models' configurations
         using ``model_dump``.
 
         Args:
             other (BaseItem): The item to compare against.
+            exclude_recorded_at (bool): If True, the ``recorded_at`` field is
+                excluded from the comparison. Defaults to True.
             **kwargs: Additional keyword arguments passed to each item model's
                 ``model_dump`` call, such as `exclude`, `include`,
-                `by_alias`, and others. If provided, the default
-                exclusion of the `recorded_at` field is suppressed!
+                `by_alias`, and others.
 
         Returns:
             FieldDiffMapping: A dictionary mapping field names to their
@@ -335,8 +367,9 @@ class BaseItem(BaseRecord):
             ... }
 
         """
-        if not kwargs:
-            kwargs['exclude'] = ('recorded_at',)
+        if exclude_recorded_at:
+            context = kwargs.setdefault('context', {})
+            context['__exclude_recorded_at__'] = True
         return model_diff(self, other, **kwargs)
 
 
@@ -383,7 +416,13 @@ class BasePage(BaseRecord, Generic[TItem]):
         """Total number of items on the page."""
         return len(self.items)
 
-    def item_diff(self, other: BasePage, **kwargs: Any) -> ModelDiffMapping:
+    def item_diff(
+        self,
+        other: BasePage,
+        *,
+        exclude_recorded_at: bool = True,
+        **kwargs: Any,
+    ) -> ModelDiffMapping:
         """Compare items between this page and another one to identify which
         items differ. Items are matched by their ID.
 
@@ -393,22 +432,20 @@ class BasePage(BaseRecord, Generic[TItem]):
         is considered to be *Deleted*. If the item is not present in any of
         the pages, its fields are considered to be ``None``.
 
-        By default, the `recorded_at` field is excluded from comparison.
-        However, **if any keyword arguments are provided, no default exclusions
-        are applied**, and the caller is responsible for specifying exclusions
-        explicitly. If you provide additional keyword arguments and still want
-        to exclude the `recorded_at` field, set ``exclude={'recorded_at'}`` or
-        equivalent in ``kwargs``.
+        By default, the ``recorded_at`` field is excluded from comparison with
+        the ``exclude_recorded_at`` argument set to ``True``. This argument acts
+        similar to the standard ``exclude_xx`` Pydantic serialization flags.
 
         The data is serialized according to the item models' configurations
         using ``model_dump``.
 
         Args:
             other (BasePage): The page to compare against.
+            exclude_recorded_at (bool): If True, the ``recorded_at`` field is
+                excluded from the comparison. Defaults to True.
             **kwargs: Additional keyword arguments passed to each item model's
                 ``model_dump`` call, such as `exclude`, `include`,
-                `by_alias`, and others. If provided, the default
-                exclusion of the `recorded_at` field is suppressed!
+                `by_alias`, and others.
 
         Returns:
             ModelDiffMapping: A dictionary mapping numeric item IDs to their
@@ -456,8 +493,9 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...     },
             ... }
         """
-        if not kwargs:
-            kwargs['exclude'] = ('recorded_at',)
+        if exclude_recorded_at:
+            context = kwargs.setdefault('context', {})
+            context['__exclude_recorded_at__'] = True
         item_missing = DynamicFieldsModel()
         diff = {}
         # compare self to other
