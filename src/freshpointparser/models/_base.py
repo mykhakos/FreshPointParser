@@ -527,12 +527,21 @@ class BasePage(BaseRecord, Generic[TItem]):
 
     @overload
     def iter_item_attr(
-        self, attr: str, *, unique: bool, unhashable: bool
+        self,
+        attr: str,
+        *,
+        unique: bool = ...,
+        unhashable: bool = ...,
     ) -> Iterator[Any]: ...
 
     @overload
     def iter_item_attr(
-        self, attr: str, default: T, *, unique: bool, unhashable: bool
+        self,
+        attr: str,
+        default: T,
+        *,
+        unique: bool = ...,
+        unhashable: bool = ...,
     ) -> Iterator[Union[Any, T]]: ...
 
     def iter_item_attr(
