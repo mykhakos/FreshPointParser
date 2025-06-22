@@ -2,6 +2,7 @@ from datetime import datetime
 from types import MappingProxyType
 
 import pytest
+from pydantic import Field
 
 from freshpointparser import get_product_page_url
 from freshpointparser.models import (
@@ -193,6 +194,27 @@ def test_product_prop_discount_rate(product, rate):
     assert product.discount_rate == rate
 
 
+def test_product_prop_is_on_sale():
+    # Default product with no prices is not on sale
+    product = Product()
+    assert not product.is_on_sale
+
+    # Product with price_curr < price_full is on sale
+    product = Product(price_full=10, price_curr=5)
+    assert product.is_on_sale
+
+    # Product with price_curr == price_full is not on sale
+    product = Product(price_full=10, price_curr=10)
+    assert not product.is_on_sale
+
+
+def test_product_prop_availability():
+    p = Product(quantity=1)
+    assert p.is_available
+    assert not p.is_sold_out
+    assert p.is_last_piece
+
+
 @pytest.mark.parametrize(
     'p1, p2, precision, is_p1_newer_than_p2',
     [
@@ -317,7 +339,7 @@ def test_product_prop_discount_rate(product, rate):
         ),
     ],
 )
-def test_product_is_newer(p1, p2, precision, is_p1_newer_than_p2):
+def test_product_is_newer_than(p1, p2, precision, is_p1_newer_than_p2):
     # direct test
     assert p1.is_newer_than(p2, precision=precision) is is_p1_newer_than_p2
 
@@ -331,6 +353,27 @@ def test_product_is_newer(p1, p2, precision, is_p1_newer_than_p2):
     # test with the product compared to itself
     assert p1.is_newer_than(p1, precision=precision) is None
     assert p2.is_newer_than(p2, precision=precision) is None
+
+
+def test_is_newer_than_invalid_precision():
+    p1 = Product(recorded_at=datetime(2024, 1, 1))
+    p2 = Product(recorded_at=datetime(2024, 1, 2))
+    with pytest.raises(ValueError):
+        p1.is_newer_than(p2, precision='q')  # type: ignore[reportArgumentType]
+
+
+def test_recorded_at_serialize_excluded():
+    product = Product()
+
+    data = product.model_dump(context={'__exclude_recorded_at__': True})
+    assert data['recorded_at'] is None
+
+    for data in (
+        product.model_dump(),
+        product.model_dump(mode='json'),
+        product.model_dump(context={'__exclude_recorded_at__': False}),
+    ):
+        assert data['recorded_at'] is not None
 
 
 @pytest.mark.parametrize(
@@ -1048,6 +1091,12 @@ def product_page(products):
     return ProductPage(items={p.id_: p for p in products})
 
 
+def test_page_item_helpers(product_page):
+    assert product_page.item_count == len(product_page.items)
+    assert set(product_page.item_ids) == set(product_page.items)
+    assert product_page.item_list == list(product_page.items.values())
+
+
 @pytest.mark.parametrize(
     'constraint, expected_product_ids',
     [
@@ -1247,6 +1296,73 @@ def test_product_page_find_items_invalid_lambda_attribute(
         list(product_page.find_items(constraint))
     with pytest.raises(AttributeError):
         product_page.find_item(constraint)
+
+
+def test_item_diff_created_updated_deleted():
+    p_old = ProductPage(
+        items={
+            1: Product(id_=1, name='Banana'),
+            2: Product(id_=2, name='Apple', quantity=2),
+        }
+    )
+    p_new = ProductPage(
+        items={
+            2: Product(id_=2, name='Apple', quantity=1),
+            3: Product(id_=3, name='Orange'),
+        }
+    )
+    diff = p_old.item_diff(p_new)
+    assert diff[1]['type'] is DiffType.DELETED
+    assert diff[2]['type'] is DiffType.UPDATED
+    assert diff[3]['type'] is DiffType.CREATED
+
+
+def test_iter_item_attr_defaults_and_uniqueness():
+    class SubProduct(Product):
+        context: dict[str, str] = Field(default_factory=dict)
+
+    page = ProductPage(
+        items={
+            1: Product(id_=1, category='c1'),
+            2: Product(id_=2, category='c2'),
+            3: Product(id_=3, category='c2'),
+            4: Product(id_=4, category='c3'),
+        }
+    )
+    # missing attr without default -> raises
+    with pytest.raises(AttributeError):
+        list(page.iter_item_attr('nonexistent'))
+
+    # missing attr with default -> returns default
+    assert list(page.iter_item_attr('nonexistent', default='default')) == [
+        'default',
+        'default',
+        'default',
+        'default',
+    ]
+
+    # unique, hashable
+    assert list(page.iter_item_attr('category', unique=True)) == [
+        'c1',
+        'c2',
+        'c3',
+    ]
+
+    # unique with unhashable values
+    page.items[5] = SubProduct(id_=5, context={'key': 'value'})
+    assert list(
+        page.iter_item_attr('context', default={}, unhashable=True)
+    ) == [
+        {},
+        {},
+        {},
+        {},
+        {'key': 'value'},
+    ]
+
+    # TypeError on unhashable unique without flag
+    with pytest.raises(AttributeError):
+        list(page.iter_item_attr('context', unique=True))
 
 
 # endregion ProductPage
