@@ -364,11 +364,11 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         """
 
         def attr_filter_id(value: str) -> bool:
-            # if not value:
-            #     return False
+            if not value:
+                return False  # assuming zero is not a valid ID
             try:
                 return int(value) == id_
-            except ValueError as e:
+            except (ValueError, TypeError) as e:
                 raise ValueError(
                     f'Unable to parse the product ID "{value}".'
                 ) from e
@@ -401,8 +401,6 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         """
 
         def attr_filter_name(value: str) -> bool:
-            # if not value:
-            #     return False
             try:
                 return self._match_strings(name, value, partial_match)
             except Exception as e:
