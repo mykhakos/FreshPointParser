@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Mapping
 from datetime import datetime
 from enum import Enum
@@ -14,7 +15,6 @@ from typing import (
     Literal,
     Optional,
     Protocol,
-    TypeAlias,
     TypedDict,
     TypeVar,
     Union,
@@ -29,6 +29,11 @@ from pydantic import (
     field_serializer,
 )
 from pydantic.alias_generators import to_camel
+
+if sys.version_info >= (3, 11):
+    from typing import TypeAlias
+else:
+    from typing_extensions import TypeAlias
 
 logger = logging.getLogger('freshpointparser.models')
 """Logger of the `freshpointparser.models` package."""
