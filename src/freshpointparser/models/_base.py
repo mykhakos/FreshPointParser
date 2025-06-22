@@ -494,9 +494,9 @@ class BasePage(BaseRecord, Generic[TItem]):
     ) -> Iterator[Union[Any, T]]: ...
 
     def iter_item_attr(
-        self, attr: str, default: T = _NO_DEFAULT, unique: bool = True
+        self, attr: str, default: T = _NO_DEFAULT, *, unique: bool = False
     ) -> Iterator[Union[Any, T]]:
-        """Iterate over values of a specific attribute from the page's items,
+        """Iterate over values of a specific attribute of the page's items,
         with optional default fallback and optional uniqueness filtering.
 
         Tip: To convert the result from an iterator to a list, use
@@ -508,7 +508,7 @@ class BasePage(BaseRecord, Generic[TItem]):
             default (T, optional): Value to use if the attribute is missing.
                 If not provided, missing attributes will raise AttributeError.
             unique (bool, optional): If True, only distinct values will be
-                yielded. Defaults to True.
+                yielded. Defaults to False.
 
         Yields:
             Iterator[Union[Any, T]]: Attribute values collected from each item
