@@ -1,4 +1,6 @@
-"""Pydantic models and other data containers of the `freshpointparser` package."""
+"""Pydantic models and other data containers of the `freshpointparser` library.
+The ``annotations`` submodule is available for additional data types.
+"""
 
 from . import annotations
 from ._base import BaseItem, BasePage, BaseRecord, logger
