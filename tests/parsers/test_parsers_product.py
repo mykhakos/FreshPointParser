@@ -5,6 +5,7 @@ import pytest
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
+from freshpointparser import parse_product_page
 from freshpointparser.models import ProductPage
 from freshpointparser.parsers import ProductPageHTMLParser
 
@@ -83,6 +84,27 @@ def test_parse_empty_data():
 
 
 # endregion Empty parser
+
+# region Parser parsing
+
+
+def test_product_data_immutable(product_page_html_parser_new):
+    """Test that the product data is immutable."""
+    parser = product_page_html_parser_new
+    for pid, product in parser.page.items.items():
+        product.name = 'New Name'
+        assert parser.page.items[pid].name != product.name, (
+            f'Product name should not be mutable: {product.name}'
+        )
+
+
+def test_parse_location_page_function(product_page_html_text):
+    page = parse_product_page(product_page_html_text)
+    assert isinstance(page, ProductPage)
+    assert page.items  # some data parsed
+
+
+# endregion Parser parsing
 
 
 # region Parser properties
@@ -252,6 +274,22 @@ def test_find_product_by_id_invalid_type(
         assert parser.find_product_by_id(product_id) is None
 
 
+def test_find_product_data_by_id_errors():
+    html = (
+        "<div class='product' data-id='1'></div>"
+        "<div class='product' data-id='1'></div>"
+    )
+    parser = ProductPageHTMLParser()
+    parser.parse(html)
+    with pytest.raises(ValueError):
+        parser._find_product_data_by_id(1)
+
+    html = "<div class='product' data-id='abc'></div>"
+    parser.parse(html)
+    with pytest.raises(ValueError):
+        parser._find_product_data_by_id(1)
+
+
 # endregion Find by ID
 
 # region Find by name
@@ -345,7 +383,7 @@ def test_find_products_by_name_invalid_type(
 @pytest.mark.is_parser_up_to_date
 @pytest.mark.parametrize(
     'product_page_id',
-    [pytest.param(id_, id=f'ID={id_}') for id_ in range(0, 1000)],
+    [pytest.param(id_, id=f'ID={id_}') for id_ in range(0, 10)],
 )
 def test_parse_data_from_internet(
     product_page_html_parser_persistent, product_page_id

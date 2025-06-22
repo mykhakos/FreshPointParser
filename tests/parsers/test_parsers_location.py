@@ -4,6 +4,7 @@ import pytest
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
+from freshpointparser import parse_location_page
 from freshpointparser.models import LocationPage
 from freshpointparser.parsers import LocationPageHTMLParser
 
@@ -72,6 +73,50 @@ def test_parse_empty_data():
 
 
 # endregion Empty parser
+
+# region Parser parsing
+
+
+def test_parse_force_and_caching(location_page_html_text):
+    parser = LocationPageHTMLParser()
+
+    # first call should parse and cache
+    assert parser.parse(location_page_html_text) is True
+    ts_first = parser._parse_datetime
+
+    # same input -> no parsing
+    assert parser.parse(location_page_html_text) is False
+    assert parser._parse_datetime == ts_first
+
+    # force re-parse
+    assert parser.parse(location_page_html_text, force=True) is True
+    assert parser._parse_datetime > ts_first
+
+
+def test_load_json_errors():
+    parser = LocationPageHTMLParser()
+    # pattern not found
+    with pytest.raises(ValueError):
+        parser._load_json('<html></html>')
+
+    # invalid JSON in the matched text
+    faulty = 'devices = "[{]" ;'
+    with pytest.raises(ValueError):
+        parser._load_json(faulty)
+
+    # data not a list
+    not_list = 'devices = "{}";'
+    with pytest.raises(ValueError):
+        parser._load_json(not_list)
+
+
+def test_parse_location_page_function(location_page_html_text):
+    page = parse_location_page(location_page_html_text)
+    assert isinstance(page, LocationPage)
+    assert page.items  # some data parsed
+
+
+# endregion Parser parsing
 
 # region Parser properties
 

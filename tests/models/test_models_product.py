@@ -1,5 +1,6 @@
 from datetime import datetime
 from types import MappingProxyType
+from typing import Dict
 
 import pytest
 from pydantic import Field
@@ -1319,7 +1320,7 @@ def test_item_diff_created_updated_deleted():
 
 def test_iter_item_attr_defaults_and_uniqueness():
     class SubProduct(Product):
-        context: dict[str, str] = Field(default_factory=dict)
+        context: Dict[str, str] = Field(default_factory=dict)
 
     page = ProductPage(
         items={
