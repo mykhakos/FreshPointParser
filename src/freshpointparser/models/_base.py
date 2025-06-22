@@ -456,6 +456,8 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...     },
             ... }
         """
+        if not kwargs:
+            kwargs['exclude'] = ('recorded_at',)
         item_missing = DynamicFieldsModel()
         diff = {}
         # compare self to other
