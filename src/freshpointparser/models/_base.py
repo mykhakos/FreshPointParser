@@ -370,6 +370,7 @@ class BaseItem(BaseRecord):
         if exclude_recorded_at:
             context = dict(kwargs.get('context', {}))
             context['__exclude_recorded_at__'] = True
+            kwargs['context'] = context
         return model_diff(self, other, **kwargs)
 
 
@@ -496,6 +497,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         if exclude_recorded_at:
             context = dict(kwargs.get('context', {}))
             context['__exclude_recorded_at__'] = True
+            kwargs['context'] = context
         item_missing = DynamicFieldsModel()
         diff = {}
         # compare self to other
@@ -524,15 +526,22 @@ class BasePage(BaseRecord, Generic[TItem]):
         return diff
 
     @overload
-    def iter_item_attr(self, attr: str) -> Iterator[Any]: ...
+    def iter_item_attr(
+        self, attr: str, *, unique: bool, unhashable: bool
+    ) -> Iterator[Any]: ...
 
     @overload
     def iter_item_attr(
-        self, attr: str, default: T
+        self, attr: str, default: T, *, unique: bool, unhashable: bool
     ) -> Iterator[Union[Any, T]]: ...
 
     def iter_item_attr(
-        self, attr: str, default: T = _NO_DEFAULT, *, unique: bool = False
+        self,
+        attr: str,
+        default: T = _NO_DEFAULT,
+        *,
+        unique: bool = False,
+        unhashable: bool = False,
     ) -> Iterator[Union[Any, T]]:
         """Iterate over values of a specific attribute of the page's items,
         with optional default fallback and optional uniqueness filtering.
@@ -547,6 +556,9 @@ class BasePage(BaseRecord, Generic[TItem]):
                 If not provided, missing attributes will raise AttributeError.
             unique (bool, optional): If True, only distinct values will be
                 yielded. Defaults to False.
+            unhashable (bool, optional): If True, uniqueness is checked
+                by comparing values directly, which is useful for unhashable
+                types like lists or dictionaries, but is slower. Defaults to False.
 
         Yields:
             Iterator[Union[Any, T]]: Attribute values collected from each item
@@ -557,13 +569,27 @@ class BasePage(BaseRecord, Generic[TItem]):
             values = (getattr(item, attr) for item in items)
         else:
             values = (getattr(item, attr, default) for item in items)
-
         if unique:
-            seen = set()
-            for value in values:
-                if value not in seen:
-                    seen.add(value)
+            if unhashable:
+                seen = []
+                for value in values:
+                    if any(value == seen_value for seen_value in seen):
+                        continue
+                    seen.append(value)
                     yield value
+            else:
+                try:
+                    seen = set()
+                    for value in values:
+                        if value not in seen:
+                            seen.add(value)
+                            yield value
+                except TypeError as e:
+                    raise TypeError(
+                        f"Cannot yield unique values for attribute '{attr}': "
+                        f'the values are not hashable. '
+                        f"Set 'unhashable=True' to compare the values directly."
+                    ) from e
         else:
             yield from values
 
