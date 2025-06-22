@@ -368,7 +368,7 @@ class BaseItem(BaseRecord):
 
         """
         if exclude_recorded_at:
-            context = kwargs.setdefault('context', {})
+            context = dict(kwargs.get('context', {}))
             context['__exclude_recorded_at__'] = True
         return model_diff(self, other, **kwargs)
 
@@ -494,7 +494,7 @@ class BasePage(BaseRecord, Generic[TItem]):
             ... }
         """
         if exclude_recorded_at:
-            context = kwargs.setdefault('context', {})
+            context = dict(kwargs.get('context', {}))
             context['__exclude_recorded_at__'] = True
         item_missing = DynamicFieldsModel()
         diff = {}
