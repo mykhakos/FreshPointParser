@@ -93,6 +93,11 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
     def _parse_page_html(self, page_html: Union[str, bytes]) -> None:
         """Parse the HTML content of the page.
 
+        Implementations should extract relevant data from the HTML content
+        and store it in the parser's internal state. This method is called
+        when the HTML content is updated or when the parser is forced to
+        re-parse the content.
+
         Args:
             page_html (Union[str, bytes]): HTML content of the page.
         """
@@ -102,18 +107,33 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
     def _construct_page(self) -> TPage:
         """Construct a page model from the parsed HTML content.
 
+        Implementations should build a **new** page model instance
+        using the data extracted from :meth:`_parse_page_html`.  The returned
+        model does not have to be cached and repeated calls may therefore yield
+        a different object with the same data.  Mutating the returned object has
+        no effect on the parser's internal state.
+
         Returns:
             TPage: An instance of the page model containing the parsed data.
+            TPage: A page model containing the parsed data.
         """
         pass
 
     @property
     def page(self) -> TPage:
-        """Page model containing all parsed HTML data."""
+        """Page model containing the parsed HTML data.
+
+        A fresh page model instance is created on every access. Consequently, modifying
+        the returned object does not affect the cached parser state.
+        """
         return self._construct_page()
 
     def parse(self, page_html: Union[str, bytes], force: bool = False) -> bool:
         """Parse page HTML content.
+
+        **Note**: The method returns only a flag indicating whether parsing occurred
+        and **does not** return the parsed page model. Access the :pyattr:`page`
+        property after calling :func:`parse` to obtain the full page data.
 
         Args:
             page_html (Union[str, bytes]): HTML content of the page to parse.
@@ -123,8 +143,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
                 content if the hash has changed. Defaults to False.
 
         Returns:
-            bool: True if the HTML content differed from the previous content
-            and was parsed or was forced to be re-parsed, False otherwise.
+            bool: True if the HTML content was parsed or forcefully re-parsed.
         """
         if self._update_html_hash(page_html, force):
             self._parse_page_html(page_html)

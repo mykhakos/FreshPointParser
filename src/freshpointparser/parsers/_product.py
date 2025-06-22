@@ -320,14 +320,16 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         self._all_products_found = False
 
     def _construct_page(self) -> ProductPage:
-        """The product page data parsed and validated from the HTML content.
+        """Return the product page data parsed from the HTML content.
 
-        The data is cached after the first extraction until the page HTML
-        changes. If the data cannot be parsed, a ValueError is raised.
+        A new :class:`ProductPage` model is created on each call using the
+        cached product list and metadata. Modifying the returned instance does
+        not change the parser's internal cache. The data is cached after the
+        first extraction until the page HTML changes. If parsing fails,
+        a ValueError is raised.
 
         Returns:
-            ProductPage: An instance of the ProductPage model
-                containing the parsed and validated data.
+            ProductPage: Parsed and validated page data.
         """
         return ProductPage(
             recorded_at=self._parse_datetime,
@@ -512,7 +514,9 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         """All products parsed and validated from the page HTML content.
 
         The data is cached after the first extraction until the page HTML
-        changes.
+        changes. The returned ``Product`` instances are detached from the
+        parser's cached data, so mutating them does not affect the parser's
+        state.
         """
         if self._all_products_found:
             return [
@@ -546,8 +550,9 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             ValueError: If the ID is an integer but is negative.
 
         Returns:
-            Optional[Product]: Product with the specified ID. If the product
-                is not found, returns None.
+            Optional[Product]: Product with the specified ID or ``None`` if it
+            is not found. The returned instance is independent of the parser's
+            cached data.
         """
         id_ = validate_id(id_)
         product = self._page.items.get(id_)
@@ -580,9 +585,10 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             TypeError: If the product name is not a string.
 
         Returns:
-            Optional[Product]: Product matching the specified name.
-                If no product is found, returns None. If multiple products
-                match, the first one is returned.
+            Optional[Product]: Product matching the specified name or ``None``
+            if no product is found. The returned instance does not modify the
+            parser's cached data. If multiple products match, the first one is
+            returned.
         """
         product = self._page.find_item(
             lambda pr: self._match_strings(name, pr.name, partial_match)
@@ -616,8 +622,9 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             TypeError: If the product name is not a string.
 
         Returns:
-            List[Product]: Products matching the specified name. If no products
-                are found, returns an empty list.
+            List[Product]: Products matching the specified name. Items in
+            the returned list are independent of the parser's cache. If no
+            products are found, an empty list is returned.
         """
         if self._all_products_found:  # use cache if all products are parsed
             iter_products = self._page.find_items(

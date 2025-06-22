@@ -130,18 +130,24 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         self._page = self._parse_json(json_data)
 
     def _construct_page(self) -> LocationPage:
-        """Get he location page data parsed from the HTML content.
+        """Get the location page data parsed from the HTML content.
+
+        The page is fully parsed during :meth:`parse`. A deep copy of the
+        cached model is returned to keep the internal state immutable. Every
+        access therefore yields a new :class:`LocationPage` instance.
 
         Returns:
-            LocationPage: A LocationPage model containing all parsed
-                locations and metadata from the HTML content.
+            LocationPage: Parsed locations and metadata from the HTML content.
         """
-        # page is fully parsed on `parse` call. Copy for cache immutability
         return self._page.model_copy(deep=True)
 
     @property
     def locations(self) -> List[Location]:
-        """All locations parsed from the page HTML content."""
+        """All locations parsed from the page HTML content.
+
+        The returned ``Location`` instances are independent of the parser's
+        cached data. Changes made to them will not modify the parser state.
+        """
         # page is fully parsed on `parse` call. Copy for cache immutability
         return [loc.model_copy(deep=True) for loc in self._page.items.values()]
 
@@ -159,8 +165,9 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             ValueError: If the ID is an integer but is negative.
 
         Returns:
-            Optional[Location]: Location with the specified ID. If
-                the location is not found, returns None.
+            Optional[Location]: Location with the specified ID or ``None`` if
+            the location is not found.  The returned instance is independent of
+            the parser's cached data.
         """
         id_ = validate_id(id_)
         location = self._page.items.get(id_)
@@ -186,9 +193,10 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             TypeError: If the location name is not a string.
 
         Returns:
-            Optional[Location]: Location matching the specified name.
-                If no location is found, returns None. If multiple locations
-                match, the first one is returned.
+            Optional[Location]: Location matching the specified name or
+            ``None`` if no location is found.  The returned instance is
+            independent of the parser's cached data.  If multiple locations
+            match, the first one is returned.
         """
         # wrapper over `LocationPage.find_item` method
         location = self._page.find_item(
@@ -216,14 +224,15 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             TypeError: If the location name is not a string.
 
         Returns:
-            List[Location]: Locations matching the specified name.
-                If no locations are found, returns an empty list.
+            List[Location]: Locations matching the specified name. Each
+            location in the returned list is detached from the parser's internal
+            cache. If no locations are found, an empty list is returned.
         """
         # wrapper over `LocationPage.find_locations` method
         locations = self._page.find_items(
             lambda loc: self._match_strings(name, loc.name, partial_match)
         )
-        # copy for cache immutability
+        # return copies to keep cached data immutable
         return [location.model_copy(deep=True) for location in locations]
 
 
