@@ -155,10 +155,10 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
     def parse(self, page_html: Union[str, bytes], force: bool = False) -> Self:
         """Parse page HTML content.
 
-        **Note**: This method returns the parser instance itself, allowing for method
-        call chaining. It does **not** return the parsed page model.The result of
-        the parse is cached and can be accessed via the :pyattr:``parse_status``
-        property.
+        **Note**: This method returns the parser instance itself, allowing for
+        method call chaining. It does **not** return the parsed page model. The
+        result of the parse is cached and can be accessed via the
+        :pyattr:`parse_status` property.
 
         Args:
             page_html (Union[str, bytes]): HTML content of the page to parse.
