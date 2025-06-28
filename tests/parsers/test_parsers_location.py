@@ -85,21 +85,21 @@ def test_parse_force_and_caching(location_page_html_text):
     assert returned is parser
     assert returned.parse_status is True
     assert parser.parse_status is True
-    ts_first = parser._parse_datetime
+    ts_first = parser.parse_datetime
 
     # same input -> no parsing
     returned = parser.parse(location_page_html_text)
     assert returned is parser
     assert returned.parse_status is False
     assert parser.parse_status is False
-    assert parser._parse_datetime == ts_first
+    assert parser.parse_datetime == ts_first
 
     # force re-parse
     returned = parser.parse(location_page_html_text, force=True)
     assert returned is parser
     assert returned.parse_status is True
     assert parser.parse_status is True
-    assert parser._parse_datetime > ts_first
+    assert parser.parse_datetime > ts_first
 
 
 def test_parse_status_tri_state(location_page_html_text):

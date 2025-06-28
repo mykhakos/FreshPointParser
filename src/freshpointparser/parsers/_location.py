@@ -109,12 +109,14 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         """
         locations = {}
         for item in data:
-            item['prop']['recordedAt'] = self._parse_datetime
+            item['prop']['recordedAt'] = self.parse_datetime
             locations[item['prop']['id']] = item['prop']
-        return LocationPage.model_validate({
-            'recordedAt': self._parse_datetime,
-            'items': locations,
-        })
+        return LocationPage.model_validate(
+            {
+                'recordedAt': self.parse_datetime,
+                'items': locations,
+            }
+        )
 
     def _parse_page_html(self, page_html: Union[str, bytes]) -> None:
         """Parse HTML content of a location page.
