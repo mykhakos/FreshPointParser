@@ -332,7 +332,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             ProductPage: Parsed and validated page data.
         """
         return ProductPage(
-            recorded_at=self.parse_datetime,
+            recorded_at=self._parse_datetime,
             items={product.id_: product for product in self.products},
             location_id=self.location_id,
             location_name=self.location_name,
@@ -427,7 +427,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         """
         price_full, price_curr = ProductHTMLParser.find_price(data)
         return Product(
-            recorded_at=self.parse_datetime,
+            recorded_at=self._parse_datetime,
             id_=ProductHTMLParser.find_id(data),
             name=ProductHTMLParser.find_name(data),
             category=ProductHTMLParser.find_category(data),

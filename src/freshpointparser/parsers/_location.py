@@ -109,11 +109,11 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         """
         locations = {}
         for item in data:
-            item['prop']['recordedAt'] = self.parse_datetime
+            item['prop']['recordedAt'] = self._parse_datetime
             locations[item['prop']['id']] = item['prop']
         return LocationPage.model_validate(
             {
-                'recordedAt': self.parse_datetime,
+                'recordedAt': self._parse_datetime,
                 'items': locations,
             }
         )
