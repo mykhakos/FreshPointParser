@@ -1,12 +1,18 @@
 import hashlib
 import logging
 import operator
+import sys
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Generic, TypeVar, Union
+from typing import Generic, Optional, TypeVar, Union
 
 from .._utils import normalize_text
 from ..models import BasePage
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 logger = logging.getLogger('freshpointparser.parsers')
 """Logger of the `freshpointparser.parsers` package."""
@@ -26,6 +32,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         """Initialize a parser instance with an empty state."""
         self._parse_datetime = datetime.now()
         self._html_hash_sha1 = self._hash_html_sha1('')
+        self._parse_result: Union[bool, None] = None
 
     @staticmethod
     def _match_strings(needle: str, haystack: str, partial_match: bool) -> bool:
@@ -114,7 +121,6 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         no effect on the parser's internal state.
 
         Returns:
-            TPage: An instance of the page model containing the parsed data.
             TPage: A page model containing the parsed data.
         """
         pass
@@ -123,17 +129,36 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
     def page(self) -> TPage:
         """Page model containing the parsed HTML data.
 
+        ``parse()`` must be called at least once before accessing this property
+        to ensure that the parser has valid data to construct the page model.
+
+        Accessing full parsed page data may require additional computation. If you are
+        only interested in a subset of the parsed data, consider using
+        specific properties or methods of the parser that return only
+        the relevant information (see specific parser implementations for details).
+
         A fresh page model instance is created on every access. Consequently, modifying
         the returned object does not affect the cached parser state.
         """
         return self._construct_page()
 
-    def parse(self, page_html: Union[str, bytes], force: bool = False) -> bool:
+    @property
+    def parse_status(self) -> Optional[bool]:
+        """Tri-state parse status.
+
+        - ``None``: Never parsed (no data available).
+        - ``True``: Last parse applied (data changed or parse was forced).
+        - ``False``: Last parse skipped (data unchanged).
+        """
+        return self._parse_result
+
+    def parse(self, page_html: Union[str, bytes], force: bool = False) -> Self:
         """Parse page HTML content.
 
-        **Note**: The method returns only a flag indicating whether parsing occurred
-        and **does not** return the parsed page model. Access the :pyattr:`page`
-        property after calling :func:`parse` to obtain the full page data.
+        **Note**: This method returns the parser instance itself, allowing for method
+        call chaining. It does **not** return the parsed page model.The result of
+        the parse is cached and can be accessed via the :pyattr:``parse_status``
+        property.
 
         Args:
             page_html (Union[str, bytes]): HTML content of the page to parse.
@@ -143,9 +168,12 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
                 content if the hash has changed. Defaults to False.
 
         Returns:
-            bool: True if the HTML content was parsed or forcefully re-parsed.
+            Self: The parser instance.
         """
         if self._update_html_hash(page_html, force):
             self._parse_page_html(page_html)
-            return True
-        return False
+            self._parse_result = True
+        else:
+            logger.debug('HTML content unchanged, skipping parsing.')
+            self._parse_result = False
+        return self
