@@ -145,6 +145,8 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
     @property
     def parse_datetime(self) -> datetime:
         """Timestamp of the last successful or skipped parse."""
+        if self._parse_status is None:
+            raise AttributeError('Parser has not parsed any HTML yet.')
         return self._parse_datetime
 
     @property

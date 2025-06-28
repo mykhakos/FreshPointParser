@@ -72,6 +72,12 @@ def test_parse_empty_data():
     assert parser.find_locations_by_name(location_name) == []
 
 
+def test_parse_datetime_access_before_parse():
+    parser = LocationPageHTMLParser()
+    with pytest.raises(AttributeError):
+        _ = parser.parse_datetime
+
+
 # endregion Empty parser
 
 # region Parser parsing
