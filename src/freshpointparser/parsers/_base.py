@@ -32,7 +32,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         """Initialize a parser instance with an empty state."""
         self._parse_datetime = datetime.now()
         self._html_hash_sha1 = self._hash_html_sha1('')
-        self._parse_result: Union[bool, None] = None
+        self._parse_status: Union[bool, None] = None
 
     @staticmethod
     def _match_strings(needle: str, haystack: str, partial_match: bool) -> bool:
@@ -143,6 +143,13 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         return self._construct_page()
 
     @property
+    def parse_datetime(self) -> datetime:
+        """Timestamp of the last successful or skipped parse."""
+        if self._parse_status is None:
+            raise AttributeError('Parser has not parsed any HTML yet.')
+        return self._parse_datetime
+
+    @property
     def parse_status(self) -> Optional[bool]:
         """Tri-state parse status.
 
@@ -150,15 +157,15 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         - ``True``: Last parse applied (data changed or parse was forced).
         - ``False``: Last parse skipped (data unchanged).
         """
-        return self._parse_result
+        return self._parse_status
 
     def parse(self, page_html: Union[str, bytes], force: bool = False) -> Self:
         """Parse page HTML content.
 
-        **Note**: This method returns the parser instance itself, allowing for method
-        call chaining. It does **not** return the parsed page model.The result of
-        the parse is cached and can be accessed via the :pyattr:``parse_status``
-        property.
+        **Note**: This method returns the parser instance itself, allowing for
+        method call chaining. It does **not** return the parsed page model. The
+        result of the parse is cached and can be accessed via the
+        :pyattr:`parse_status` property.
 
         Args:
             page_html (Union[str, bytes]): HTML content of the page to parse.
@@ -172,8 +179,8 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         """
         if self._update_html_hash(page_html, force):
             self._parse_page_html(page_html)
-            self._parse_result = True
+            self._parse_status = True
         else:
             logger.debug('HTML content unchanged, skipping parsing.')
-            self._parse_result = False
+            self._parse_status = False
         return self

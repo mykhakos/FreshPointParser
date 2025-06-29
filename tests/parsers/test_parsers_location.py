@@ -72,6 +72,12 @@ def test_parse_empty_data():
     assert parser.find_locations_by_name(location_name) == []
 
 
+def test_parse_datetime_access_before_parse():
+    parser = LocationPageHTMLParser()
+    with pytest.raises(AttributeError):
+        _ = parser.parse_datetime
+
+
 # endregion Empty parser
 
 # region Parser parsing
@@ -81,16 +87,44 @@ def test_parse_force_and_caching(location_page_html_text):
     parser = LocationPageHTMLParser()
 
     # first call should parse and cache
-    assert parser.parse(location_page_html_text) is True
-    ts_first = parser._parse_datetime
+    returned = parser.parse(location_page_html_text)
+    assert returned is parser
+    assert returned.parse_status is True
+    assert parser.parse_status is True
+    ts_first = parser.parse_datetime
 
     # same input -> no parsing
-    assert parser.parse(location_page_html_text) is False
-    assert parser._parse_datetime == ts_first
+    returned = parser.parse(location_page_html_text)
+    assert returned is parser
+    assert returned.parse_status is False
+    assert parser.parse_status is False
+    assert parser.parse_datetime == ts_first
 
     # force re-parse
-    assert parser.parse(location_page_html_text, force=True) is True
-    assert parser._parse_datetime > ts_first
+    returned = parser.parse(location_page_html_text, force=True)
+    assert returned is parser
+    assert returned.parse_status is True
+    assert parser.parse_status is True
+    assert parser.parse_datetime > ts_first
+
+
+def test_parse_status_tri_state(location_page_html_text):
+    parser = LocationPageHTMLParser()
+
+    # not parsed yet
+    assert parser.parse_status is None
+
+    # first parse -> status True
+    parser.parse(location_page_html_text)
+    assert parser.parse_status is True
+
+    # second parse with same HTML -> status False
+    parser.parse(location_page_html_text)
+    assert parser.parse_status is False
+
+    # force parse -> status True
+    parser.parse(location_page_html_text, force=True)
+    assert parser.parse_status is True
 
 
 def test_load_json_errors():
