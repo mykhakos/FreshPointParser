@@ -30,6 +30,8 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
+from ..exceptions import ModelTypeError, ModelValueError
+
 if sys.version_info >= (3, 11):
     from typing import TypeAlias
 else:
@@ -259,7 +261,7 @@ class BaseRecord(BaseModel):
             recorded_at_self = self.recorded_at.date()
             recorded_at_other = other.recorded_at.date()
         else:
-            raise ValueError(
+            raise ModelValueError(
                 f"Invalid precision '{precision}'. "
                 f"Expected one of: 's', 'm', 'h', 'd'."
             )
@@ -599,7 +601,7 @@ class BasePage(BaseRecord, Generic[TItem]):
                             seen.add(value)
                             yield value
                 except TypeError as e:
-                    raise TypeError(
+                    raise ModelTypeError(
                         f"Cannot yield unique values for attribute '{attr}': "
                         f'the values are not hashable. '
                         f"Set 'unhashable=True' to compare the values directly."
@@ -689,18 +691,35 @@ class BasePage(BaseRecord, Generic[TItem]):
             match the given constraint.
         """
         if callable(constraint):
-            return filter(constraint, self.items.values())
+            def _filter_callable() -> Iterator[TItem]:
+                for item in self.items.values():
+                    try:
+                        if constraint(item):
+                            yield item
+                    except TypeError as exc:  # invalid callable signature
+                        if exc.__class__ is TypeError:
+                            raise ModelTypeError(str(exc)) from exc
+                        raise
+
+            return _filter_callable()
 
         if isinstance(constraint, Mapping):
-            return filter(
-                lambda item: all(
-                    getattr(item, attr, _NO_DEFAULT) == value
-                    for attr, value in constraint.items()
-                ),
-                self.items.values(),
-            )
+            def _filter_mapping() -> Iterator[TItem]:
+                for item in self.items.values():
+                    try:
+                        if all(
+                            getattr(item, attr, _NO_DEFAULT) == value
+                            for attr, value in constraint.items()
+                        ):
+                            yield item
+                    except TypeError as exc:  # invalid attribute type
+                        if exc.__class__ is TypeError:
+                            raise ModelTypeError(str(exc)) from exc
+                        raise
 
-        raise TypeError(
+            return _filter_mapping()
+
+        raise ModelTypeError(
             f'Constraint must be either a Mapping or a Callable. '
             f"Got type '{type(constraint)}' instead."
         )
