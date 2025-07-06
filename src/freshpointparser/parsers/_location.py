@@ -161,9 +161,9 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
                 a string representation of a non-negative integer.
 
         Raises:
-            TypeError: If the ID is not an integer and cannot be converted to
-                an integer.
-            ValueError: If the ID is an integer but is negative.
+            ParserValueError: If the ID is an integer but is negative.
+            ParserTypeError: If the ID is not an integer and cannot be
+                converted to an integer.
 
         Returns:
             Optional[Location]: Location with the specified ID or ``None`` if
@@ -196,7 +196,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
                 (case-insensitive). Defaults to True.
 
         Raises:
-            TypeError: If the location name is not a string.
+            ParserTypeError: If the location name is not a string.
 
         Returns:
             Optional[Location]: Location matching the specified name or
@@ -204,6 +204,10 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             independent of the parser's cached data.  If multiple locations
             match, the first one is returned.
         """
+        if not isinstance(name, str):
+            raise ParserTypeError(
+                f'Expected a string for location name, got {type(name)}.'
+            )
         # wrapper over `LocationPage.find_item` method
         location = self._page.find_item(
             lambda loc: self._match_strings(name, loc.name, partial_match)
@@ -227,13 +231,17 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
                 (case-insensitive). Defaults to True.
 
         Raises:
-            TypeError: If the location name is not a string.
+            ParserTypeError: If the location name is not a string.
 
         Returns:
             List[Location]: Locations matching the specified name. Each
             location in the returned list is detached from the parser's internal
             cache. If no locations are found, an empty list is returned.
         """
+        if not isinstance(name, str):
+            raise ParserTypeError(
+                f'Expected a string for location name, got {type(name)}.'
+            )
         # wrapper over `LocationPage.find_locations` method
         locations = self._page.find_items(
             lambda loc: self._match_strings(name, loc.name, partial_match)
@@ -248,6 +256,10 @@ def parse_location_page(page_html: Union[str, bytes]) -> LocationPage:
 
     Args:
         page_html (Union[str, bytes]): HTML content of the location page to parse.
+
+    Raises:
+        ParserError: If the HTML content cannot be parsed or does not
+            contain the expected structure.
 
     Returns:
         LocationPage: Parsed and validated location page data.

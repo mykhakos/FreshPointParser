@@ -231,7 +231,7 @@ class BaseRecord(BaseModel):
                 - `d`: date precision
 
         Raises:
-            ValueError: If the precision is not one of the supported values.
+            ModelValueError: If the precision is not one of the supported values.
 
         Returns:
             Optional[bool]: With the specified precision taken into account,
@@ -576,6 +576,12 @@ class BasePage(BaseRecord, Generic[TItem]):
                 by comparing values directly, which is useful for unhashable
                 types like lists or dictionaries, but is slower. Defaults to False.
 
+        Raises:
+            AttributeError: If the attribute is not present in an item
+                and `default` is not provided.
+            ModelTypeError: If the attribute values are not hashable and
+                `unhashable` is set to False.
+
         Yields:
             Iterator[Union[Any, T]]: Attribute values collected from each item
             on the page.
@@ -643,7 +649,8 @@ class BasePage(BaseRecord, Generic[TItem]):
                 `'foo'`.
 
         Raises:
-            TypeError: If the constraint is invalid.
+            ModelTypeError: If the constraint is invalid, i.e., not a
+                Mapping or a Callable.
 
         Returns:
             Optional[TBaseItem]: The first item on the page that matches
@@ -684,26 +691,29 @@ class BasePage(BaseRecord, Generic[TItem]):
                 `'foo'`.
 
         Raises:
-            TypeError: If the constraint is invalid.
+            ModelTypeError: If the constraint is invalid, i.e., not a
+                Mapping or a Callable.
 
         Returns:
             Iterator[TBaseItem]: A lazy iterator over all items on the page that
             match the given constraint.
         """
         if callable(constraint):
+
             def _filter_callable() -> Iterator[TItem]:
                 for item in self.items.values():
                     try:
                         if constraint(item):
                             yield item
                     except TypeError as exc:  # invalid callable signature
-                        if exc.__class__ is TypeError:
+                        if type(exc) is TypeError:
                             raise ModelTypeError(str(exc)) from exc
                         raise
 
             return _filter_callable()
 
         if isinstance(constraint, Mapping):
+
             def _filter_mapping() -> Iterator[TItem]:
                 for item in self.items.values():
                     try:
@@ -713,7 +723,7 @@ class BasePage(BaseRecord, Generic[TItem]):
                         ):
                             yield item
                     except TypeError as exc:  # invalid attribute type
-                        if exc.__class__ is TypeError:
+                        if type(exc) is TypeError:
                             raise ModelTypeError(str(exc)) from exc
                         raise
 

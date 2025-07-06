@@ -500,7 +500,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         from the page HTML content.
 
         The value is cached after the first extraction until the page HTML
-        changes. If the value cannot be parsed, a ValueError is raised.
+        changes. If the value cannot be parsed, a ParserValueError is raised.
         """
         if 'location_name' in self._page.model_fields_set:  # cached
             return self._page.location_name
@@ -553,9 +553,9 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
                 a string representation of a non-negative integer.
 
         Raises:
-            TypeError: If the ID is not an integer and cannot be converted to
-                an integer.
-            ValueError: If the ID is an integer but is negative.
+            ParserValueError: If the ID is an integer but is negative.
+            ParserTypeError: If the ID is not an integer and cannot be
+                converted to an integer.
 
         Returns:
             Optional[Product]: Product with the specified ID or ``None`` if it
@@ -595,7 +595,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
                 (case-insensitive). Defaults to True.
 
         Raises:
-            TypeError: If the product name is not a string.
+            ParserTypeError: If the product name is not a string.
 
         Returns:
             Optional[Product]: Product matching the specified name or ``None``
@@ -603,6 +603,10 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             parser's cached data. If multiple products match, the first one is
             returned.
         """
+        if not isinstance(name, str):
+            raise ParserTypeError(
+                f'Expected a string for product name, got {type(name)}.'
+            )
         product = self._page.find_item(
             lambda pr: self._match_strings(name, pr.name, partial_match)
         )
@@ -639,6 +643,10 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             the returned list are independent of the parser's cache. If no
             products are found, an empty list is returned.
         """
+        if not isinstance(name, str):
+            raise ParserTypeError(
+                f'Expected a string for product name, got {type(name)}.'
+            )
         if self._all_products_found:  # use cache if all products are parsed
             iter_products = self._page.find_items(
                 lambda pr: self._match_strings(name, pr.name, partial_match)
@@ -661,6 +669,10 @@ def parse_product_page(page_html: Union[str, bytes]) -> ProductPage:
 
     Args:
         page_html (Union[str, bytes]): HTML content of the product page to parse.
+
+    Raises:
+        ParserError: If the HTML content cannot be parsed or does not
+            contain the expected structure.
 
     Returns:
         ProductPage: Parsed and validated product page data.
