@@ -13,10 +13,10 @@ import bs4
 
 from .._utils import normalize_text, validate_id
 from ..exceptions import (
-    ParserAttributeError,
-    ParserKeyError,
-    ParserTypeError,
-    ParserValueError,
+    FreshPointParserAttributeError,
+    FreshPointParserKeyError,
+    FreshPointParserTypeError,
+    FreshPointParserValueError,
 )
 from ..models import (
     Product,
@@ -55,20 +55,20 @@ class ProductHTMLParser:
             bs4.Tag: The Tag contained in the provided `resultset`.
 
         Raises:
-            ParserValueError: If `resultset` does not contain exactly one Tag.
-            ParserTypeError: If the extracted element is not a `bs4.Tag` object.
+            FreshPointParserValueError: If `resultset` does not contain exactly one Tag.
+            FreshPointParserTypeError: If the extracted element is not a `bs4.Tag` object.
         """
         if len(resultset) == 0:
-            raise ParserValueError(
+            raise FreshPointParserValueError(
                 'ResultSet is empty (expected one Tag element).'
             )
         if len(resultset) != 1:
-            raise ParserValueError(
+            raise FreshPointParserValueError(
                 f'Unexpected number of elements in the ResultSet'
                 f'(expected 1, got {len(resultset)}).'
             )
         if not isinstance(resultset[0], bs4.Tag):
-            raise ParserTypeError(
+            raise FreshPointParserTypeError(
                 f'The element in the ResultSet is not a Tag object. '
                 f'(got type "{type(resultset[0]).__name__}").'
             )
@@ -86,17 +86,17 @@ class ProductHTMLParser:
             str: The value of the specified attribute.
 
         Raises:
-            ParserKeyError: If the attribute is missing.
-            ParserValueError: If the attribute is not a string.
+            FreshPointParserKeyError: If the attribute is missing.
+            FreshPointParserValueError: If the attribute is not a string.
         """
         try:
             attr = tag[attr_name]
         except KeyError as err:
-            raise ParserKeyError(
+            raise FreshPointParserKeyError(
                 f'Product attributes do not contain keyword "{attr_name}".'
             ) from err
         if not isinstance(attr, str):
-            raise ParserValueError(
+            raise FreshPointParserValueError(
                 f'Unexpected "{attr_name}" attribute parsing results: '
                 f'attribute value is expected to be a string '
                 f'(got type "{type(attr)}").'
@@ -159,7 +159,7 @@ class ProductHTMLParser:
     def find_category(cls, product_data: bs4.Tag) -> str:
         """Extract the product category from the given product data."""
         if product_data.parent is None:
-            raise ParserAttributeError(
+            raise FreshPointParserAttributeError(
                 f'Unable to extract product category name for product '
                 f'"id={cls._find_id_safe(product_data)}" from the provided '
                 f'html data (parent data is missing).'
@@ -169,7 +169,7 @@ class ProductHTMLParser:
         try:
             return cls._extract_single_tag(category).text.strip()  # type: ignore
         except Exception as exp:
-            raise ParserValueError(
+            raise FreshPointParserValueError(
                 f'Unable to extract product category name for product '
                 f'"id={cls._find_id_safe(product_data)}" from the provided '
                 f'html data ({exp}).'
@@ -205,12 +205,12 @@ class ProductHTMLParser:
             T: The converted value.
 
         Raises:
-            ParserValueError: If an error occurs during the conversion process.
+            FreshPointParserValueError: If an error occurs during the conversion process.
         """
         try:
             return converter()
         except Exception as exc:
-            raise ParserValueError(
+            raise FreshPointParserValueError(
                 f'Unable to convert a parsed value for the product '
                 f'"id={cls._find_id_safe(product_data)}".'
             ) from exc
@@ -276,7 +276,7 @@ class ProductHTMLParser:
             )
             if price_curr > price_full:
                 id_ = cls._find_id_safe(product_data)
-                raise ParserValueError(
+                raise FreshPointParserValueError(
                     f'Unexpected product "id={id_}" parsing results: '
                     f'current price "{price_curr}" is greater than '
                     f'the regular full price "{price_full}".'
@@ -291,7 +291,7 @@ class ProductHTMLParser:
             #             f'but the "isPromo" flag is not set.'
             #             )
             return price_full, price_curr
-        raise ParserValueError(
+        raise FreshPointParserValueError(
             f'Unexpected number of elements in the ResultSet'
             f'(expected 1 or 2, got {len(result)}).'
         )
@@ -364,7 +364,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             id_ (int): The ID of the product to search for.
 
         Raises:
-            ParserValueError: If the product with the specified ID is not unique.
+            FreshPointParserValueError: If the product with the specified ID is not unique.
 
         Returns:
             Optional[bs4.Tag]: A Tag containing the data of the matched product.
@@ -377,7 +377,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             try:
                 return int(value) == id_
             except (ValueError, TypeError) as e:
-                raise ParserValueError(
+                raise FreshPointParserValueError(
                     f'Unable to parse the product ID "{value}".'
                 ) from e
 
@@ -389,7 +389,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         if len(result) == 0:
             return None
         if len(result) != 1:
-            raise ParserValueError(f'ID="{id_}" is not unique.')
+            raise FreshPointParserValueError(f'ID="{id_}" is not unique.')
         return result[0]  # type: ignore
 
     def _find_product_data_by_name(
@@ -411,10 +411,10 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         def attr_filter_name(value: str) -> bool:
             try:
                 return self._match_strings(name, value, partial_match)
-            except ParserTypeError as exc:
+            except FreshPointParserTypeError as exc:
                 raise exc
             except Exception as e:
-                raise ParserValueError(
+                raise FreshPointParserValueError(
                     f'Unable to parse the product name "{value}".'
                 ) from e
 
@@ -467,7 +467,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         the device ID) extracted from the page HTML content.
 
         The value is cached after the first extraction until the page HTML
-        changes. If the value cannot be parsed, a ParserValueError is raised.
+        changes. If the value cannot be parsed, a FreshPointParserValueError is raised.
         """
         if 'location_id' in self._page.model_fields_set:  # cached
             return self._page.location_id
@@ -475,7 +475,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             name='script', string=self._RE_PATTERN_DEVICE_ID
         )
         if not script_tag:
-            raise ParserValueError(
+            raise FreshPointParserValueError(
                 'Unable to parse page ID '
                 '(<script/> tag with "deviceId" text was not found).'
             )
@@ -483,7 +483,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             pattern=self._RE_PATTERN_DEVICE_ID, string=script_tag.get_text()
         )
         if not match:
-            raise ParserValueError(
+            raise FreshPointParserValueError(
                 'Unable to parse page ID ("deviceId" text '
                 'within the <script/> tag was not matched).'
             )
@@ -492,7 +492,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             self._page.location_id = location_id
             return location_id
         except Exception as e:
-            raise ParserValueError('Unable to parse page ID.') from e
+            raise FreshPointParserValueError('Unable to parse page ID.') from e
 
     @property
     def location_name(self) -> str:
@@ -500,13 +500,13 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         from the page HTML content.
 
         The value is cached after the first extraction until the page HTML
-        changes. If the value cannot be parsed, a ParserValueError is raised.
+        changes. If the value cannot be parsed, a FreshPointParserValueError is raised.
         """
         if 'location_name' in self._page.model_fields_set:  # cached
             return self._page.location_name
         title_tag = self._bs4_parser.find('title')
         if not title_tag:
-            raise ParserValueError(
+            raise FreshPointParserValueError(
                 'Unable to parse location name (<title/> tag  was not found).'
             )
         title_text = title_tag.get_text()
@@ -515,7 +515,9 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             self._page.location_name = location_name
             return location_name
         except Exception as e:
-            raise ParserValueError('Unable to parse location name.') from e
+            raise FreshPointParserValueError(
+                'Unable to parse location name.'
+            ) from e
 
     @property
     def products(self) -> List[Product]:
@@ -553,8 +555,8 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
                 a string representation of a non-negative integer.
 
         Raises:
-            ParserValueError: If the ID is an integer but is negative.
-            ParserTypeError: If the ID is not an integer and cannot be
+            FreshPointParserValueError: If the ID is an integer but is negative.
+            FreshPointParserTypeError: If the ID is not an integer and cannot be
                 converted to an integer.
 
         Returns:
@@ -565,9 +567,9 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         try:
             id_ = validate_id(id_)
         except ValueError as exc:
-            raise ParserValueError(str(exc)) from exc
+            raise FreshPointParserValueError(str(exc)) from exc
         except TypeError as exc:
-            raise ParserTypeError(str(exc)) from exc
+            raise FreshPointParserTypeError(str(exc)) from exc
         product = self._page.items.get(id_)
         if product is not None:  # found in cache
             return product.model_copy(deep=True)  # copy for cache immutability
@@ -595,7 +597,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
                 (case-insensitive). Defaults to True.
 
         Raises:
-            ParserTypeError: If the product name is not a string.
+            FreshPointParserTypeError: If the product name is not a string.
 
         Returns:
             Optional[Product]: Product matching the specified name or ``None``
@@ -604,7 +606,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             returned.
         """
         if not isinstance(name, str):
-            raise ParserTypeError(
+            raise FreshPointParserTypeError(
                 f'Expected a string for product name, got {type(name)}.'
             )
         product = self._page.find_item(
@@ -644,7 +646,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             products are found, an empty list is returned.
         """
         if not isinstance(name, str):
-            raise ParserTypeError(
+            raise FreshPointParserTypeError(
                 f'Expected a string for product name, got {type(name)}.'
             )
         if self._all_products_found:  # use cache if all products are parsed
@@ -671,7 +673,7 @@ def parse_product_page(page_html: Union[str, bytes]) -> ProductPage:
         page_html (Union[str, bytes]): HTML content of the product page to parse.
 
     Raises:
-        ParserError: If the HTML content cannot be parsed or does not
+        FresgPointParserError: If the HTML content cannot be parsed or does not
             contain the expected structure.
 
     Returns:

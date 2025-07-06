@@ -7,7 +7,10 @@ from datetime import datetime
 from typing import Generic, Optional, TypeVar, Union
 
 from .._utils import normalize_text
-from ..exceptions import ParserAttributeError, ParserTypeError
+from ..exceptions import (
+    FreshPointParserAttributeError,
+    FreshPointParserTypeError,
+)
 from ..models import BasePage
 
 if sys.version_info >= (3, 11):
@@ -49,13 +52,15 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
                 case-insensitive and ignores diacritics.
 
         Raises:
-            ParserTypeError: If the needle is not a string.
+            FreshPointParserTypeError: If the needle is not a string.
 
         Returns:
             bool: True if the needle is found in the haystack, False otherwise.
         """
         if not isinstance(needle, str):
-            raise ParserTypeError(f'Expected a string, got {type(needle)}.')
+            raise FreshPointParserTypeError(
+                f'Expected a string, got {type(needle)}.'
+            )
         op = operator.contains if partial_match else operator.eq
         return op(normalize_text(haystack), normalize_text(needle))
 
@@ -148,10 +153,12 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         """Timestamp of the last successful or skipped parse.
 
         If the parser has never parsed any HTML content, this property will
-        raise a :pyexc:`ParserAttributeError`.
+        raise a :pyexc:`FreshPointParserAttributeError`.
         """
         if self._parse_status is None:
-            raise ParserAttributeError('Parser has not parsed any HTML yet.')
+            raise FreshPointParserAttributeError(
+                'Parser has not parsed any HTML yet.'
+            )
         return self._parse_datetime
 
     @property

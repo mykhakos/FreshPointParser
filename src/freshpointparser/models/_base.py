@@ -30,7 +30,7 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
-from ..exceptions import ModelTypeError, ModelValueError
+from ..exceptions import FreshPointParserTypeError, FreshPointParserValueError
 
 if sys.version_info >= (3, 11):
     from typing import TypeAlias
@@ -231,7 +231,7 @@ class BaseRecord(BaseModel):
                 - `d`: date precision
 
         Raises:
-            ModelValueError: If the precision is not one of the supported values.
+            FreshPointParserValueError: If the precision is not one of the supported values.
 
         Returns:
             Optional[bool]: With the specified precision taken into account,
@@ -261,7 +261,7 @@ class BaseRecord(BaseModel):
             recorded_at_self = self.recorded_at.date()
             recorded_at_other = other.recorded_at.date()
         else:
-            raise ModelValueError(
+            raise FreshPointParserValueError(
                 f"Invalid precision '{precision}'. "
                 f"Expected one of: 's', 'm', 'h', 'd'."
             )
@@ -579,7 +579,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         Raises:
             AttributeError: If the attribute is not present in an item
                 and `default` is not provided.
-            ModelTypeError: If the attribute values are not hashable and
+            FreshPointParserTypeError: If the attribute values are not hashable and
                 `unhashable` is set to False.
 
         Yields:
@@ -607,7 +607,7 @@ class BasePage(BaseRecord, Generic[TItem]):
                             seen.add(value)
                             yield value
                 except TypeError as e:
-                    raise ModelTypeError(
+                    raise FreshPointParserTypeError(
                         f"Cannot yield unique values for attribute '{attr}': "
                         f'the values are not hashable. '
                         f"Set 'unhashable=True' to compare the values directly."
@@ -649,7 +649,7 @@ class BasePage(BaseRecord, Generic[TItem]):
                 `'foo'`.
 
         Raises:
-            ModelTypeError: If the constraint is invalid, i.e., not a
+            FreshPointParserTypeError: If the constraint is invalid, i.e., not a
                 Mapping or a Callable.
 
         Returns:
@@ -691,7 +691,7 @@ class BasePage(BaseRecord, Generic[TItem]):
                 `'foo'`.
 
         Raises:
-            ModelTypeError: If the constraint is invalid, i.e., not a
+            FreshPointParserTypeError: If the constraint is invalid, i.e., not a
                 Mapping or a Callable.
 
         Returns:
@@ -707,7 +707,7 @@ class BasePage(BaseRecord, Generic[TItem]):
                             yield item
                     except TypeError as exc:  # invalid callable signature
                         if type(exc) is TypeError:
-                            raise ModelTypeError(str(exc)) from exc
+                            raise FreshPointParserTypeError(str(exc)) from exc
                         raise
 
             return _filter_callable()
@@ -724,12 +724,12 @@ class BasePage(BaseRecord, Generic[TItem]):
                             yield item
                     except TypeError as exc:  # invalid attribute type
                         if type(exc) is TypeError:
-                            raise ModelTypeError(str(exc)) from exc
+                            raise FreshPointParserTypeError(str(exc)) from exc
                         raise
 
             return _filter_mapping()
 
-        raise ModelTypeError(
+        raise FreshPointParserTypeError(
             f'Constraint must be either a Mapping or a Callable. '
             f"Got type '{type(constraint)}' instead."
         )

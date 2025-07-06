@@ -6,6 +6,8 @@ from typing import Union
 
 from unidecode import unidecode
 
+from .exceptions import FreshPointParserTypeError, FreshPointParserValueError
+
 logger = logging.getLogger('freshpointparser')
 """Top-level logger of the `freshpointparser` package."""
 
@@ -24,10 +26,10 @@ def validate_id(id_: object) -> int:
             either a string or an integer.
 
     Raises:
-        TypeError: If the object is not an integer or not a string.
-        ValueError: If the object is a string that is not a numeric string
-            representing a non-negative integer, or if the object is an
-            integer that is negative.
+        FreshPointParserTypeError: If the object is not an integer or not a string.
+        FreshPointParserValueError: If the object is a string that is not a numeric
+            string representing a non-negative integer, or if the object is
+            an integer that is negative.
 
     Returns:
         int: The validated ID, as a non-negative integer.
@@ -36,14 +38,16 @@ def validate_id(id_: object) -> int:
         if id_.isdecimal():
             return int(id_)
         else:
-            raise ValueError(
+            raise FreshPointParserValueError(
                 f'ID must be a numeric string representing a non-negative '
                 f'integer (got "{id_}").'
             )
     if not isinstance(id_, int):
-        raise TypeError(f'ID must be an integer (got {type(id_)}).')
+        raise FreshPointParserTypeError(
+            f'ID must be an integer (got {type(id_)}).'
+        )
     if id_ < 0:
-        raise ValueError('ID must be a non-negative integer.')
+        raise FreshPointParserValueError('ID must be a non-negative integer.')
     return id_
 
 
@@ -59,10 +63,10 @@ def get_product_page_url(location_id: Union[int, str]) -> str:
             the ID is 296.
 
     Raises:
-        TypeError: If the location ID is not an integer or a string.
-        ValueError: If the location ID is a string that is not a numeric string
-            representing a non-negative integer, or if the location ID is an
-            integer that is negative.
+        FreshPointParserTypeError: If the object is not an integer or not a string.
+        FreshPointParserValueError: If the object is a string that is not a numeric
+            string representing a non-negative integer, or if the object is
+            an integer that is negative.
 
     Returns:
         str: The full page URL for the given location ID.
@@ -88,6 +92,10 @@ def normalize_text(text: object) -> str:
     Args:
         text (Any): The text to be normalized.
 
+    Raises:
+        FreshPointParserValueError: If the text cannot be normalized due to an
+            unexpected error, such as encoding issues.
+
     Returns:
         str: The normalized text.
     """
@@ -96,4 +104,6 @@ def normalize_text(text: object) -> str:
     try:
         return unidecode(str(text).strip()).casefold()
     except Exception as e:
-        raise ValueError(f'Failed to normalize text "{text}".') from e
+        raise FreshPointParserValueError(
+            f'Failed to normalize text "{text}".'
+        ) from e
