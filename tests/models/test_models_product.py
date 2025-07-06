@@ -6,11 +6,14 @@ import pytest
 from pydantic import Field
 
 from freshpointparser import get_product_page_url
+from freshpointparser.exceptions import (
+    FreshPointParserTypeError,
+    FreshPointParserValueError,
+)
 from freshpointparser.models import (
     Product,
     ProductPage,
 )
-from freshpointparser.exceptions import ModelTypeError, ModelValueError
 from freshpointparser.models._product import DEFAULT_PRODUCT_PIC_URL
 from freshpointparser.models.annotations import (
     DiffType,
@@ -360,7 +363,7 @@ def test_product_is_newer_than(p1, p2, precision, is_p1_newer_than_p2):
 def test_is_newer_than_invalid_precision():
     p1 = Product(recorded_at=datetime(2024, 1, 1))
     p2 = Product(recorded_at=datetime(2024, 1, 2))
-    with pytest.raises(ModelValueError):
+    with pytest.raises(FreshPointParserValueError):
         p1.is_newer_than(p2, precision='q')  # type: ignore[reportArgumentType]
 
 
@@ -1264,9 +1267,9 @@ def test_product_page_find_items_no_match(product_page, constraint):
     ],
 )
 def test_product_page_find_items_invalid_constraint(product_page, constraint):
-    with pytest.raises(ModelTypeError):
+    with pytest.raises(FreshPointParserTypeError):
         list(product_page.find_items(constraint))
-    with pytest.raises(ModelTypeError):
+    with pytest.raises(FreshPointParserTypeError):
         product_page.find_item(constraint)
 
 

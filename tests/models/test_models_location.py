@@ -4,8 +4,8 @@ from types import MappingProxyType
 import pytest
 
 from freshpointparser import get_location_page_url
+from freshpointparser.exceptions import FreshPointParserTypeError
 from freshpointparser.models import Location, LocationPage
-from freshpointparser.exceptions import ModelTypeError
 
 # region Location
 
@@ -373,9 +373,9 @@ def test_location_page_find_items_no_match(locations_page, constraint):
 def test_location_page_find_items_invalid_constraint(
     locations_page, constraint
 ):
-    with pytest.raises(ModelTypeError):
+    with pytest.raises(FreshPointParserTypeError):
         list(locations_page.find_items(constraint))
-    with pytest.raises(ModelTypeError):
+    with pytest.raises(FreshPointParserTypeError):
         locations_page.find_item(constraint)
 
 

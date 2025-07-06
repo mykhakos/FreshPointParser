@@ -6,9 +6,9 @@ from pydantic.alias_generators import to_camel
 
 from freshpointparser import parse_location_page
 from freshpointparser.exceptions import (
-    ParserAttributeError,
-    ParserTypeError,
-    ParserValueError,
+    FreshPointParserAttributeError,
+    FreshPointParserTypeError,
+    FreshPointParserValueError,
 )
 from freshpointparser.models import LocationPage
 from freshpointparser.parsers import LocationPageHTMLParser
@@ -79,7 +79,7 @@ def test_parse_empty_data():
 
 def test_parse_datetime_access_before_parse():
     parser = LocationPageHTMLParser()
-    with pytest.raises(ParserAttributeError):
+    with pytest.raises(FreshPointParserAttributeError):
         _ = parser.parse_datetime
 
 
@@ -135,17 +135,17 @@ def test_parse_status_tri_state(location_page_html_text):
 def test_load_json_errors():
     parser = LocationPageHTMLParser()
     # pattern not found
-    with pytest.raises(ParserValueError):
+    with pytest.raises(FreshPointParserValueError):
         parser._load_json('<html></html>')
 
     # invalid JSON in the matched text
     faulty = 'devices = "[{]" ;'
-    with pytest.raises(ParserValueError):
+    with pytest.raises(FreshPointParserValueError):
         parser._load_json(faulty)
 
     # data not a list
     not_list = 'devices = "{}";'
-    with pytest.raises(ParserValueError):
+    with pytest.raises(FreshPointParserValueError):
         parser._load_json(not_list)
 
 
@@ -253,7 +253,7 @@ def test_find_location_by_id_invalid_value(
     location_page_html_parser_new, location_id
 ):
     parser = location_page_html_parser_new
-    with pytest.raises(ParserValueError):
+    with pytest.raises(FreshPointParserValueError):
         assert parser.find_location_by_id(location_id) is None
 
 
@@ -262,7 +262,7 @@ def test_find_location_by_id_invalid_type(
     location_page_html_parser_new, location_id
 ):
     parser = location_page_html_parser_new
-    with pytest.raises(ParserTypeError):
+    with pytest.raises(FreshPointParserTypeError):
         assert parser.find_location_by_id(location_id) is None
 
 
@@ -354,7 +354,7 @@ def test_find_location_by_name_invalid_type(
     location_page_html_parser_new, location_name
 ):
     parser = location_page_html_parser_new
-    with pytest.raises(ParserTypeError):
+    with pytest.raises(FreshPointParserTypeError):
         parser.find_location_by_name(location_name)
         parser.find_locations_by_name(location_name)
 
