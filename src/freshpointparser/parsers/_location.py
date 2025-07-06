@@ -9,6 +9,7 @@ from typing import (
 
 from freshpointparser._utils import validate_id
 
+from ..exceptions import ParserTypeError, ParserValueError
 from ..models import (
     Location,
     LocationPage,
@@ -48,7 +49,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
                 location page.
 
         Raises:
-            ValueError: If the location data cannot be found or parsed.
+            ParserValueError: If the location data cannot be found or parsed.
 
         Returns:
             List[Dict]: A list of location data dictionaries extracted from the
@@ -60,7 +61,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         else:
             match_ = re.search(self._RE_SEARCH_PATTERN_BYTES, page_html)
         if not match_:
-            raise ValueError(
+            raise ParserValueError(
                 'Unable to find the location data in the HTML '
                 '(regex pattern not matched).'
             )
@@ -69,17 +70,17 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             # embedded in the HTML (a JSON string inside a JavaScript string)
             data = json.loads(json.loads(match_.group(1)))
         except IndexError as e:
-            raise ValueError(
+            raise ParserValueError(
                 'Unable to parse the location data in the HTML '
                 '(regex data group is missing).'
             ) from e
         except Exception as e:
-            raise ValueError(
+            raise ParserValueError(
                 'Unable to parse the location data in the HTML '
                 '(Unexpected error during JSON parsing).'
             ) from e
         if not isinstance(data, list):
-            raise ValueError(
+            raise ParserValueError(
                 'Unable to parse the location data in the HTML '
                 '(data is not a list).'
             )
@@ -111,12 +112,10 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         for item in data:
             item['prop']['recordedAt'] = self._parse_datetime
             locations[item['prop']['id']] = item['prop']
-        return LocationPage.model_validate(
-            {
-                'recordedAt': self._parse_datetime,
-                'items': locations,
-            }
-        )
+        return LocationPage.model_validate({
+            'recordedAt': self._parse_datetime,
+            'items': locations,
+        })
 
     def _parse_page_html(self, page_html: Union[str, bytes]) -> None:
         """Parse HTML content of a location page.
@@ -171,7 +170,12 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             the location is not found.  The returned instance is independent of
             the parser's cached data.
         """
-        id_ = validate_id(id_)
+        try:
+            id_ = validate_id(id_)
+        except ValueError as exc:
+            raise ParserValueError(str(exc)) from exc
+        except TypeError as exc:
+            raise ParserTypeError(str(exc)) from exc
         location = self._page.items.get(id_)
         if location is None:
             return None

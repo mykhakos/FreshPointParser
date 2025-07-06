@@ -6,6 +6,10 @@ from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from freshpointparser import parse_product_page
+from freshpointparser.exceptions import (
+    ParserTypeError,
+    ParserValueError,
+)
 from freshpointparser.models import ProductPage
 from freshpointparser.parsers import ProductPageHTMLParser
 
@@ -71,7 +75,7 @@ def product_page_expected_meta():
 
 def test_parse_empty_data():
     parser = ProductPageHTMLParser()
-    with pytest.raises(ValueError):
+    with pytest.raises(ParserValueError):
         parser.location_id
         parser.location_name
         assert parser.page
@@ -261,7 +265,7 @@ def test_find_product_by_id_invalid_value(
     product_page_html_parser_new, product_id
 ):
     parser = product_page_html_parser_new
-    with pytest.raises(ValueError):
+    with pytest.raises(ParserValueError):
         assert parser.find_product_by_id(product_id) is None
 
 
@@ -270,7 +274,7 @@ def test_find_product_by_id_invalid_type(
     product_page_html_parser_new, product_id
 ):
     parser = product_page_html_parser_new
-    with pytest.raises(TypeError):
+    with pytest.raises(ParserTypeError):
         assert parser.find_product_by_id(product_id) is None
 
 
@@ -281,12 +285,12 @@ def test_find_product_data_by_id_errors():
     )
     parser = ProductPageHTMLParser()
     parser.parse(html)
-    with pytest.raises(ValueError):
+    with pytest.raises(ParserValueError):
         parser._find_product_data_by_id(1)
 
     html = "<div class='product' data-id='abc'></div>"
     parser.parse(html)
-    with pytest.raises(ValueError):
+    with pytest.raises(ParserValueError):
         parser._find_product_data_by_id(1)
 
 
@@ -369,7 +373,7 @@ def test_find_products_by_name_invalid_type(
     product_page_html_parser_new, product_name
 ):
     parser = product_page_html_parser_new
-    with pytest.raises(ValueError):
+    with pytest.raises(ParserTypeError):
         parser.find_product_by_name(product_name)
         parser.find_products_by_name(product_name)
 
