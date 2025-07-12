@@ -7,14 +7,6 @@ from pydantic import Field, NonNegativeFloat, NonNegativeInt
 from .._utils import get_product_page_url, normalize_text
 from ._base import BaseItem, BasePage
 
-DEFAULT_PRODUCT_PIC_URL = (
-    r'https://images.weserv.nl/?url=http://freshpoint.freshserver.cz/'
-    r'backend/web/media/photo/1_f587dd3fa21b22.jpg'
-)
-"""Default picture URL for a product.
-The URL points to an image hosted on the FreshPoint server.
-"""
-
 
 @dataclass
 class ProductQuantityUpdateInfo:
@@ -156,7 +148,10 @@ class Product(BaseItem):
     )
     """Additional information about the product such as ingredients or nutritional values."""
     pic_url: str = Field(
-        default=DEFAULT_PRODUCT_PIC_URL,
+        default=(
+            r'https://images.weserv.nl/?url=http://freshpoint.freshserver.cz/'
+            r'backend/web/media/photo/1_f587dd3fa21b22.jpg'
+        ),
         title='Illustrative Product Picture URL',
         description='URL of the illustrative product image.',
     )
