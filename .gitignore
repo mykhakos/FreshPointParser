@@ -99,3 +99,9 @@ cython_debug/
 
 # VSCode
 .vscode/
+
+# PyCharm
+.idea/
+
+# Ruff
+.ruff_cache/
