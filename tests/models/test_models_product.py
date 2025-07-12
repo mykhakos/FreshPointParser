@@ -119,9 +119,7 @@ def test_product_init(product, expected_attrs):
         ),
     ],
 )
-def test_product_init_price_resolve(
-    product, expected_price_full, expected_price_curr
-):
+def test_product_init_price_resolve(product, expected_price_full, expected_price_curr):
     assert product.price_full == expected_price_full
     assert product.price_curr == expected_price_curr
 
@@ -168,20 +166,14 @@ def test_product_prop_category_lowercase_ascii(
 @pytest.mark.parametrize(
     'product, rate',
     [
-        pytest.param(
-            Product(price_full=0, price_curr=0), 0, id='both prices (zero)'
-        ),
-        pytest.param(
-            Product(price_full=0, price_curr=10), 0, id='price_curr only'
-        ),
+        pytest.param(Product(price_full=0, price_curr=0), 0, id='both prices (zero)'),
+        pytest.param(Product(price_full=0, price_curr=10), 0, id='price_curr only'),
         pytest.param(
             Product(price_full=5, price_curr=10),
             0,
             id='price_full < price_curr',
         ),
-        pytest.param(
-            Product(price_full=10, price_curr=0), 1, id='price_full only'
-        ),
+        pytest.param(Product(price_full=10, price_curr=0), 1, id='price_full only'),
         pytest.param(
             Product(price_full=10, price_curr=5),
             0.5,
@@ -659,9 +651,7 @@ def test_product_diff_exclude_recorded_at_with_kwargs(
         pytest.param(0, 0, False, False, True, id='stock restocked'),
         pytest.param(0, 0, True, True, False, id='last piece and depleted'),
         pytest.param(0, 0, False, True, True, id='last piece and restocked'),
-        pytest.param(
-            0, 0, True, True, True, id='last piece, depleted, and restocked'
-        ),
+        pytest.param(0, 0, True, True, True, id='last piece, depleted, and restocked'),
     ],
 )
 def test_product_quantity_update_info(
@@ -816,9 +806,7 @@ def test_product_compare_quantity(product_this, product_other, info):
     sale_ended
     """,
     [
-        pytest.param(
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, False, False, id='no change'
-        ),
+        pytest.param(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, False, False, id='no change'),
         pytest.param(
             0.0,
             15.0,
@@ -994,18 +982,14 @@ def test_compare_price(product_this, product_other, info):
         pytest.param(
             ProductPage(
                 items={
-                    1: Product(
-                        id_=1, location_id=296, recorded_at=datetime(2025, 1, 1)
-                    )
+                    1: Product(id_=1, location_id=296, recorded_at=datetime(2025, 1, 1))
                 },
                 location_id=296,
                 location_name='foo',
             ),
             {
                 'items': {
-                    1: Product(
-                        id_=1, location_id=296, recorded_at=datetime(2025, 1, 1)
-                    )
+                    1: Product(id_=1, location_id=296, recorded_at=datetime(2025, 1, 1))
                 },
                 'location_id': 296,
                 'location_name': 'foo',
@@ -1022,12 +1006,8 @@ def test_product_page_init(page, expected_attrs):
 @pytest.mark.parametrize(
     'location_id, expected_url',
     [
-        pytest.param(
-            0, get_product_page_url(location_id=0), id='location_id=0'
-        ),
-        pytest.param(
-            296, get_product_page_url(location_id=296), id='location_id=296'
-        ),
+        pytest.param(0, get_product_page_url(location_id=0), id='location_id=0'),
+        pytest.param(296, get_product_page_url(location_id=296), id='location_id=296'),
     ],
 )
 def test_product_page_prop_url(location_id, expected_url):
@@ -1039,9 +1019,7 @@ def test_product_page_prop_url(location_id, expected_url):
     'location_name, expected_location_name_lowercase_ascii',
     [
         pytest.param('', '', id='empty location name'),
-        pytest.param(
-            'foo', 'foo', id='location name with ascii charactersonly'
-        ),
+        pytest.param('foo', 'foo', id='location name with ascii charactersonly'),
         pytest.param(
             "L'Oréal Česká republika",
             "l'oreal ceska republika",
@@ -1053,10 +1031,7 @@ def test_product_page_prop_location_name_lowercase_ascii(
     location_name, expected_location_name_lowercase_ascii
 ):
     page = ProductPage(location_name=location_name)
-    assert (
-        page.location_name_lowercase_ascii
-        == expected_location_name_lowercase_ascii
-    )
+    assert page.location_name_lowercase_ascii == expected_location_name_lowercase_ascii
 
 
 @pytest.fixture(scope='module')
@@ -1251,9 +1226,7 @@ def test_page_item_helpers(product_page):
         ),
     ],
 )
-def test_product_page_find_items(
-    product_page, constraint, expected_product_ids
-):
+def test_product_page_find_items(product_page, constraint, expected_product_ids):
     products = product_page.find_items(constraint)
     assert [p.id_ for p in products] == expected_product_ids
     product = product_page.find_item(constraint)
@@ -1266,9 +1239,7 @@ def test_product_page_find_items(
         pytest.param({'': 'orange'}, id='dict constraint: empty string key'),
         pytest.param({'cat': 'fruit'}, id='dict constraint: partial key'),
         pytest.param({'nema': 'orange'}, id='dict constraint: misspelled key'),
-        pytest.param(
-            {'id': 1}, id='dict constraint: pydantic validation alias key'
-        ),
+        pytest.param({'id': 1}, id='dict constraint: pydantic validation alias key'),
         pytest.param(
             {'name': 'orange', 'cat': 'fruit', 'quant': 1},
             id='dict constraint: multiple keys, one invalid',
@@ -1371,9 +1342,7 @@ def test_product_page_find_items_invalid_constraint(product_page, constraint):
         ),
     ],
 )
-def test_product_page_find_items_invalid_lambda_attribute(
-    product_page, constraint
-):
+def test_product_page_find_items_invalid_lambda_attribute(product_page, constraint):
     with pytest.raises(AttributeError):
         list(product_page.find_items(constraint))
     with pytest.raises(AttributeError):
@@ -1432,9 +1401,7 @@ def test_iter_item_attr_defaults_and_uniqueness():
 
     # unique with unhashable values
     page.items[5] = SubProduct(id_=5, context={'key': 'value'})
-    assert list(
-        page.iter_item_attr('context', default={}, unhashable=True)
-    ) == [
+    assert list(page.iter_item_attr('context', default={}, unhashable=True)) == [
         {},
         {},
         {},

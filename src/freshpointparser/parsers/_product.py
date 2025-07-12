@@ -36,9 +36,7 @@ class ProductHTMLParser:
     availability, etc.
     """
 
-    _RE_PATTERN_FIND_QUANTITY = re.compile(
-        r'^((posledni)|(\d+))\s(kus|kusy|kusu)!?$'
-    )
+    _RE_PATTERN_FIND_QUANTITY = re.compile(r'^((posledni)|(\d+))\s(kus|kusy|kusu)!?$')
     """Regex pattern to find the quantity of a product in the HTML string."""
     _RE_PATTERN_FIND_PRICE = re.compile(r'^\d+\.\d+$')
     """Regex pattern to find the price of a product in the HTML string."""
@@ -184,15 +182,12 @@ class ProductHTMLParser:
             return str(cls.find_id(product_data))
         except Exception as e:
             logger.warning(
-                f'Unable to extract product ID from the provided html data '
-                f'({e}).'
+                f'Unable to extract product ID from the provided html data ({e}).'
             )
             return '?'
 
     @classmethod
-    def _run_converter(
-        cls, converter: Callable[[], T], product_data: bs4.Tag
-    ) -> T:
+    def _run_converter(cls, converter: Callable[[], T], product_data: bs4.Tag) -> T:
         """Run the given converter function and return the converted value.
 
         Args:
@@ -515,9 +510,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             self._page.location_name = location_name
             return location_name
         except Exception as e:
-            raise FreshPointParserValueError(
-                'Unable to parse location name.'
-            ) from e
+            raise FreshPointParserValueError('Unable to parse location name.') from e
 
     @property
     def products(self) -> List[Product]:

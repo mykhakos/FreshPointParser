@@ -81,8 +81,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             ) from e
         if not isinstance(data, list):
             raise FreshPointParserValueError(
-                'Unable to parse the location data in the HTML '
-                '(data is not a list).'
+                'Unable to parse the location data in the HTML (data is not a list).'
             )
         return data
 

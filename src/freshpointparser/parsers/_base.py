@@ -58,9 +58,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
             bool: True if the needle is found in the haystack, False otherwise.
         """
         if not isinstance(needle, str):
-            raise FreshPointParserTypeError(
-                f'Expected a string, got {type(needle)}.'
-            )
+            raise FreshPointParserTypeError(f'Expected a string, got {type(needle)}.')
         op = operator.contains if partial_match else operator.eq
         return op(normalize_text(haystack), normalize_text(needle))
 
@@ -79,9 +77,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
             page_html = page_html.encode('utf-8')
         return hashlib.sha1(page_html).hexdigest()  # noqa: S324
 
-    def _update_html_hash(
-        self, page_html: Union[str, bytes], force: bool
-    ) -> bool:
+    def _update_html_hash(self, page_html: Union[str, bytes], force: bool) -> bool:
         """Update the HTML hash if the page HTML has changed.
 
         Args:
@@ -156,9 +152,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         raise a :pyexc:`FreshPointParserAttributeError`.
         """
         if self._parse_status is None:
-            raise FreshPointParserAttributeError(
-                'Parser has not parsed any HTML yet.'
-            )
+            raise FreshPointParserAttributeError('Parser has not parsed any HTML yet.')
         return self._parse_datetime
 
     @property

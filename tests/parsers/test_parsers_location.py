@@ -160,9 +160,7 @@ def test_parse_location_page_function(location_page_html_text):
 # region Parser properties
 
 
-def test_validate_parsed_locations(
-    location_page_html_parser_persistent, location_page
-):
+def test_validate_parsed_locations(location_page_html_parser_persistent, location_page):
     # assert each location in the parser is in the reference
     location_ids = set()
     for location in location_page_html_parser_persistent.locations:
@@ -222,18 +220,14 @@ def test_validate_generated_location_page(
 # region Find by ID
 
 
-def test_find_location_by_id_int_exists(
-    location_page_html_parser_new, location_page
-):
+def test_find_location_by_id_int_exists(location_page_html_parser_new, location_page):
     parser = location_page_html_parser_new
     for location_id in location_page.items:
         assert parser.find_location_by_id(location_id) is not None
         assert parser.find_location_by_id(location_id).id_ == location_id
 
 
-def test_find_location_by_id_str_exists(
-    location_page_html_parser_new, location_page
-):
+def test_find_location_by_id_str_exists(location_page_html_parser_new, location_page):
     parser = location_page_html_parser_new
     for location_id in location_page.items:
         assert parser.find_location_by_id(str(location_id)) is not None
@@ -241,26 +235,20 @@ def test_find_location_by_id_str_exists(
 
 
 @pytest.mark.parametrize('location_id', [0, 999999])
-def test_find_location_by_id_not_found(
-    location_page_html_parser_new, location_id
-):
+def test_find_location_by_id_not_found(location_page_html_parser_new, location_id):
     parser = location_page_html_parser_new
     assert parser.find_location_by_id(location_id) is None
 
 
 @pytest.mark.parametrize('location_id', [-1, '-1', '13.5', '1480a', 'id'])
-def test_find_location_by_id_invalid_value(
-    location_page_html_parser_new, location_id
-):
+def test_find_location_by_id_invalid_value(location_page_html_parser_new, location_id):
     parser = location_page_html_parser_new
     with pytest.raises(FreshPointParserValueError):
         assert parser.find_location_by_id(location_id) is None
 
 
 @pytest.mark.parametrize('location_id', [13.5, None, {}])
-def test_find_location_by_id_invalid_type(
-    location_page_html_parser_new, location_id
-):
+def test_find_location_by_id_invalid_type(location_page_html_parser_new, location_id):
     parser = location_page_html_parser_new
     with pytest.raises(FreshPointParserTypeError):
         assert parser.find_location_by_id(location_id) is None
@@ -278,18 +266,13 @@ def test_find_location_by_name_exists_full_match(
     parser = location_page_html_parser_new
     for location in location_page.items.values():
         assert (
-            parser.find_location_by_name(location.name, partial_match=False)
-            is not None
+            parser.find_location_by_name(location.name, partial_match=False) is not None
         )
         assert (
-            parser.find_location_by_name(
-                location.name, partial_match=False
-            ).name
+            parser.find_location_by_name(location.name, partial_match=False).name
             == location.name
         )
-        locations = parser.find_locations_by_name(
-            location.name, partial_match=False
-        )
+        locations = parser.find_locations_by_name(location.name, partial_match=False)
         # assert len(locations) == 1  # name may not be unique, assertion removed
         assert locations[0].name == location.name
 
@@ -313,37 +296,22 @@ def test_find_location_by_name_exists_partial_match(
         raise RuntimeError(
             f'Invalid test setup: no location contains "{location_name}" in its name'
         )
-    assert (
-        parser.find_location_by_name(location_name, partial_match=True)
-        is not None
-    )
-    assert (
-        parser.find_location_by_name(location_name, partial_match=False) is None
-    )
-    assert (
-        parser.find_locations_by_name(location_name, partial_match=True) != []
-    )
-    assert (
-        parser.find_locations_by_name(location_name, partial_match=False) == []
-    )
+    assert parser.find_location_by_name(location_name, partial_match=True) is not None
+    assert parser.find_location_by_name(location_name, partial_match=False) is None
+    assert parser.find_locations_by_name(location_name, partial_match=True) != []
+    assert parser.find_locations_by_name(location_name, partial_match=False) == []
 
 
 @pytest.mark.parametrize(
     'location_name',
     ['   cpi    May', 'alpwd,apwd,a'],
 )
-def test_find_location_by_name_not_found(
-    location_page_html_parser_new, location_name
-):
+def test_find_location_by_name_not_found(location_page_html_parser_new, location_name):
     parser = location_page_html_parser_new
     assert parser.find_location_by_name(location_name) is None
     assert parser.find_locations_by_name(location_name) == []
-    assert (
-        parser.find_location_by_name(location_name, partial_match=False) is None
-    )
-    assert (
-        parser.find_locations_by_name(location_name, partial_match=False) == []
-    )
+    assert parser.find_location_by_name(location_name, partial_match=False) is None
+    assert parser.find_locations_by_name(location_name, partial_match=False) == []
 
 
 @pytest.mark.parametrize(

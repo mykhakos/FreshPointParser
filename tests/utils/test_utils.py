@@ -84,9 +84,7 @@ def test_validate_id(input_value, expected_output):
         'None',
     ],
 )
-def test_validate_id_invalid(
-    input_value, expected_exception, exception_message
-):
+def test_validate_id_invalid(input_value, expected_exception, exception_message):
     with pytest.raises(expected_exception) as excinfo:
         validate_id(input_value)
     assert str(excinfo.value) == exception_message

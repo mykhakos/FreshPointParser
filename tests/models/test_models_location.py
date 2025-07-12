@@ -70,9 +70,7 @@ def test_location_init(location, expected_attrs):
     ],
     ids=['empty name', 'regular name'],
 )
-def test_location_prop_name_lowercase_ascii(
-    name, expected_name_lowercase_ascii
-):
+def test_location_prop_name_lowercase_ascii(name, expected_name_lowercase_ascii):
     location = Location(name=name)
     assert location.name_lowercase_ascii == expected_name_lowercase_ascii
 
@@ -226,12 +224,8 @@ def locations_page(locations):
             [2],
             id='MappingProxyType constraint: name_lowercase_ascii',
         ),
-        pytest.param(
-            lambda loc: loc, [0, 1, 2], id='lambda constraint: any location'
-        ),
-        pytest.param(
-            lambda loc: loc.id_ == 1, [1], id='lambda constraint: id_'
-        ),
+        pytest.param(lambda loc: loc, [0, 1, 2], id='lambda constraint: any location'),
+        pytest.param(lambda loc: loc.id_ == 1, [1], id='lambda constraint: id_'),
         pytest.param(
             lambda loc: 'AB' in loc.name,
             [1, 2],
@@ -259,9 +253,7 @@ def locations_page(locations):
         ),
     ],
 )
-def test_location_page_find_items(
-    locations_page, constraint, expected_location_ids
-):
+def test_location_page_find_items(locations_page, constraint, expected_location_ids):
     locations_page.find_items
     locations = locations_page.find_items(constraint=constraint)
     assert [loc.id_ for loc in locations] == expected_location_ids
@@ -281,9 +273,7 @@ def test_location_page_find_items(
             {'nema': 'AAC TECHNOLOGIES SOLUTIONS'},
             id='dict constraint: misspelled key',
         ),
-        pytest.param(
-            {'id': 1}, id='dict constraint: pydantic validation alias key'
-        ),
+        pytest.param({'id': 1}, id='dict constraint: pydantic validation alias key'),
         pytest.param(
             {'name': 'ABB', 'addr': 'Vyskočilova 1561/4a, Praha Michle'},
             id='dict constraint: multiple keys, one invalid',
@@ -314,9 +304,7 @@ def test_location_page_find_items(
             MappingProxyType({'name_lowercase_ascii': 'xyz'}),
             id='MappingProxyType constraint: wrong name_lowercase_ascii',
         ),
-        pytest.param(
-            lambda loc: loc.id_ == 123, id='lambda constraint: wrong id_'
-        ),
+        pytest.param(lambda loc: loc.id_ == 123, id='lambda constraint: wrong id_'),
         pytest.param(
             lambda loc: 'XYZ' in loc.name,
             id='lambda constraint: partial name (no match)',
@@ -370,9 +358,7 @@ def test_location_page_find_items_no_match(locations_page, constraint):
         pytest.param(object, id='uninstantiated class constraint'),
     ],
 )
-def test_location_page_find_items_invalid_constraint(
-    locations_page, constraint
-):
+def test_location_page_find_items_invalid_constraint(locations_page, constraint):
     with pytest.raises(FreshPointParserTypeError):
         list(locations_page.find_items(constraint))
     with pytest.raises(FreshPointParserTypeError):
@@ -390,8 +376,7 @@ def test_location_page_find_items_invalid_constraint(
             id='lambda constraint: misspelled attribute',
         ),
         pytest.param(
-            lambda p: p.name == 'ABB'
-            and p.addr == 'Vyskočilova 1561/4a, Praha Michle',
+            lambda p: p.name == 'ABB' and p.addr == 'Vyskočilova 1561/4a, Praha Michle',
             id='lambda constraint: multiple attributes, one partial',
         ),
         pytest.param(
@@ -401,9 +386,7 @@ def test_location_page_find_items_invalid_constraint(
         ),
     ],
 )
-def test_location_page_find_items_invalid_lambda_attribute(
-    locations_page, constraint
-):
+def test_location_page_find_items_invalid_lambda_attribute(locations_page, constraint):
     with pytest.raises(AttributeError):
         list(locations_page.find_items(constraint))
     with pytest.raises(AttributeError):

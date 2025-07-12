@@ -41,8 +41,8 @@ else:
 logger = logging.getLogger('freshpointparser.models')
 """Logger of the `freshpointparser.models` package."""
 
-
-_NO_DEFAULT = object()
+_NoDefaultType = Enum('_NoDefaultType', 'NO_DEFAULT')
+_NO_DEFAULT = _NoDefaultType.NO_DEFAULT
 """Sentinel value for the ``default`` argument of ``getattr()``."""
 
 
@@ -128,9 +128,7 @@ ModelDiffMapping: TypeAlias = Dict[int, ModelDiff]
 """Mapping of item IDs to their differences."""
 
 
-def model_diff(
-    left: BaseModel, right: BaseModel, **kwargs: Any
-) -> FieldDiffMapping:
+def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMapping:
     """Compare the left model with the right model to identify which model
     fields have different values.
 
@@ -250,9 +248,7 @@ class BaseRecord(BaseModel):
             recorded_at_other = other.recorded_at.replace(microsecond=0)
         elif precision == 'm':
             recorded_at_self = self.recorded_at.replace(second=0, microsecond=0)
-            recorded_at_other = other.recorded_at.replace(
-                second=0, microsecond=0
-            )
+            recorded_at_other = other.recorded_at.replace(second=0, microsecond=0)
         elif precision == 'h':
             recorded_at_self = self.recorded_at.replace(
                 minute=0, second=0, microsecond=0
@@ -265,8 +261,7 @@ class BaseRecord(BaseModel):
             recorded_at_other = other.recorded_at.date()
         else:
             raise FreshPointParserValueError(
-                f"Invalid precision '{precision}'. "
-                f"Expected one of: 's', 'm', 'h', 'd'."
+                f"Invalid precision '{precision}'. Expected one of: 's', 'm', 'h', 'd'."
             )
         if recorded_at_self == recorded_at_other:
             return None
@@ -406,8 +401,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         repr=False,
         title='Items',
         description=(
-            'Dictionary of item IDs as keys and data models on the page '
-            'as values.'
+            'Dictionary of item IDs as keys and data models on the page as values.'
         ),
     )
     """Dictionary of item IDs as keys and data models on the page as values."""
@@ -557,7 +551,7 @@ class BasePage(BaseRecord, Generic[TItem]):
     def iter_item_attr(
         self,
         attr: str,
-        default: T = _NO_DEFAULT,
+        default: Union[T, _NoDefaultType] = _NO_DEFAULT,
         *,
         unique: bool = False,
         unhashable: bool = False,
@@ -598,9 +592,7 @@ class BasePage(BaseRecord, Generic[TItem]):
             if unhashable:
                 seen_unhashable: List[Any] = []
                 for value in values:
-                    if any(
-                        value == seen_value for seen_value in seen_unhashable
-                    ):
+                    if any(value == seen_value for seen_value in seen_unhashable):
                         continue
                     seen_unhashable.append(value)
                     yield value

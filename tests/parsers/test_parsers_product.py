@@ -114,9 +114,7 @@ def test_parse_location_page_function(product_page_html_text):
 # region Parser properties
 
 
-def test_validate_parsed_products(
-    product_page_html_parser_persistent, product_page
-):
+def test_validate_parsed_products(product_page_html_parser_persistent, product_page):
     # assert each product in the parser is in the reference
     product_ids = set()
     for product in product_page_html_parser_persistent.products:
@@ -236,18 +234,14 @@ def test_validate_generated_product_page(
 # region Find by ID
 
 
-def test_find_product_by_id_int_exists(
-    product_page_html_parser_new, product_page
-):
+def test_find_product_by_id_int_exists(product_page_html_parser_new, product_page):
     parser = product_page_html_parser_new
     for product_id in product_page.items:
         assert parser.find_product_by_id(product_id) is not None
         assert parser.find_product_by_id(product_id).id_ == product_id
 
 
-def test_find_product_by_id_str_exists(
-    product_page_html_parser_new, product_page
-):
+def test_find_product_by_id_str_exists(product_page_html_parser_new, product_page):
     parser = product_page_html_parser_new
     for product_id in product_page.items:
         assert parser.find_product_by_id(str(product_id)) is not None
@@ -261,18 +255,14 @@ def test_find_product_by_id_not_found(product_page_html_parser_new, product_id):
 
 
 @pytest.mark.parametrize('product_id', [-1, '-1', '13.5', '1480a', 'id'])
-def test_find_product_by_id_invalid_value(
-    product_page_html_parser_new, product_id
-):
+def test_find_product_by_id_invalid_value(product_page_html_parser_new, product_id):
     parser = product_page_html_parser_new
     with pytest.raises(FreshPointParserValueError):
         assert parser.find_product_by_id(product_id) is None
 
 
 @pytest.mark.parametrize('product_id', [13.5, None, {}])
-def test_find_product_by_id_invalid_type(
-    product_page_html_parser_new, product_id
-):
+def test_find_product_by_id_invalid_type(product_page_html_parser_new, product_id):
     parser = product_page_html_parser_new
     with pytest.raises(FreshPointParserTypeError):
         assert parser.find_product_by_id(product_id) is None
@@ -280,8 +270,7 @@ def test_find_product_by_id_invalid_type(
 
 def test_find_product_data_by_id_errors():
     html = (
-        "<div class='product' data-id='1'></div>"
-        "<div class='product' data-id='1'></div>"
+        "<div class='product' data-id='1'></div><div class='product' data-id='1'></div>"
     )
     parser = ProductPageHTMLParser()
     parser.parse(html)
@@ -305,16 +294,13 @@ def test_find_products_by_name_exists_full_match(
     parser = product_page_html_parser_new
     for product in product_page.items.values():
         assert (
-            parser.find_product_by_name(product.name, partial_match=False)
-            is not None
+            parser.find_product_by_name(product.name, partial_match=False) is not None
         )
         assert (
             parser.find_product_by_name(product.name, partial_match=False).name
             == product.name
         )
-        products = parser.find_products_by_name(
-            product.name, partial_match=False
-        )
+        products = parser.find_products_by_name(product.name, partial_match=False)
         # assert len(products) == 1  # name may not be unique, assertion removed
         assert products[0].name == product.name
 
@@ -338,13 +324,8 @@ def test_find_products_by_name_exists_partial_match(
         raise RuntimeError(
             f'Invalid test setup: no product contains "{product_name}" in its name'
         )
-    assert (
-        parser.find_product_by_name(product_name, partial_match=True)
-        is not None
-    )
-    assert (
-        parser.find_product_by_name(product_name, partial_match=False) is None
-    )
+    assert parser.find_product_by_name(product_name, partial_match=True) is not None
+    assert parser.find_product_by_name(product_name, partial_match=False) is None
     assert parser.find_products_by_name(product_name, partial_match=True) != []
     assert parser.find_products_by_name(product_name, partial_match=False) == []
 
@@ -353,15 +334,11 @@ def test_find_products_by_name_exists_partial_match(
     'product_name',
     ['   zahradní    limonada    bezovy   květ   ', 'alpwd,apwd,a'],
 )
-def test_find_products_by_name_not_found(
-    product_page_html_parser_new, product_name
-):
+def test_find_products_by_name_not_found(product_page_html_parser_new, product_name):
     parser = product_page_html_parser_new
     assert parser.find_product_by_name(product_name) is None
     assert parser.find_products_by_name(product_name) == []
-    assert (
-        parser.find_product_by_name(product_name, partial_match=False) is None
-    )
+    assert parser.find_product_by_name(product_name, partial_match=False) is None
     assert parser.find_products_by_name(product_name, partial_match=False) == []
 
 
@@ -369,9 +346,7 @@ def test_find_products_by_name_not_found(
     'product_name',
     [None, 1480, {}],
 )
-def test_find_products_by_name_invalid_type(
-    product_page_html_parser_new, product_name
-):
+def test_find_products_by_name_invalid_type(product_page_html_parser_new, product_name):
     parser = product_page_html_parser_new
     with pytest.raises(FreshPointParserTypeError):
         parser.find_product_by_name(product_name)
@@ -389,9 +364,7 @@ def test_find_products_by_name_invalid_type(
     'product_page_id',
     [pytest.param(id_, id=f'ID={id_}') for id_ in range(0, 10)],
 )
-def test_parse_data_from_internet(
-    product_page_html_parser_persistent, product_page_id
-):
+def test_parse_data_from_internet(product_page_html_parser_persistent, product_page_id):
     """Go through all product pages fetched from the internet and validate them.
 
     This test aims to validate the parser's ability to parse actual fresh data.
@@ -408,9 +381,7 @@ def test_parse_data_from_internet(
         try:
             response = httpx.get(url)
             if response.is_redirect:
-                logger.warning(
-                    f'Location {loc_url} does not exist (redirected)'
-                )
+                logger.warning(f'Location {loc_url} does not exist (redirected)')
                 return response
             response.raise_for_status()
             return response
@@ -428,9 +399,7 @@ def test_parse_data_from_internet(
     if response.is_redirect:
         pytest.skip(f'Location {loc_url} does not exist (redirected)')
     else:
-        assert parser.page != ProductPage(), (
-            f'Did not parse any data from {loc_url}'
-        )
+        assert parser.page != ProductPage(), f'Did not parse any data from {loc_url}'
 
 
 # endregion Parse data from internet

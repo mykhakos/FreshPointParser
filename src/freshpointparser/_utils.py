@@ -43,9 +43,7 @@ def validate_id(id_: object) -> int:
                 f'integer (got "{id_}").'
             )
     if not isinstance(id_, int):
-        raise FreshPointParserTypeError(
-            f'ID must be an integer (got {type(id_)}).'
-        )
+        raise FreshPointParserTypeError(f'ID must be an integer (got {type(id_)}).')
     if id_ < 0:
         raise FreshPointParserValueError('ID must be a non-negative integer.')
     return id_
@@ -104,6 +102,4 @@ def normalize_text(text: object) -> str:
     try:
         return unidecode(str(text).strip()).casefold()
     except Exception as e:
-        raise FreshPointParserValueError(
-            f'Failed to normalize text "{text}".'
-        ) from e
+        raise FreshPointParserValueError(f'Failed to normalize text "{text}".') from e
