@@ -22,6 +22,11 @@ class ProductQuantityUpdateInfo:
     are more in the new product compared to the old product.
     A value of 0 implies no increase.
     """
+    stock_is_last_piece: bool = False
+    """A flag indicating the product is the last piece in stock.
+    True if the new product's stock quantity is one while the old
+    product's stock was greater than one.
+    """
     stock_depleted: bool = False
     """A flag indicating complete depletion of the product stock.
     True if the new product's stock quantity is zero while the old
@@ -245,20 +250,23 @@ class Product(BaseItem):
         if self.quantity > new.quantity:
             decrease = self.quantity - new.quantity
             increase = 0
+            last_piece = new.quantity == 1 and self.quantity > 1
             depleted = new.quantity == 0
             restocked = False
         elif self.quantity < new.quantity:
             decrease = 0
             increase = new.quantity - self.quantity
+            last_piece = False
             depleted = False
             restocked = self.quantity == 0
         else:
             decrease = 0
             increase = 0
+            last_piece = False
             depleted = False
             restocked = False
         return ProductQuantityUpdateInfo(
-            decrease, increase, depleted, restocked
+            decrease, increase, last_piece, depleted, restocked
         )
 
     def compare_price(self, new: Product) -> ProductPriceUpdateInfo:

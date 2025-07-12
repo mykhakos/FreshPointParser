@@ -14,7 +14,6 @@ from freshpointparser.models import (
     Product,
     ProductPage,
 )
-from freshpointparser.models._product import DEFAULT_PRODUCT_PIC_URL
 from freshpointparser.models.annotations import (
     DiffType,
     ProductPriceUpdateInfo,
@@ -22,6 +21,11 @@ from freshpointparser.models.annotations import (
 )
 
 # region Product
+
+DEFAULT_PRODUCT_PIC_URL = (
+    r'https://images.weserv.nl/?url=http://freshpoint.freshserver.cz/'
+    r'backend/web/media/photo/1_f587dd3fa21b22.jpg'
+)
 
 
 @pytest.mark.parametrize(
@@ -639,24 +643,44 @@ def test_product_diff_exclude_recorded_at_with_kwargs(
 
 
 @pytest.mark.parametrize(
-    'stock_decrease, stock_increase, stock_depleted, stock_restocked',
+    """
+        stock_decrease,
+        stock_increase,
+        stock_is_last_piece,
+        stock_depleted,
+        stock_restocked
+    """,
     [
-        pytest.param(0, 0, False, False, id='no change'),
-        pytest.param(0, 10, False, True, id='stock increased'),
-        pytest.param(5, 0, True, False, id='stock decreased'),
+        pytest.param(0, 0, False, False, False, id='no change'),
+        pytest.param(0, 10, False, False, True, id='stock increased'),
+        pytest.param(5, 0, True, False, False, id='stock decreased'),
+        pytest.param(5, 0, False, True, False, id='stock depleted'),
+        pytest.param(0, 0, True, False, False, id='last piece'),
+        pytest.param(0, 0, False, False, True, id='stock restocked'),
+        pytest.param(0, 0, True, True, False, id='last piece and depleted'),
+        pytest.param(0, 0, False, True, True, id='last piece and restocked'),
+        pytest.param(
+            0, 0, True, True, True, id='last piece, depleted, and restocked'
+        ),
     ],
 )
 def test_product_quantity_update_info(
-    stock_decrease, stock_increase, stock_depleted, stock_restocked
+    stock_decrease,
+    stock_increase,
+    stock_is_last_piece,
+    stock_depleted,
+    stock_restocked,
 ):
     update_info = ProductQuantityUpdateInfo(
         stock_decrease=stock_decrease,
         stock_increase=stock_increase,
+        stock_is_last_piece=stock_is_last_piece,
         stock_depleted=stock_depleted,
         stock_restocked=stock_restocked,
     )
     assert update_info.stock_decrease == stock_decrease
     assert update_info.stock_increase == stock_increase
+    assert update_info.stock_is_last_piece == stock_is_last_piece
     assert update_info.stock_depleted == stock_depleted
     assert update_info.stock_restocked == stock_restocked
 
@@ -670,6 +694,7 @@ def test_product_quantity_update_info(
             ProductQuantityUpdateInfo(
                 stock_decrease=0,
                 stock_increase=0,
+                stock_is_last_piece=False,
                 stock_depleted=False,
                 stock_restocked=False,
             ),
@@ -681,6 +706,7 @@ def test_product_quantity_update_info(
             ProductQuantityUpdateInfo(
                 stock_decrease=3,
                 stock_increase=0,
+                stock_is_last_piece=False,
                 stock_depleted=False,
                 stock_restocked=False,
             ),
@@ -692,6 +718,7 @@ def test_product_quantity_update_info(
             ProductQuantityUpdateInfo(
                 stock_decrease=0,
                 stock_increase=3,
+                stock_is_last_piece=False,
                 stock_depleted=False,
                 stock_restocked=False,
             ),
@@ -703,6 +730,7 @@ def test_product_quantity_update_info(
             ProductQuantityUpdateInfo(
                 stock_decrease=2,
                 stock_increase=0,
+                stock_is_last_piece=False,
                 stock_depleted=True,
                 stock_restocked=False,
             ),
@@ -714,10 +742,59 @@ def test_product_quantity_update_info(
             ProductQuantityUpdateInfo(
                 stock_decrease=0,
                 stock_increase=2,
+                stock_is_last_piece=False,
                 stock_depleted=False,
                 stock_restocked=True,
             ),
             id='stock restocked',
+        ),
+        pytest.param(
+            Product(quantity=1),
+            Product(quantity=0),
+            ProductQuantityUpdateInfo(
+                stock_decrease=1,
+                stock_increase=0,
+                stock_is_last_piece=False,
+                stock_depleted=True,
+                stock_restocked=False,
+            ),
+            id='last piece and depleted',
+        ),
+        pytest.param(
+            Product(quantity=0),
+            Product(quantity=1),
+            ProductQuantityUpdateInfo(
+                stock_decrease=0,
+                stock_increase=1,
+                stock_is_last_piece=False,
+                stock_depleted=False,
+                stock_restocked=True,
+            ),
+            id='last piece and restocked',
+        ),
+        pytest.param(
+            Product(quantity=1),
+            Product(quantity=1),
+            ProductQuantityUpdateInfo(
+                stock_decrease=0,
+                stock_increase=0,
+                stock_is_last_piece=False,
+                stock_depleted=False,
+                stock_restocked=False,
+            ),
+            id='last piece, no change',
+        ),
+        pytest.param(
+            Product(quantity=2),
+            Product(quantity=1),
+            ProductQuantityUpdateInfo(
+                stock_decrease=1,
+                stock_increase=0,
+                stock_is_last_piece=True,
+                stock_depleted=False,
+                stock_restocked=False,
+            ),
+            id='last piece and depleted',
         ),
     ],
 )
