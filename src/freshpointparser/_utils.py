@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from functools import lru_cache
-from typing import Union
+from typing import Any, Union
 
 from unidecode import unidecode
 
@@ -15,14 +15,14 @@ LOCATION_PAGE_URL = 'https://my.freshpoint.cz'
 
 
 @lru_cache(maxsize=1024)
-def validate_id(id_: object) -> int:
+def validate_id(id_: Any) -> int:  # noqa: ANN401
     """Validate the given object as an ID integer. If the object is a string,
     it must be a numeric string representing a non-negative integer. If the
     object is an integer, it must be non-negative. The result is cached for
     improved performance on repeated calls with the same input.
 
     Args:
-        id_ (object): The object to be validated as an ID. This can be
+        id_ (Any): The object to be validated as an ID. This can be
             either a string or an integer.
 
     Raises:
@@ -53,10 +53,10 @@ def get_product_page_url(location_id: Union[int, str]) -> str:
     """Generate a FreshPoint.cz product page HTTPS URL for a given location ID.
 
     Args:
-        location_id (int): The ID of the location (also known as the page ID and
-            the device ID) for which to generate the URL. This is the number
-            that uniquely identifies the location in the FreshPoint.cz system.
-            It is the last part of the product page URL, after the last slash.
+        location_id (Union[int, str]): The ID of the location (also known as
+            the page ID and the device ID) for which to generate the URL. This is
+            the number that uniquely identifies the location in the FreshPoint.cz
+            system. It is the last part of the product page URL, after the last slash.
             For example, in https://my.freshpoint.cz/device/product-list/296,
             the ID is 296.
 
@@ -82,7 +82,7 @@ def get_location_page_url() -> str:
     return LOCATION_PAGE_URL
 
 
-def normalize_text(text: object) -> str:
+def normalize_text(text: Any) -> str:  # noqa: ANN401
     """Normalize the given text by removing diacritics, leading/trailing
     whitespace, and converting it to lowercase. Non-string values are
     converted to strings. `None` values are converted to empty strings.
