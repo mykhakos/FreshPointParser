@@ -663,11 +663,10 @@ def parse_product_page(page_html: Union[str, bytes]) -> ProductPage:
     ProductPage model.
 
     Args:
-        page_html (Union[str, bytes]): HTML content of the product page to parse.
+        page_html (Union[str, bytes]): HTML content of the product page.
 
     Raises:
-        FresgPointParserError: If the HTML content cannot be parsed or does not
-            contain the expected structure.
+        FreshPointParserError: If the HTML does not match the expected structure.
 
     Returns:
         ProductPage: Parsed and validated product page data.

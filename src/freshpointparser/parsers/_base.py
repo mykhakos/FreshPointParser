@@ -19,17 +19,15 @@ else:
     from typing_extensions import Self
 
 logger = logging.getLogger('freshpointparser.parsers')
-"""Logger of the `freshpointparser.parsers` package."""
+"""Logger of the ``freshpointparser.parsers`` package."""
 
 TPage = TypeVar('TPage', bound=BasePage)
 
 
 class BasePageHTMLParser(ABC, Generic[TPage]):
-    """Base class for parsing HTML content of FreshPoint.cz pages.
+    """Provides common functionality for parsing HTML content of FreshPoint.cz pages.
 
-    This class provides common functionality for parsing HTML content.
-    It is not intended to be used directly but serves as a base class
-    for more specific parsers.
+    Note: This is a base class that is not intended to be used directly.
     """
 
     def __init__(self) -> None:
@@ -132,7 +130,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         """Page model containing the parsed HTML data.
 
         ``parse()`` must be called at least once before accessing this property
-        to ensure that the parser has valid data to construct the page model.
+        to ensure that the parser has valid HTML data to construct the page model.
 
         Accessing full parsed page data may require additional computation. If you are
         only interested in a subset of the parsed data, consider using
@@ -169,12 +167,12 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         """Parse page HTML content.
 
         **Note**: This method returns the parser instance itself, allowing for
-        method call chaining. It does **not** return the parsed page model. The
-        result of the parse is cached and can be accessed via the
+        method call chaining. It does **not** return the parsed page model.
+        The result of the parse is cached and can be accessed via the
         :pyattr:`parse_status` property.
 
         Args:
-            page_html (Union[str, bytes]): HTML content of the page to parse.
+            page_html (Union[str, bytes]): HTML content of the page.
             force (bool): If True, forces the parser to re-parse the HTML
                 content even if the hash of the content matches the hash of the
                 previous content. If False, the parser will only re-parse the

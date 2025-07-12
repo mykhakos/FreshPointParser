@@ -254,11 +254,10 @@ def parse_location_page(page_html: Union[str, bytes]) -> LocationPage:
     `my.freshpoint.cz` to a structured LocationPage model.
 
     Args:
-        page_html (Union[str, bytes]): HTML content of the location page to parse.
+        page_html (Union[str, bytes]): HTML content of the location page.
 
     Raises:
-        FresgPointParserError: If the HTML content cannot be parsed or does not
-            contain the expected structure.
+        FreshPointParserError: If the HTML does not match the expected structure.
 
     Returns:
         LocationPage: Parsed and validated location page data.
