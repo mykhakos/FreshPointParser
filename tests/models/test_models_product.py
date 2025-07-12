@@ -672,17 +672,17 @@ def test_product_quantity_update_info(
     stock_restocked,
 ):
     update_info = ProductQuantityUpdateInfo(
-        stock_decrease=stock_decrease,
-        stock_increase=stock_increase,
-        stock_is_last_piece=stock_is_last_piece,
-        stock_depleted=stock_depleted,
-        stock_restocked=stock_restocked,
+        quantity_decrease=stock_decrease,
+        quantity_increase=stock_increase,
+        is_last_piece=stock_is_last_piece,
+        is_depleted=stock_depleted,
+        is_restocked=stock_restocked,
     )
-    assert update_info.stock_decrease == stock_decrease
-    assert update_info.stock_increase == stock_increase
-    assert update_info.stock_is_last_piece == stock_is_last_piece
-    assert update_info.stock_depleted == stock_depleted
-    assert update_info.stock_restocked == stock_restocked
+    assert update_info.quantity_decrease == stock_decrease
+    assert update_info.quantity_increase == stock_increase
+    assert update_info.is_last_piece == stock_is_last_piece
+    assert update_info.is_depleted == stock_depleted
+    assert update_info.is_restocked == stock_restocked
 
 
 @pytest.mark.parametrize(
@@ -692,11 +692,11 @@ def test_product_quantity_update_info(
             Product(quantity=0),
             Product(quantity=0),
             ProductQuantityUpdateInfo(
-                stock_decrease=0,
-                stock_increase=0,
-                stock_is_last_piece=False,
-                stock_depleted=False,
-                stock_restocked=False,
+                quantity_decrease=0,
+                quantity_increase=0,
+                is_last_piece=False,
+                is_depleted=False,
+                is_restocked=False,
             ),
             id='no stock',
         ),
@@ -704,11 +704,11 @@ def test_product_quantity_update_info(
             Product(quantity=5),
             Product(quantity=2),
             ProductQuantityUpdateInfo(
-                stock_decrease=3,
-                stock_increase=0,
-                stock_is_last_piece=False,
-                stock_depleted=False,
-                stock_restocked=False,
+                quantity_decrease=3,
+                quantity_increase=0,
+                is_last_piece=False,
+                is_depleted=False,
+                is_restocked=False,
             ),
             id='stock decreased',
         ),
@@ -716,11 +716,11 @@ def test_product_quantity_update_info(
             Product(quantity=2),
             Product(quantity=5),
             ProductQuantityUpdateInfo(
-                stock_decrease=0,
-                stock_increase=3,
-                stock_is_last_piece=False,
-                stock_depleted=False,
-                stock_restocked=False,
+                quantity_decrease=0,
+                quantity_increase=3,
+                is_last_piece=False,
+                is_depleted=False,
+                is_restocked=False,
             ),
             id='stock increased',
         ),
@@ -728,11 +728,11 @@ def test_product_quantity_update_info(
             Product(quantity=2),
             Product(quantity=0),
             ProductQuantityUpdateInfo(
-                stock_decrease=2,
-                stock_increase=0,
-                stock_is_last_piece=False,
-                stock_depleted=True,
-                stock_restocked=False,
+                quantity_decrease=2,
+                quantity_increase=0,
+                is_last_piece=False,
+                is_depleted=True,
+                is_restocked=False,
             ),
             id='stock depleted',
         ),
@@ -740,11 +740,11 @@ def test_product_quantity_update_info(
             Product(quantity=0),
             Product(quantity=2),
             ProductQuantityUpdateInfo(
-                stock_decrease=0,
-                stock_increase=2,
-                stock_is_last_piece=False,
-                stock_depleted=False,
-                stock_restocked=True,
+                quantity_decrease=0,
+                quantity_increase=2,
+                is_last_piece=False,
+                is_depleted=False,
+                is_restocked=True,
             ),
             id='stock restocked',
         ),
@@ -752,11 +752,11 @@ def test_product_quantity_update_info(
             Product(quantity=1),
             Product(quantity=0),
             ProductQuantityUpdateInfo(
-                stock_decrease=1,
-                stock_increase=0,
-                stock_is_last_piece=False,
-                stock_depleted=True,
-                stock_restocked=False,
+                quantity_decrease=1,
+                quantity_increase=0,
+                is_last_piece=False,
+                is_depleted=True,
+                is_restocked=False,
             ),
             id='last piece and depleted',
         ),
@@ -764,11 +764,11 @@ def test_product_quantity_update_info(
             Product(quantity=0),
             Product(quantity=1),
             ProductQuantityUpdateInfo(
-                stock_decrease=0,
-                stock_increase=1,
-                stock_is_last_piece=False,
-                stock_depleted=False,
-                stock_restocked=True,
+                quantity_decrease=0,
+                quantity_increase=1,
+                is_last_piece=False,
+                is_depleted=False,
+                is_restocked=True,
             ),
             id='last piece and restocked',
         ),
@@ -776,11 +776,11 @@ def test_product_quantity_update_info(
             Product(quantity=1),
             Product(quantity=1),
             ProductQuantityUpdateInfo(
-                stock_decrease=0,
-                stock_increase=0,
-                stock_is_last_piece=False,
-                stock_depleted=False,
-                stock_restocked=False,
+                quantity_decrease=0,
+                quantity_increase=0,
+                is_last_piece=False,
+                is_depleted=False,
+                is_restocked=False,
             ),
             id='last piece, no change',
         ),
@@ -788,11 +788,11 @@ def test_product_quantity_update_info(
             Product(quantity=2),
             Product(quantity=1),
             ProductQuantityUpdateInfo(
-                stock_decrease=1,
-                stock_increase=0,
-                stock_is_last_piece=True,
-                stock_depleted=False,
-                stock_restocked=False,
+                quantity_decrease=1,
+                quantity_increase=0,
+                is_last_piece=True,
+                is_depleted=False,
+                is_restocked=False,
             ),
             id='last piece and depleted',
         ),
@@ -860,8 +860,8 @@ def test_product_price_update_info(
         price_curr_increase=price_curr_increase,
         discount_rate_decrease=discount_rate_decrease,
         discount_rate_increase=discount_rate_increase,
-        sale_started=sale_started,
-        sale_ended=sale_ended,
+        has_sale_started=sale_started,
+        has_sale_ended=sale_ended,
     )
     assert update_info.price_full_decrease == price_full_decrease
     assert update_info.price_full_increase == price_full_increase
@@ -869,8 +869,8 @@ def test_product_price_update_info(
     assert update_info.price_curr_increase == price_curr_increase
     assert update_info.discount_rate_decrease == discount_rate_decrease
     assert update_info.discount_rate_increase == discount_rate_increase
-    assert update_info.sale_started == sale_started
-    assert update_info.sale_ended == sale_ended
+    assert update_info.has_sale_started == sale_started
+    assert update_info.has_sale_ended == sale_ended
 
 
 @pytest.mark.parametrize(
@@ -886,8 +886,8 @@ def test_product_price_update_info(
                 price_curr_increase=0,
                 discount_rate_decrease=0,
                 discount_rate_increase=0,
-                sale_started=False,
-                sale_ended=False,
+                has_sale_started=False,
+                has_sale_ended=False,
             ),
             id='no price change (default prices)',
         ),
@@ -901,8 +901,8 @@ def test_product_price_update_info(
                 price_curr_increase=0,
                 discount_rate_decrease=0,
                 discount_rate_increase=0,
-                sale_started=False,
-                sale_ended=False,
+                has_sale_started=False,
+                has_sale_ended=False,
             ),
             id='no price change (custom prices)',
         ),
@@ -916,8 +916,8 @@ def test_product_price_update_info(
                 price_curr_increase=0,
                 discount_rate_decrease=0,
                 discount_rate_increase=0.5,
-                sale_started=True,
-                sale_ended=False,
+                has_sale_started=True,
+                has_sale_ended=False,
             ),
             id='price_curr decreased',
         ),
@@ -931,8 +931,8 @@ def test_product_price_update_info(
                 price_curr_increase=5,
                 discount_rate_decrease=0.5,
                 discount_rate_increase=0,
-                sale_started=False,
-                sale_ended=True,
+                has_sale_started=False,
+                has_sale_ended=True,
             ),
             id='price_curr increased',
         ),
@@ -946,8 +946,8 @@ def test_product_price_update_info(
                 price_curr_increase=5,
                 discount_rate_decrease=0,
                 discount_rate_increase=0,
-                sale_started=False,
-                sale_ended=False,
+                has_sale_started=False,
+                has_sale_ended=False,
             ),
             id='price_full and price_curr increased',
         ),
@@ -961,8 +961,8 @@ def test_product_price_update_info(
                 price_curr_increase=0,
                 discount_rate_decrease=0.0,
                 discount_rate_increase=0.25,
-                sale_started=False,
-                sale_ended=False,
+                has_sale_started=False,
+                has_sale_ended=False,
             ),
             id='price_full and price_curr decreased',
         ),

@@ -12,27 +12,27 @@ from ._base import BaseItem, BasePage
 class ProductQuantityUpdateInfo:
     """Summarizes the details of stock quantity changes in a product."""
 
-    stock_decrease: int = 0
+    quantity_decrease: int = 0
     """Decrease in stock quantity. Represents how many items
     are fewer in the new product compared to the old product.
     A value of 0 implies no decrease.
     """
-    stock_increase: int = 0
+    quantity_increase: int = 0
     """Increase in stock quantity. Indicates how many items
     are more in the new product compared to the old product.
     A value of 0 implies no increase.
     """
-    stock_is_last_piece: bool = False
+    is_last_piece: bool = False
     """A flag indicating the product is the last piece in stock.
     True if the new product's stock quantity is one while the old
     product's stock was greater than one.
     """
-    stock_depleted: bool = False
+    is_depleted: bool = False
     """A flag indicating complete depletion of the product stock.
     True if the new product's stock quantity is zero while the old
     product's stock was greater than zero.
     """
-    stock_restocked: bool = False
+    is_restocked: bool = False
     """A flag indicating the product has been restocked.
     True if the new product's stock quantity is greater than zero
     while the old product's stock was zero.
@@ -73,11 +73,11 @@ class ProductPriceUpdateInfo:
     of the discount rate in the new product compared to the old product.
     A value of 0.0 indicates that the discount rate has not increased.
     """
-    sale_started: bool = False
+    has_sale_started: bool = False
     """A flag indicating whether a sale has started on the product.
     True if the new product is on sale and the old product was not.
     """
-    sale_ended: bool = False
+    has_sale_ended: bool = False
     """A flag indicating whether a sale has ended on the product.
     True if the new product is not on sale and the old product was.
     """
@@ -324,8 +324,8 @@ class Product(BaseItem):
             price_curr_increase,
             discount_rate_decrease,
             discount_rate_increase,
-            sale_started=(not self.is_on_sale and new.is_on_sale),
-            sale_ended=(self.is_on_sale and not new.is_on_sale),
+            has_sale_started=(not self.is_on_sale and new.is_on_sale),
+            has_sale_ended=(self.is_on_sale and not new.is_on_sale),
         )
 
 
