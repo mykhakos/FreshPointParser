@@ -1,29 +1,26 @@
-"""Pydantic models and other data containers of the `freshpointparser` package."""
+"""Pydantic models and other data containers of the `freshpointparser` library.
+The ``annotations`` submodule is available for additional data types.
+"""
 
-from ._models import (
-    DEFAULT_PRODUCT_PIC_URL,
+from . import annotations
+from ._base import BaseItem, BasePage, BaseRecord, logger
+from ._location import (
     Location,
-    LocationAttrs,
-    LocationCoordinates,
     LocationPage,
+)
+from ._product import (
     Product,
-    ProductAttrs,
     ProductPage,
-    ProductPriceUpdateInfo,
-    ProductQuantityUpdateInfo,
-    logger,
 )
 
 __all__ = [
-    'DEFAULT_PRODUCT_PIC_URL',
+    'BaseItem',
+    'BasePage',
+    'BaseRecord',
     'Location',
-    'LocationAttrs',
-    'LocationCoordinates',
     'LocationPage',
     'Product',
-    'ProductAttrs',
     'ProductPage',
-    'ProductPriceUpdateInfo',
-    'ProductQuantityUpdateInfo',
+    'annotations',
     'logger',
 ]
