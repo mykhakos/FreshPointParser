@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import sys
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import (
     Any,
@@ -15,6 +15,7 @@ from typing import (
     Literal,
     Optional,
     Protocol,
+    Set,
     TypedDict,
     TypeVar,
     Union,
@@ -239,6 +240,8 @@ class BaseRecord(BaseModel):
                 - False if this model's record datetime is older than the other's
                 - None if the record datetimes are the same
         """
+        recorded_at_self: Union[datetime, date]
+        recorded_at_other: Union[datetime, date]
         if precision is None:
             recorded_at_self = self.recorded_at
             recorded_at_other = other.recorded_at
@@ -593,18 +596,20 @@ class BasePage(BaseRecord, Generic[TItem]):
             values = (getattr(item, attr, default) for item in items)
         if unique:
             if unhashable:
-                seen = []
+                seen_unhashable: List[Any] = []
                 for value in values:
-                    if any(value == seen_value for seen_value in seen):
+                    if any(
+                        value == seen_value for seen_value in seen_unhashable
+                    ):
                         continue
-                    seen.append(value)
+                    seen_unhashable.append(value)
                     yield value
             else:
                 try:
-                    seen = set()
+                    seen_hashable: Set[Any] = set()
                     for value in values:
-                        if value not in seen:
-                            seen.add(value)
+                        if value not in seen_hashable:
+                            seen_hashable.add(value)
                             yield value
                 except TypeError as e:
                     raise FreshPointParserTypeError(
