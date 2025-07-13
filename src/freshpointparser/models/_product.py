@@ -122,7 +122,7 @@ class Product(BaseItem):
     """Indicates whether the product is being promoted.
 
     **The product being a promo does not guarantee that the product currently
-    has a discount and vice versa.** Use `is_on_sale` to check if the product is
+    has a discount and vice versa.** Use ``is_on_sale`` to check if the product is
     on sale.
     """
     quantity: NonNegativeInt = Field(
@@ -173,7 +173,7 @@ class Product(BaseItem):
 
     def model_post_init(self, __context: object) -> None:
         """Post-initialization hook for the product model. Do not call directly.
-        Override with caution and call `super().model_post_init(__context)`.
+        Override with caution and call ``super().model_post_init(__context)``.
 
         :meta private:
 
@@ -233,7 +233,7 @@ class Product(BaseItem):
         """Compare the stock availability of the product in two different
         points in time.
 
-        This comparison is meaningful primarily when the `new` argument
+        This comparison is meaningful primarily when the ``new`` argument
         represents the same product at a different state or time, such as
         after a stock update.
 
@@ -273,7 +273,7 @@ class Product(BaseItem):
         """Compare the pricing details of the product in two different points
         in time.
 
-        This comparison is meaningful primarily when the `new` argument
+        This comparison is meaningful primarily when the ``new`` argument
         represents the same product but in a different pricing state, such as
         after a price adjustment.
 

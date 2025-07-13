@@ -18,7 +18,7 @@ from ._base import BasePageHTMLParser
 
 
 class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
-    """Parses HTML content of a FreshPoint location webpage `my.freshpoint.cz`.
+    """Parses HTML content of a FreshPoint location webpage ``my.freshpoint.cz``.
     Allows accessing the parsed webpage data and searching for locations by name
     or ID.
     """
@@ -37,7 +37,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         r"""Extract and parse the JSON location data embedded in the HTML.
 
         The location data is stored in the page HTML as a JavaScript string
-        variable: `devices = "[{\"prop\":{...}}]";`
+        variable: ``devices = "[{\"prop\":{...}}]";``
 
         This method uses regex to find this variable assignment and extract
         the JSON string. A double JSON parsing approach is used because the data
@@ -148,7 +148,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         The returned ``Location`` instances are independent of the parser's
         cached data. Changes made to them will not modify the parser state.
         """
-        # page is fully parsed on `parse` call. Copy for cache immutability
+        # page is fully parsed on ``parse`` call. Copy for cache immutability
         return [loc.model_copy(deep=True) for loc in self._page.items.values()]
 
     def find_location_by_id(self, id_: Union[int, str]) -> Optional[Location]:
@@ -189,7 +189,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             name (str): The name of the location to search for. Note that
                 location names are normalized to lowercase ASCII characters.
                 The match is case-insensitive and ignores diacritics regardless
-                of the `partial_match` value.
+                of the ``partial_match`` value.
             partial_match (bool): If True, the name match can be partial
                 (case-insensitive). If False, the name match must be exact
                 (case-insensitive). Defaults to True.
@@ -207,7 +207,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             raise FreshPointParserTypeError(
                 f'Expected a string for location name, got {type(name)}.'
             )
-        # wrapper over `LocationPage.find_item` method
+        # wrapper over ``LocationPage.find_item`` method
         location = self._page.find_item(
             lambda loc: self._match_strings(name, loc.name, partial_match)
         )
@@ -224,7 +224,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             name (str): The name of the location to filter by. Note that location
                 names are normalized to lowercase ASCII characters. The match
                 is case-insensitive and ignores diacritics regardless of the
-                `partial_match` value.
+                ``partial_match`` value.
             partial_match (bool): If True, the name match can be partial
                 (case-insensitive). If False, the name match must be exact
                 (case-insensitive). Defaults to True.
@@ -241,7 +241,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             raise FreshPointParserTypeError(
                 f'Expected a string for location name, got {type(name)}.'
             )
-        # wrapper over `LocationPage.find_locations` method
+        # wrapper over ``LocationPage.find_locations`` method
         locations = self._page.find_items(
             lambda loc: self._match_strings(name, loc.name, partial_match)
         )
@@ -251,7 +251,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
 
 def parse_location_page(page_html: Union[str, bytes]) -> LocationPage:
     """Parse the HTML content of a FreshPoint location webpage
-    `my.freshpoint.cz` to a structured LocationPage model.
+    ``my.freshpoint.cz`` to a structured LocationPage model.
 
     Args:
         page_html (Union[str, bytes]): HTML content of the location page.

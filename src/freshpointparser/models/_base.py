@@ -39,7 +39,7 @@ else:
     from typing_extensions import TypeAlias
 
 logger = logging.getLogger('freshpointparser.models')
-"""Logger of the `freshpointparser.models` package."""
+"""Logger of the ``freshpointparser.models`` package."""
 
 _NoDefaultType = Enum('_NoDefaultType', 'NO_DEFAULT')
 _NO_DEFAULT = _NoDefaultType.NO_DEFAULT
@@ -145,8 +145,8 @@ def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMap
         left (model): The model to compare.
         right (model): The model to compare with.
         **kwargs: Additional keyword arguments to pass to the ``model_dump``
-            calls to control the serialization process, such as `exclude`,
-            `include`, `by_alias`, and others.
+            calls to control the serialization process, such as ``exclude``,
+            ``include``, ``by_alias``, and others.
 
     Returns:
         FieldDiffMapping: A dictionary mapping field names to their differences,
@@ -188,7 +188,7 @@ def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMap
 
 
 class HasRecordedAt(Protocol):
-    """Protocol for classes that have the `recorded_at` datetime attribute."""
+    """Protocol for classes that have the ``recorded_at`` datetime attribute."""
 
     recorded_at: datetime
     """Datetime when the data has been recorded."""
@@ -212,22 +212,22 @@ class BaseRecord(BaseModel):
         precision: Optional[Literal['s', 'm', 'h', 'd']] = None,
     ) -> Optional[bool]:
         """Check if this record is newer than another one by comparing
-        their `recorded_at` fields at the specified precision.
+        their ``recorded_at`` fields at the specified precision.
 
         Note that precision here means truncating the datetime to the desired
         level (e.g., cutting off seconds, minutes, etc.), not rounding it.
 
         Args:
             other (HasRecordedAt): The record to compare against. Must contain
-                the `recorded_at` datetime attribute.
+                the ``recorded_at`` datetime attribute.
             precision (Optional[Literal['s', 'm', 'h', 'd']]): The level of
                 precision for the comparison. Supported values:
 
-                - `None`: full precision (microsecond) (default)
-                - `s`: second precision
-                - `m`: minute precision
-                - `h`: hour precision
-                - `d`: date precision
+                - ``None``: full precision (microsecond) (default)
+                - ``s``: second precision
+                - ``m``: minute precision
+                - ``h``: hour precision
+                - ``d``: date precision
 
         Raises:
             FreshPointParserValueError: If the precision is not one of the supported values.
@@ -293,7 +293,7 @@ class BaseItem(BaseRecord):
         that it should not be recorded.
         """
         # This method could be a part of the BaseRecord class, but at the moment
-        # there are no use cases to exclude the `recorded_at` field there.
+        # there are no use cases to exclude the ``recorded_at`` field there.
         if not info.context:
             return value
         try:
@@ -335,8 +335,8 @@ class BaseItem(BaseRecord):
             exclude_recorded_at (bool): If True, the ``recorded_at`` field is
                 excluded from the comparison. Defaults to True.
             **kwargs: Additional keyword arguments passed to each item model's
-                ``model_dump`` call, such as `exclude`, `include`,
-                `by_alias`, and others.
+                ``model_dump`` call, such as ``exclude``, ``include``,
+                ``by_alias``, and others.
 
         Returns:
             FieldDiffMapping: A dictionary mapping field names to their
@@ -344,12 +344,12 @@ class BaseItem(BaseRecord):
 
             Each field difference is a dictionary
             (:class:`~freshpointparser.models.annotations.FieldDiff`) containing
-            the `type` and `values` keys.
+            the ``type`` and ``values`` keys.
 
-            - `type` (:class:`~freshpointparser.models.annotations.DiffType`): \
+            - ``type`` (:class:`~freshpointparser.models.annotations.DiffType`): \
             An enumeration value indicating the type of the difference.
 
-            - `values` (:class:`~freshpointparser.models.annotations.DiffValues`): \
+            - ``values`` (:class:`~freshpointparser.models.annotations.DiffValues`): \
             A pair of values - `left` from this model and `right` from the other \
             model. If a field is missing in one model, its value will be ``None``.
 
@@ -363,11 +363,11 @@ class BaseItem(BaseRecord):
             ...     },
             ...     'field_only_in_this': {
             ...         'type': DiffType.CREATED,
-            ...         'values': {'left': 'foo', 'right': None},
+            ...         'values': {'left': ``'foo'``, 'right': None},
             ...     },
             ...     'field_only_in_other': {
             ...         'type': DiffType.DELETED,
-            ...         'values': {'left': None, 'right': 'bar'},
+            ...         'values': {'left': None, 'right': ``'bar'``},
             ...     },
             ... }
 
@@ -449,17 +449,17 @@ class BasePage(BaseRecord, Generic[TItem]):
             exclude_recorded_at (bool): If True, the ``recorded_at`` field is
                 excluded from the comparison. Defaults to True.
             **kwargs: Additional keyword arguments passed to each item model's
-                ``model_dump`` call, such as `exclude`, `include`,
-                `by_alias`, and others.
+                ``model_dump`` call, such as ``exclude``, ``include``,
+                ``by_alias``, and others.
 
         Returns:
             ModelDiffMapping: A dictionary mapping numeric item IDs to their
             corresponding differences.
 
             Each dictionary value is a dictionary (ModelDiff) containing
-            the `type` and `diff` keys.
+            the ``type`` and `diff` keys.
 
-            - `type` (DiffType): An enumeration value indicating the type of \
+            - ``type`` (DiffType): An enumeration value indicating the type of \
             the difference (`Created`, `Updated`, or `Deleted`).
 
             - `diff` (FieldDiffMapping): A dictionary mapping field names to \
@@ -483,7 +483,7 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...         'diff': {
             ...             'field_only_in_this': {
             ...                 'type': DiffType.DELETED,
-            ...                 'values': {'left': 'foo', 'right': None},
+            ...                 'values': {'left': ``'foo'``, 'right': None},
             ...             },
             ...         },
             ...     },
@@ -492,7 +492,7 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...         'diff': {
             ...             'field_only_in_other': {
             ...                 'type': DiffType.CREATED,
-            ...                 'values': {'left': None, 'right': 'bar'},
+            ...                 'values': {'left': None, 'right': ``'bar'``},
             ...             },
             ...         },
             ...     },
@@ -632,8 +632,8 @@ class BasePage(BaseRecord, Generic[TItem]):
                 is the expected value. If a key is not present in the item, this
                 item is skipped.
 
-                Example: ``{'name': 'foo'}`` will match items where
-                the `name` attribute of the item is equal to `'foo'`.
+                Example: ``{'name': ``'foo'``}`` will match items where
+                the ``name`` attribute of the item is equal to ``'foo'``.
 
                 - Callable that receives an item instance and returns a boolean.
 
@@ -641,9 +641,9 @@ class BasePage(BaseRecord, Generic[TItem]):
                 argument, which is an instance of the item model, and return
                 a boolean value indicating whether the item meets the constraint.
 
-                Example: ``lambda item: 'foo' in item.name`` will match items
-                where the `name` attribute of the item contains the string
-                `'foo'`.
+                Example: ``lambda item: ``'foo'`` in item.name`` will match items
+                where the ``name`` attribute of the item contains the string
+                ``'foo'``.
 
         Raises:
             FreshPointParserTypeError: If the constraint is invalid, i.e., not a
@@ -674,8 +674,8 @@ class BasePage(BaseRecord, Generic[TItem]):
                 is the expected value. If a key is not present in the item, this
                 item is skipped.
 
-                Example: ``{'name': 'foo'}`` will match items where
-                the `name` attribute of the item is equal to `'foo'`.
+                Example: ``{'name': ``'foo'``}`` will match items where
+                the ``name`` attribute of the item is equal to ``'foo'``.
 
                 - Callable that receives an item instance and returns a boolean.
 
@@ -683,9 +683,9 @@ class BasePage(BaseRecord, Generic[TItem]):
                 argument, which is an instance of the item model, and return
                 a boolean value indicating whether the item meets the constraint.
 
-                Example: ``lambda item: 'foo' in item.name`` will match items
-                where the `name` attribute of the item contains the string
-                `'foo'`.
+                Example: ``lambda item: ``'foo'`` in item.name`` will match items
+                where the ``name`` attribute of the item contains the string
+                ``'foo'``.
 
         Raises:
             FreshPointParserTypeError: If the constraint is invalid, i.e., not a

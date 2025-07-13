@@ -1,4 +1,4 @@
-"""FreshPoint webpage HTML parsers of the `freshpointparser` library."""
+"""FreshPoint webpage HTML parsers of the ``freshpointparser`` library."""
 
 from ._base import BasePageHTMLParser, logger
 from ._location import LocationPageHTMLParser, parse_location_page
