@@ -9,7 +9,7 @@ from unidecode import unidecode
 from .exceptions import FreshPointParserTypeError, FreshPointParserValueError
 
 logger = logging.getLogger('freshpointparser')
-"""Top-level logger of the `freshpointparser` package."""
+"""Top-level logger of the ``freshpointparser`` package."""
 
 LOCATION_PAGE_URL = 'https://my.freshpoint.cz'
 
@@ -85,7 +85,7 @@ def get_location_page_url() -> str:
 def normalize_text(text: Any) -> str:  # noqa: ANN401
     """Normalize the given text by removing diacritics, leading/trailing
     whitespace, and converting it to lowercase. Non-string values are
-    converted to strings. `None` values are converted to empty strings.
+    converted to strings. ``None`` values are converted to empty strings.
 
     Args:
         text (Any): The text to be normalized.

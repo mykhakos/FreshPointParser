@@ -32,7 +32,7 @@ class ProductHTMLParser:
 
     This class provides static methods to parse various attributes of a product
     from its HTML representation. It's designed to work with BeautifulSoup
-    `Tag` objects, extracting data such as product name, ID number, pricing,
+    ``Tag`` objects, extracting data such as product name, ID number, pricing,
     availability, etc.
     """
 
@@ -46,15 +46,15 @@ class ProductHTMLParser:
         """Get a single Tag in a ResultSet.
 
         Args:
-            resultset (bs4.ResultSet): A `bs4.ResultSet` object
-                expected to contain exactly one `bs4.Tag` object.
+            resultset (bs4.ResultSet): A ``bs4.ResultSet`` object
+                expected to contain exactly one ``bs4.Tag`` object.
 
         Returns:
-            bs4.Tag: The Tag contained in the provided `resultset`.
+            bs4.Tag: The Tag contained in the provided ``resultset``.
 
         Raises:
-            FreshPointParserValueError: If `resultset` does not contain exactly one Tag.
-            FreshPointParserTypeError: If the extracted element is not a `bs4.Tag` object.
+            FreshPointParserValueError: If ``resultset`` does not contain exactly one Tag.
+            FreshPointParserTypeError: If the extracted element is not a ``bs4.Tag`` object.
         """
         if len(resultset) == 0:
             raise FreshPointParserValueError(
@@ -294,7 +294,7 @@ class ProductHTMLParser:
 
 class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
     """Parses HTML content of a FreshPoint product webpage
-    `my.freshpoint.cz/device/product-list/<pageId>`. Allows accessing
+    ``my.freshpoint.cz/device/product-list/<pageId>``. Allows accessing
     the parsed webpage data and searching for products by name or ID.
     """
 
@@ -584,7 +584,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             name (str): The name of the product to search for. Note that product
                 names are normalized to lowercase ASCII characters. The match
                 is case-insensitive and ignores diacritics regardless of the
-                `partial_match` value.
+                ``partial_match`` value.
             partial_match (bool): If True, the name match can be partial
                 (case-insensitive). If False, the name match must be exact
                 (case-insensitive). Defaults to True.
@@ -625,7 +625,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             name (str): The name of the product to filter by. Note that product
                 names are normalized to lowercase ASCII characters. The match
                 is case-insensitive and ignores diacritics regardless of the
-                `partial_match` value.
+                ``partial_match`` value.
             partial_match (bool): If True, the name match can be partial
                 (case-insensitive). If False, the name match must be exact
                 (case-insensitive). Defaults to True.
@@ -659,7 +659,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
 
 def parse_product_page(page_html: Union[str, bytes]) -> ProductPage:
     """Parse the HTML content of a FreshPoint product webpage
-    `my.freshpoint.cz/device/product-list/<pageId>` to a structured
+    ``my.freshpoint.cz/device/product-list/<pageId>`` to a structured
     ProductPage model.
 
     Args:

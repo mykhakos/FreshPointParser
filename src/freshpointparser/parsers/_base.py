@@ -44,9 +44,9 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         Args:
             needle (str): String to search for.
             haystack (str): String to search in.
-            partial_match (bool): If True, checks if `needle` is a substring of
-                `haystack` (`needle in haystack`). If False, checks for exact
-                match (`needle == haystack`). In both cases, the match is
+            partial_match (bool): If True, checks if ``needle`` is a substring of
+                ``haystack`` (``needle in haystack``). If False, checks for exact
+                match (``needle == haystack``). In both cases, the match is
                 case-insensitive and ignores diacritics.
 
         Raises:
