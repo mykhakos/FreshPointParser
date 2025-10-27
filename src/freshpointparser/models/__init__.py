@@ -2,7 +2,7 @@
 The ``annotations`` submodule is available for additional data types.
 """
 
-from . import annotations
+from . import types
 from ._base import BaseItem, BasePage, BaseRecord, logger
 from ._location import Location, LocationPage
 from ._product import Product, ProductPage
@@ -15,6 +15,6 @@ __all__ = [
     'LocationPage',
     'Product',
     'ProductPage',
-    'annotations',
     'logger',
+    'types',
 ]
