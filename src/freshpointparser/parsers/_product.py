@@ -18,10 +18,7 @@ from ..exceptions import (
     FreshPointParserTypeError,
     FreshPointParserValueError,
 )
-from ..models import (
-    Product,
-    ProductPage,
-)
+from ..models import Product, ProductPage
 from ._base import BasePageHTMLParser, logger
 
 T = TypeVar('T')

@@ -10,10 +10,7 @@ from typing import (
 from freshpointparser._utils import validate_id
 
 from ..exceptions import FreshPointParserTypeError, FreshPointParserValueError
-from ..models import (
-    Location,
-    LocationPage,
-)
+from ..models import Location, LocationPage
 from ._base import BasePageHTMLParser
 
 

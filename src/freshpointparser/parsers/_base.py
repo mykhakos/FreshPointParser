@@ -7,10 +7,7 @@ from datetime import datetime
 from typing import Generic, Optional, TypeVar, Union
 
 from .._utils import normalize_text
-from ..exceptions import (
-    FreshPointParserAttributeError,
-    FreshPointParserTypeError,
-)
+from ..exceptions import FreshPointParserAttributeError, FreshPointParserTypeError
 from ..models import BasePage
 
 if sys.version_info >= (3, 11):
