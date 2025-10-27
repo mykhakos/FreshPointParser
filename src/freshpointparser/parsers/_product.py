@@ -182,11 +182,7 @@ class ProductHTMLParser:
         quantity = product_data.find_next(
             string=(
                 lambda text: bool(
-                    text
-                    and re.match(
-                        pattern=cls._RE_PATTERN_FIND_QUANTITY,
-                        string=normalize_text(text),
-                    )
+                    text and cls._RE_PATTERN_FIND_QUANTITY.match(normalize_text(text))
                 )
             ),
         )
@@ -208,11 +204,7 @@ class ProductHTMLParser:
         prices = product_data.find_all(
             string=(
                 lambda text: bool(
-                    text
-                    and re.match(
-                        pattern=cls._RE_PATTERN_FIND_PRICE,
-                        string=normalize_text(text),
-                    )
+                    text and cls._RE_PATTERN_FIND_PRICE.match(normalize_text(text))
                 )
             ),
         )
@@ -432,7 +424,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
                 'Unable to parse page ID '
                 '(script tag with "deviceId" text was not found).'
             )
-        match = re.search(pattern=self._RE_PATTERN_DEVICE_ID, string=script)
+        match = self._RE_PATTERN_DEVICE_ID.search(script)
         if not match:
             raise FreshPointParserValueError(
                 'Unable to parse page ID '
