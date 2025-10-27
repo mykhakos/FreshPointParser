@@ -22,13 +22,7 @@ from typing import (
     overload,
 )
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    SerializationInfo,
-    field_serializer,
-)
+from pydantic import BaseModel, ConfigDict, Field, SerializationInfo, field_serializer
 from pydantic.alias_generators import to_camel
 
 from ..exceptions import FreshPointParserTypeError, FreshPointParserValueError

@@ -136,13 +136,21 @@ class Product(BaseItem):
         title='Full Price',
         description='Full price of the product.',
     )
-    """Full price of the product."""
+    """Full price of the product.
+
+    If the full price is not provided upon initialization,
+    it is set to the value of the current price.
+    """
     price_curr: NonNegativeFloat = Field(
         default=0.0,
         title='Current Price',
         description='Current selling price of the product.',
     )
-    """Current selling price of the product."""
+    """Current selling price of the product.
+
+    If the current price is not provided upon initialization,
+    it is set to the value of the full price.
+    """
     info: str = Field(
         default='',
         title='Information',
@@ -200,6 +208,8 @@ class Product(BaseItem):
     def discount_rate(self) -> float:
         """Discount rate (<0; 1>) of the product, calculated based on
         the difference between the full price and the current selling price.
+
+        Precision is up to two decimal places (whole percentage points).
         """
         if self.price_full == 0 or self.price_full < self.price_curr:
             return 0

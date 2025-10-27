@@ -1,4 +1,4 @@
-"""Main entry point for the ``freshpointparser`` package."""
+"""Main entry point for the ``freshpointparser`` library."""
 
 from . import exceptions, models, parsers
 from ._utils import get_location_page_url, get_product_page_url, logger
