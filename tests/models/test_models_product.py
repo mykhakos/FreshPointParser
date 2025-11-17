@@ -3,7 +3,7 @@ from types import MappingProxyType
 from typing import Dict
 
 import pytest
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 from freshpointparser import get_product_page_url
 from freshpointparser.exceptions import (
@@ -14,7 +14,7 @@ from freshpointparser.models import (
     Product,
     ProductPage,
 )
-from freshpointparser.models.annotations import (
+from freshpointparser.models.types import (
     DiffType,
     ProductPriceUpdateInfo,
     ProductQuantityUpdateInfo,
@@ -962,6 +962,228 @@ def test_compare_price(product_this, product_other, info):
     assert product_this.compare_price(product_this) == info_no_diff
 
 
+# region Product - parsing_errors
+
+
+@pytest.mark.parametrize(
+    'product_data, expected_parsing_errors',
+    [
+        pytest.param(
+            {},
+            {},
+            id='no errors - empty data',
+        ),
+        pytest.param(
+            {'id_': 1, 'name': 'Apple', 'quantity': 5},
+            {},
+            id='no errors - valid data',
+        ),
+        pytest.param(
+            {'id_': 1, 'name': ValueError('Invalid name')},
+            {'name': 'ValueError: Invalid name'},
+            id='single parsing error - name',
+        ),
+        pytest.param(
+            {
+                'id_': 1,
+                'name': ValueError('Invalid name'),
+                'quantity': TypeError('Invalid quantity'),
+            },
+            {
+                'name': 'ValueError: Invalid name',
+                'quantity': 'TypeError: Invalid quantity',
+            },
+            id='multiple parsing errors',
+        ),
+        pytest.param(
+            {
+                'id_': 1,
+                'price_full': AttributeError('Cannot parse price'),
+                'category': 'Fruit',
+            },
+            {'price_full': 'AttributeError: Cannot parse price'},
+            id='parsing error with valid fields',
+        ),
+        pytest.param(
+            {
+                'id_': 1,
+                'price_curr': RuntimeError('Price error'),
+                'quantity': KeyError('Quantity missing'),
+            },
+            {
+                'price_curr': 'RuntimeError: Price error',
+                'quantity': "KeyError: 'Quantity missing'",
+            },
+            id='multiple different error types',
+        ),
+    ],
+)
+def test_product_parsing_errors_initialization(product_data, expected_parsing_errors):
+    """Test that parsing errors are correctly captured during initialization."""
+    product = Product(**product_data)
+    assert product.parsing_errors == expected_parsing_errors
+
+
+def test_product_parsing_errors_field_is_frozen():
+    """Test that parsing_errors field is frozen and cannot be modified."""
+    product = Product()
+    with pytest.raises(ValidationError, match='frozen_field'):
+        product.parsing_errors = {}  # type: ignore[misc]
+
+
+def test_product_parsing_errors_fields_not_set():
+    """Test that fields with errors are not set on the model (use defaults)."""
+    product = Product(
+        id_=123,
+        name=ValueError('Bad name'),  # type: ignore[arg-type]
+        quantity=TypeError('Bad quantity'),  # type: ignore[arg-type]
+        price_full=10.0,
+    )
+    # Fields with errors should use default values
+    assert not product.name
+    assert product.quantity == 0
+    # But ID and price_full should be set correctly
+    assert product.id_ == 123
+    assert product.price_full == 10.0
+    # Errors should be captured
+    assert 'name' in product.parsing_errors
+    assert 'quantity' in product.parsing_errors
+
+
+@pytest.mark.parametrize(
+    'exception, expected_error_msg',
+    [
+        pytest.param(
+            ValueError('Test error'),
+            'ValueError: Test error',
+            id='ValueError',
+        ),
+        pytest.param(
+            TypeError('Type mismatch'),
+            'TypeError: Type mismatch',
+            id='TypeError',
+        ),
+        pytest.param(
+            AttributeError('Missing attribute'),
+            'AttributeError: Missing attribute',
+            id='AttributeError',
+        ),
+        pytest.param(
+            RuntimeError('Runtime issue'),
+            'RuntimeError: Runtime issue',
+            id='RuntimeError',
+        ),
+        pytest.param(
+            KeyError('key'),
+            "KeyError: 'key'",
+            id='KeyError',
+        ),
+    ],
+)
+def test_product_parsing_errors_exception_types(exception, expected_error_msg):
+    """Test that different exception types are correctly formatted."""
+    product = Product(name=exception)  # type: ignore[arg-type]
+    assert product.parsing_errors['name'] == expected_error_msg
+
+
+def test_product_parsing_errors_serialization():
+    """Test that parsing_errors are included in serialization."""
+    product = Product(
+        id_=1,
+        name=ValueError('Bad name'),  # type: ignore[arg-type]
+        category='Fruit',
+        quantity=5,
+    )
+    data = product.model_dump()
+    assert 'parsing_errors' in data
+    assert data['parsing_errors'] == {'name': 'ValueError: Bad name'}
+    assert data['category'] == 'Fruit'
+    assert data['quantity'] == 5
+
+
+def test_product_parsing_errors_json_serialization():
+    """Test that parsing_errors work with JSON mode serialization."""
+    product = Product(
+        id_=1,
+        name=ValueError('Bad name'),  # type: ignore[arg-type]
+        price_full=TypeError('Bad price'),  # type: ignore[arg-type]
+        category='Fruit',
+    )
+    data = product.model_dump(mode='json')
+    assert 'parsing_errors' in data
+    assert data['parsing_errors'] == {
+        'name': 'ValueError: Bad name',
+        'price_full': 'TypeError: Bad price',
+    }
+
+
+def test_product_parsing_errors_with_explicit_field():
+    """Test that parsing_errors are preserved when errors exist in fields."""
+    product = Product(
+        id_=1,
+        name=ValueError('Name error'),  # type: ignore[arg-type]
+        category='Fruit',
+    )
+    # The error should be captured
+    assert 'name' in product.parsing_errors
+    assert product.parsing_errors['name'] == 'ValueError: Name error'
+    # Other fields should work normally
+    assert product.category == 'Fruit'
+
+
+def test_product_parsing_errors_in_diff():
+    """Test that parsing_errors field can be included or excluded in diff."""
+    p1 = Product(
+        id_=1,
+        name='Apple',
+        quantity=ValueError('Error 1'),  # type: ignore[arg-type]
+    )
+    p2 = Product(
+        id_=1,
+        name='Apple',
+        price_full=ValueError('Error 2'),  # type: ignore[arg-type]
+    )
+
+    # By default, parsing_errors should be in the diff
+    diff_default = p1.diff(p2, exclude_recorded_at=True)
+    # parsing_errors is a dict, so it should show as different
+    if 'parsing_errors' in diff_default:
+        assert diff_default['parsing_errors']['type'] == DiffType.UPDATED
+
+    # Can explicitly exclude parsing_errors
+    diff_excluded = p1.diff(p2, exclude_recorded_at=True, exclude={'parsing_errors'})
+    assert 'parsing_errors' not in diff_excluded
+
+
+def test_product_parsing_errors_multiple_fields():
+    """Test handling of parsing errors across multiple fields."""
+    product = Product(
+        id_=1,
+        name=ValueError('Bad name'),  # type: ignore[arg-type]
+        category=TypeError('Bad category'),  # type: ignore[arg-type]
+        quantity=AttributeError('Bad quantity'),  # type: ignore[arg-type]
+        price_full=RuntimeError('Bad price_full'),  # type: ignore[arg-type]
+        price_curr=KeyError('Bad price_curr'),  # type: ignore[arg-type]
+    )
+
+    assert len(product.parsing_errors) == 5
+    assert 'name' in product.parsing_errors
+    assert 'category' in product.parsing_errors
+    assert 'quantity' in product.parsing_errors
+    assert 'price_full' in product.parsing_errors
+    assert 'price_curr' in product.parsing_errors
+
+    # All fields should have default values
+    assert not product.name
+    assert not product.category
+    assert product.quantity == 0
+    assert product.price_full == 0
+    assert product.price_curr == 0
+
+
+# endregion Product - parsing_errors
+
+
 # endregion Product
 
 # region ProductPage
@@ -1412,6 +1634,136 @@ def test_iter_item_attr_defaults_and_uniqueness():
     # TypeError on unhashable unique without flag
     with pytest.raises(AttributeError):
         list(page.iter_item_attr('context', unique=True))
+
+
+# region ProductPage - parsing_errors
+
+
+def test_product_page_parsing_errors():
+    """Test that parsing_errors work at the page level."""
+    page = ProductPage(
+        items={
+            1: Product(id_=1, name='Apple', quantity=5),
+            2: Product(
+                id_=2,
+                name=ValueError('Bad name'),  # type: ignore[arg-type]
+                quantity=TypeError('Bad quantity'),  # type: ignore[arg-type]
+            ),
+        }
+    )
+
+    # The page itself should have no parsing errors
+    assert page.parsing_errors == {}
+
+    # But individual items can have parsing errors
+    assert page.items[1].parsing_errors == {}
+    assert page.items[2].parsing_errors == {
+        'name': 'ValueError: Bad name',
+        'quantity': 'TypeError: Bad quantity',
+    }
+
+
+def test_product_page_with_parsing_errors_serialization():
+    """Test serialization of a page with items containing parsing errors."""
+    page = ProductPage(
+        items={
+            1: Product(id_=1, name='Valid Product'),
+            2: Product(
+                id_=2,
+                name=ValueError('Invalid'),  # type: ignore[arg-type]
+                price_full=TypeError('Bad price'),  # type: ignore[arg-type]
+            ),
+        }
+    )
+
+    data = page.model_dump()
+    assert data['items'][1]['parsing_errors'] == {}
+    assert data['items'][2]['parsing_errors'] == {
+        'name': 'ValueError: Invalid',
+        'price_full': 'TypeError: Bad price',
+    }
+
+
+def test_product_page_find_items_with_parsing_errors():
+    """Test that find_items can search by parsing_errors."""
+    page = ProductPage(
+        items={
+            1: Product(id_=1, name='Apple'),
+            2: Product(id_=2, name=ValueError('Error1')),  # type: ignore[arg-type]
+            3: Product(id_=3, quantity=TypeError('Error2')),  # type: ignore[arg-type]
+            4: Product(
+                id_=4,
+                name=ValueError('Error3'),  # type: ignore[arg-type]
+                price_full=AttributeError('Error4'),  # type: ignore[arg-type]
+            ),
+        }
+    )
+
+    # Find items with no parsing errors
+    no_errors = list(page.find_items(lambda p: not p.parsing_errors))
+    assert [p.id_ for p in no_errors] == [1]
+
+    # Find items with parsing errors
+    has_errors = list(page.find_items(lambda p: bool(p.parsing_errors)))
+    assert [p.id_ for p in has_errors] == [2, 3, 4]
+
+    # Find items with specific error in name field
+    name_errors = list(page.find_items(lambda p: 'name' in p.parsing_errors))
+    assert [p.id_ for p in name_errors] == [2, 4]
+
+    # Find items with multiple errors
+    multiple_errors = list(page.find_items(lambda p: len(p.parsing_errors) > 1))
+    assert [p.id_ for p in multiple_errors] == [4]
+
+
+def test_product_page_item_diff_with_parsing_errors():
+    """Test that item_diff handles parsing_errors correctly."""
+    page1 = ProductPage(
+        items={
+            1: Product(id_=1, name='Apple', quantity=ValueError('Error 1')),  # type: ignore[arg-type]
+            2: Product(id_=2, name='Banana'),
+        }
+    )
+    page2 = ProductPage(
+        items={
+            1: Product(id_=1, name='Apple', price_full=ValueError('Error 2')),  # type: ignore[arg-type]
+            3: Product(id_=3, name='Cherry'),
+        }
+    )
+
+    diff = page1.item_diff(page2)
+
+    # Item 1 exists in both but has different parsing_errors
+    assert 1 in diff
+    if 'parsing_errors' in diff[1]['diff']:
+        assert diff[1]['diff']['parsing_errors']['type'] == DiffType.UPDATED
+
+    # Item 2 deleted
+    assert diff[2]['type'] == DiffType.DELETED
+
+    # Item 3 created
+    assert diff[3]['type'] == DiffType.CREATED
+
+
+def test_product_page_iter_item_attr_parsing_errors():
+    """Test iter_item_attr with parsing_errors field."""
+    page = ProductPage(
+        items={
+            1: Product(id_=1, name='Apple'),
+            2: Product(id_=2, name=ValueError('Error')),  # type: ignore[arg-type]
+            3: Product(id_=3, quantity=TypeError('Error')),  # type: ignore[arg-type]
+        }
+    )
+
+    # Get all parsing_errors (unhashable, so need unhashable=True for unique)
+    all_errors = list(page.iter_item_attr('parsing_errors'))
+    assert len(all_errors) == 3
+    assert all_errors[0] == {}
+    assert 'name' in all_errors[1]
+    assert 'quantity' in all_errors[2]
+
+
+# endregion ProductPage - parsing_errors
 
 
 # endregion ProductPage

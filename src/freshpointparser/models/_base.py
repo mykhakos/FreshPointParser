@@ -22,7 +22,14 @@ from typing import (
     overload,
 )
 
-from pydantic import BaseModel, ConfigDict, Field, SerializationInfo, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializationInfo,
+    field_serializer,
+    model_validator,
+)
 from pydantic.alias_generators import to_camel
 
 from ..exceptions import FreshPointParserTypeError, FreshPointParserValueError
@@ -199,6 +206,29 @@ class BaseRecord(BaseModel):
         description='Datetime when the data has been recorded.',
     )
     """Datetime when the data has been recorded."""
+
+    parsing_errors: Dict[str, str] = Field(
+        default_factory=dict,
+        title='Parse Errors',
+        description='Mapping of field names to error messages encountered during parsing.',
+        frozen=True,
+    )
+    """Mapping of field names to error messages encountered during parsing."""
+
+    @model_validator(mode='before')
+    @classmethod
+    def _filter_parsing_errors(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(data, dict):
+            return data
+
+        parsing_errors = data.setdefault('parsing_errors', {})
+        for key, value in data.items():
+            if isinstance(value, Exception):
+                parsing_errors[key] = f'{type(value).__name__}: {value!s}'
+        for key in parsing_errors:
+            del data[key]
+
+        return data
 
     def is_newer_than(
         self,
