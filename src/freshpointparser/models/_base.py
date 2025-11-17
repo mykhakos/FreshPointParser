@@ -21,6 +21,7 @@ from typing import (
     Union,
     overload,
 )
+from uuid import uuid4
 
 from pydantic import (
     BaseModel,
@@ -125,7 +126,7 @@ class ModelDiff(TypedDict):
     """Mapping of field names to their differences."""
 
 
-ModelDiffMapping: TypeAlias = Dict[int, ModelDiff]
+ModelDiffMapping: TypeAlias = Dict[str, ModelDiff]
 """Mapping of item IDs to their differences."""
 
 
@@ -300,14 +301,15 @@ class BaseRecord(BaseModel):
 class BaseItem(BaseRecord):
     """Base model of a FreshPoint item."""
 
-    id_: int = Field(
-        default=0,
+    id_: str = Field(
+        default_factory=lambda: str(uuid4()),
         serialization_alias='id',  # not using 'alias' to bypass
         validation_alias='id',  # Pyright / Pylance limitations
+        coerce_numbers_to_str=True,
         title='ID',
-        description='Unique numeric identifier.',
+        description='Unique item identifier (usually numeric unless undefined).',
     )
-    """Unique numeric identifier."""
+    """Unique item identifier (usually numeric unless undefined)."""
 
     @field_serializer('recorded_at')
     def _serialize_recorded_at(  # noqa: PLR6301
@@ -330,6 +332,11 @@ class BaseItem(BaseRecord):
             )
             return value
         return value
+
+    @property
+    def is_default_id(self) -> bool:
+        """Check if the item ID is a default generated UUID value."""
+        return 'id_' not in self.model_fields_set
 
     def diff(
         self,
@@ -420,7 +427,7 @@ TItem = TypeVar(
 class BasePage(BaseRecord, Generic[TItem]):
     """Base data model of a FreshPoint page."""
 
-    items: Dict[int, TItem] = Field(
+    items: Dict[str, TItem] = Field(
         default_factory=dict,
         repr=False,
         title='Items',
@@ -436,7 +443,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         return list(self.items.values())
 
     @property
-    def item_ids(self) -> List[int]:
+    def item_ids(self) -> List[str]:
         """IDs of the items listed on the page."""
         return list(self.items.keys())
 
@@ -493,7 +500,7 @@ class BasePage(BaseRecord, Generic[TItem]):
 
             >>> from freshpointparser.models.annotations import DiffType
             >>> {
-            ...     1001: {
+            ...     '1001': {
             ...         'type': DiffType.UPDATED,
             ...         'diff': {
             ...             'field_common': {
@@ -502,7 +509,7 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...             },
             ...         },
             ...     },
-            ...     1002: {
+            ...     '1002': {
             ...         'type': DiffType.DELETED,
             ...         'diff': {
             ...             'field_only_in_this': {
@@ -511,7 +518,7 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...             },
             ...         },
             ...     },
-            ...     1003: {
+            ...     '1003': {
             ...         'type': DiffType.CREATED,
             ...         'diff': {
             ...             'field_only_in_other': {

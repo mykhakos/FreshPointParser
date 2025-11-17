@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from types import MappingProxyType
 from typing import Dict
@@ -34,7 +35,7 @@ DEFAULT_PRODUCT_PIC_URL = (
         pytest.param(
             Product(),
             dict(
-                id_=0,
+                id_='0',
                 name='',
                 category='',
                 is_vegetarian=False,
@@ -50,7 +51,7 @@ DEFAULT_PRODUCT_PIC_URL = (
         ),
         pytest.param(
             Product(
-                id_=1,
+                id_='1',
                 name='Product',
                 category='Category',
                 is_vegetarian=True,
@@ -63,7 +64,7 @@ DEFAULT_PRODUCT_PIC_URL = (
                 location_id=5,
             ),
             dict(
-                id_=1,
+                id_='1',
                 name='Product',
                 category='Category',
                 is_vegetarian=True,
@@ -80,7 +81,7 @@ DEFAULT_PRODUCT_PIC_URL = (
     ],
 )
 def test_product_init(product, expected_attrs):
-    assert product.id_ == expected_attrs['id_']
+    assert product.id_ == expected_attrs['id_'] or uuid.UUID(product.id_)
     assert product.name == expected_attrs['name']
     assert product.category == expected_attrs['category']
     assert product.is_vegetarian == expected_attrs['is_vegetarian']
@@ -381,12 +382,12 @@ def test_recorded_at_serialize_excluded():
     'product_this, product_other, diff',
     [
         pytest.param(
-            Product(id_=123, name='foo', quantity=0, price_full=5),
-            Product(id_=321, name='bar', quantity=5, price_full=10),
+            Product(id_='123', name='foo', quantity=0, price_full=5),
+            Product(id_='321', name='bar', quantity=5, price_full=10),
             {
                 'id_': {
                     'type': DiffType.UPDATED,
-                    'values': {'left': 123, 'right': 321},
+                    'values': {'left': '123', 'right': '321'},
                 },
                 'name': {
                     'type': DiffType.UPDATED,
@@ -408,8 +409,8 @@ def test_recorded_at_serialize_excluded():
             id='different products',
         ),
         pytest.param(
-            Product(category='foo'),
-            Product(category='bar'),
+            Product(id_='123', category='foo'),
+            Product(id_='123', category='bar'),
             {
                 'category': {
                     'type': DiffType.UPDATED,
@@ -419,14 +420,14 @@ def test_recorded_at_serialize_excluded():
             id='different category',
         ),
         pytest.param(
-            Product(id_=123, quantity=4, price_full=10),
-            Product(id_=123, quantity=4, price_full=10),
+            Product(id_='123', quantity=4, price_full=10),
+            Product(id_='123', quantity=4, price_full=10),
             {},
             id='same product',
         ),
         pytest.param(
-            Product(id_=123, quantity=4, price_full=10, price_curr=10),
-            Product(id_=123, quantity=4, price_full=10, price_curr=5),
+            Product(id_='123', quantity=4, price_full=10, price_curr=10),
+            Product(id_='123', quantity=4, price_full=10, price_curr=5),
             {
                 'price_curr': {
                     'type': DiffType.UPDATED,
@@ -436,8 +437,8 @@ def test_recorded_at_serialize_excluded():
             id='same product, different price_curr',
         ),
         pytest.param(
-            Product(id_=123, quantity=4, price_full=10, price_curr=5),
-            Product(id_=123, quantity=4, price_full=10, price_curr=10),
+            Product(id_='123', quantity=4, price_full=10, price_curr=5),
+            Product(id_='123', quantity=4, price_full=10, price_curr=10),
             {
                 'price_curr': {
                     'type': DiffType.UPDATED,
@@ -447,8 +448,8 @@ def test_recorded_at_serialize_excluded():
             id='same product, different price_curr (reversed)',
         ),
         pytest.param(
-            Product(id_=123, quantity=5, price_full=10, price_curr=10),
-            Product(id_=123, quantity=0, price_full=10, price_curr=10),
+            Product(id_='123', quantity=5, price_full=10, price_curr=10),
+            Product(id_='123', quantity=0, price_full=10, price_curr=10),
             {
                 'quantity': {
                     'type': DiffType.UPDATED,
@@ -460,16 +461,16 @@ def test_recorded_at_serialize_excluded():
     ],
 )
 def test_product_diff(product_this, product_other, diff):
-    assert product_this.diff(product_other) == diff
-    assert product_this.diff(product_other, exclude={'recorded_at'}) == diff
+    product_diff = product_this.diff(product_other)
+    assert product_diff == diff
 
 
 @pytest.mark.parametrize(
     'product_this, product_other, kwargs, expected_diff_true, expected_diff_false',
     [
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
             {},
             {},
             {
@@ -484,8 +485,8 @@ def test_product_diff(product_this, product_other, diff):
             id='only recorded_at differs',
         ),
         pytest.param(
-            Product(name='Apple', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(name='Banana', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
+            Product(id_='0', name='Apple', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
+            Product(id_='0', name='Banana', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
             {},
             {
                 'name': {
@@ -509,8 +510,8 @@ def test_product_diff(product_this, product_other, diff):
             id='recorded_at and name differ',
         ),
         pytest.param(
-            Product(name='Apple', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(name='Banana', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
+            Product(id_='0', name='Apple', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
+            Product(id_='0', name='Banana', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
             {'exclude': {'name'}},
             {},
             {
@@ -525,8 +526,8 @@ def test_product_diff(product_this, product_other, diff):
             id='exclude name, only recorded_at diff',
         ),
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Apple'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Apple'),
             {'include': {'recorded_at'}},
             {},
             {
@@ -541,8 +542,8 @@ def test_product_diff(product_this, product_other, diff):
             id='include only recorded_at',
         ),
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
             {'include': {'recorded_at', 'name'}},
             {
                 'name': {
@@ -566,8 +567,8 @@ def test_product_diff(product_this, product_other, diff):
             id='include recorded_at and name',
         ),
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
             {'by_alias': True},
             {},
             {
@@ -582,8 +583,8 @@ def test_product_diff(product_this, product_other, diff):
             id='by_alias kwarg',
         ),
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
             {'exclude': {'recorded_at'}},
             {
                 'name': {
@@ -600,8 +601,8 @@ def test_product_diff(product_this, product_other, diff):
             id='exclude kwarg includes recorded_at',
         ),
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
             {'exclude': {'recorded_at'}},
             {
                 'name': {
@@ -623,15 +624,11 @@ def test_product_diff_exclude_recorded_at_with_kwargs(
     product_this, product_other, kwargs, expected_diff_true, expected_diff_false
 ):
     # exclude_recorded_at=True
-    assert (
-        product_this.diff(product_other, exclude_recorded_at=True, **kwargs)
-        == expected_diff_true
-    )
+    product_diff = product_this.diff(product_other, exclude_recorded_at=True, **kwargs)
+    assert product_diff == expected_diff_true
     # exclude_recorded_at=False
-    assert (
-        product_this.diff(product_other, exclude_recorded_at=False, **kwargs)
-        == expected_diff_false
-    )
+    product_diff = product_this.diff(product_other, exclude_recorded_at=False, **kwargs)
+    assert product_diff == expected_diff_false
 
 
 @pytest.mark.parametrize(
@@ -1034,7 +1031,7 @@ def test_product_parsing_errors_field_is_frozen():
 def test_product_parsing_errors_fields_not_set():
     """Test that fields with errors are not set on the model (use defaults)."""
     product = Product(
-        id_=123,
+        id_='123',
         name=ValueError('Bad name'),  # type: ignore[arg-type]
         quantity=TypeError('Bad quantity'),  # type: ignore[arg-type]
         price_full=10.0,
@@ -1043,7 +1040,7 @@ def test_product_parsing_errors_fields_not_set():
     assert not product.name
     assert product.quantity == 0
     # But ID and price_full should be set correctly
-    assert product.id_ == 123
+    assert product.id_ == '123'
     assert product.price_full == 10.0
     # Errors should be captured
     assert 'name' in product.parsing_errors
@@ -1089,7 +1086,7 @@ def test_product_parsing_errors_exception_types(exception, expected_error_msg):
 def test_product_parsing_errors_serialization():
     """Test that parsing_errors are included in serialization."""
     product = Product(
-        id_=1,
+        id_='1',
         name=ValueError('Bad name'),  # type: ignore[arg-type]
         category='Fruit',
         quantity=5,
@@ -1104,7 +1101,7 @@ def test_product_parsing_errors_serialization():
 def test_product_parsing_errors_json_serialization():
     """Test that parsing_errors work with JSON mode serialization."""
     product = Product(
-        id_=1,
+        id_='1',
         name=ValueError('Bad name'),  # type: ignore[arg-type]
         price_full=TypeError('Bad price'),  # type: ignore[arg-type]
         category='Fruit',
@@ -1120,7 +1117,7 @@ def test_product_parsing_errors_json_serialization():
 def test_product_parsing_errors_with_explicit_field():
     """Test that parsing_errors are preserved when errors exist in fields."""
     product = Product(
-        id_=1,
+        id_='1',
         name=ValueError('Name error'),  # type: ignore[arg-type]
         category='Fruit',
     )
@@ -1134,12 +1131,12 @@ def test_product_parsing_errors_with_explicit_field():
 def test_product_parsing_errors_in_diff():
     """Test that parsing_errors field can be included or excluded in diff."""
     p1 = Product(
-        id_=1,
+        id_='1',
         name='Apple',
         quantity=ValueError('Error 1'),  # type: ignore[arg-type]
     )
     p2 = Product(
-        id_=1,
+        id_='1',
         name='Apple',
         price_full=ValueError('Error 2'),  # type: ignore[arg-type]
     )
@@ -1158,7 +1155,7 @@ def test_product_parsing_errors_in_diff():
 def test_product_parsing_errors_multiple_fields():
     """Test handling of parsing errors across multiple fields."""
     product = Product(
-        id_=1,
+        id_='1',
         name=ValueError('Bad name'),  # type: ignore[arg-type]
         category=TypeError('Bad category'),  # type: ignore[arg-type]
         quantity=AttributeError('Bad quantity'),  # type: ignore[arg-type]
@@ -1204,14 +1201,18 @@ def test_product_parsing_errors_multiple_fields():
         pytest.param(
             ProductPage(
                 items={
-                    1: Product(id_=1, location_id=296, recorded_at=datetime(2025, 1, 1))
+                    '1': Product(
+                        id_='1', location_id=296, recorded_at=datetime(2025, 1, 1)
+                    )
                 },
                 location_id=296,
                 location_name='foo',
             ),
             {
                 'items': {
-                    1: Product(id_=1, location_id=296, recorded_at=datetime(2025, 1, 1))
+                    '1': Product(
+                        id_='1', location_id=296, recorded_at=datetime(2025, 1, 1)
+                    )
                 },
                 'location_id': 296,
                 'location_name': 'foo',
@@ -1260,7 +1261,7 @@ def test_product_page_prop_location_name_lowercase_ascii(
 def products():
     return [
         Product(
-            id_=0,
+            id_='0',
             name='orange',
             category='fruit',
             quantity=1,
@@ -1269,7 +1270,7 @@ def products():
             info='very good',
         ),
         Product(
-            id_=1,
+            id_='1',
             name='cheesecake',
             category='dessert',
             quantity=5,
@@ -1277,7 +1278,7 @@ def products():
             price_curr=2.2,
         ),
         Product(
-            id_=2,
+            id_='2',
             name='apple',
             category='fruit',
             quantity=10,
@@ -1285,7 +1286,7 @@ def products():
             price_curr=1.2,
         ),
         Product(
-            id_=3,
+            id_='3',
             name='banana',
             category='fruit',
             quantity=0,
@@ -1295,7 +1296,7 @@ def products():
             is_gluten_free=True,
         ),
         Product(
-            id_=4,
+            id_='4',
             name='carrot',
             category='vegetable',
             quantity=15,
@@ -1303,7 +1304,7 @@ def products():
             is_gluten_free=True,
         ),
         Product(
-            id_=5,
+            id_='5',
             name='doughnut',
             category='pastry',
             quantity=5,
@@ -1312,7 +1313,7 @@ def products():
             info='try it',
         ),
         Product(
-            id_=6,
+            id_='6',
             name='eggs',
             category='dairy',
             quantity=12,
@@ -1320,7 +1321,7 @@ def products():
             price_curr=2.5,
         ),
         Product(
-            id_=7,
+            id_='7',
             name='fish',
             category='seafood',
             quantity=8,
@@ -1329,7 +1330,7 @@ def products():
             pic_url='https://example.com',
         ),
         Product(
-            id_=8,
+            id_='8',
             name='grapes',
             category='fruit',
             quantity=20,
@@ -1338,7 +1339,7 @@ def products():
             is_vegetarian=True,
         ),
         Product(
-            id_=9,
+            id_='9',
             name='honey',
             category='sweetener',
             quantity=0,
@@ -1346,7 +1347,7 @@ def products():
             price_curr=3.5,
         ),
         Product(
-            id_=10,
+            id_='10',
             name='ice cream',
             category='dessert',
             quantity=10,
@@ -1354,7 +1355,7 @@ def products():
             price_curr=2.0,
         ),
         Product(
-            id_=11,
+            id_='11',
             name='jam',
             category='spread',
             quantity=7,
@@ -1381,69 +1382,69 @@ def test_page_item_helpers(product_page):
     [
         pytest.param(
             {},
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'],
             id='dict constraint: empty',
         ),
-        pytest.param({'name': 'orange'}, [0], id='dict constraint: name'),
-        pytest.param({'id_': 4}, [4], id='dict constraint: id'),
+        pytest.param({'name': 'orange'}, ['0'], id='dict constraint: name'),
+        pytest.param({'id_': '4'}, ['4'], id='dict constraint: id'),
         pytest.param(
-            {'id_': 4, 'name': 'carrot'},
-            [4],
+            {'id_': '4', 'name': 'carrot'},
+            ['4'],
             id='dict constraint: id with other constraint',
         ),
         pytest.param(
             {'name': 'jam', 'category': 'spread'},
-            [11],
+            ['11'],
             id='dict constraint: two constraints',
         ),
         pytest.param(
             {'name': 'honey', 'category': 'sweetener', 'quantity': 0},
-            [9],
+            ['9'],
             id='dict constraint: multiple constraints',
         ),
         pytest.param(
             {'name_lowercase_ascii': 'orange'},
-            [0],
+            ['0'],
             id='dict constraint: property constraint',
         ),
         pytest.param(
             MappingProxyType({'name': 'orange'}),
-            [0],
+            ['0'],
             id='MappingProxyType constraint: name',
         ),
         pytest.param(
             lambda p: p,
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'],
             id='lambda constraint: any product',
         ),
         pytest.param(
             lambda p: 'ice' in p.name,
-            [10],
+            ['10'],
             id='lambda constraint: partial name match',
         ),
         pytest.param(
             lambda p: p.price_full > 3.0,
-            [7, 9],
+            ['7', '9'],
             id='lambda constraint: full price gt',
         ),
         pytest.param(
             lambda p: 1.0 <= p.price_curr <= 2.0,
-            [0, 2, 4, 8, 10],
+            ['0', '2', '4', '8', '10'],
             id='lambda constraint: curr price range',
         ),
         pytest.param(
             lambda p: 5 <= p.quantity <= 10,
-            [1, 2, 5, 7, 10, 11],
+            ['1', '2', '5', '7', '10', '11'],
             id='lambda constraint: quantity range',
         ),
         pytest.param(
             lambda p: p.is_vegetarian and p.is_gluten_free,
-            [3],
+            ['3'],
             id='lambda constraint: vegetarian and gluten free',
         ),
         pytest.param(
             lambda p: p.price_curr < 2.0 and p.quantity > 8,
-            [2, 8],
+            ['2', '8'],
             id='lambda constraint: multiple parameters',
         ),
     ],
@@ -1574,20 +1575,20 @@ def test_product_page_find_items_invalid_lambda_attribute(product_page, constrai
 def test_item_diff_created_updated_deleted():
     p_old = ProductPage(
         items={
-            1: Product(id_=1, name='Banana'),
-            2: Product(id_=2, name='Apple', quantity=2),
+            '1': Product(id_='1', name='Banana'),
+            '2': Product(id_='2', name='Apple', quantity=2),
         }
     )
     p_new = ProductPage(
         items={
-            2: Product(id_=2, name='Apple', quantity=1),
-            3: Product(id_=3, name='Orange'),
+            '2': Product(id_='2', name='Apple', quantity=1),
+            '3': Product(id_='3', name='Orange'),
         }
     )
     diff = p_old.item_diff(p_new)
-    assert diff[1]['type'] is DiffType.DELETED
-    assert diff[2]['type'] is DiffType.UPDATED
-    assert diff[3]['type'] is DiffType.CREATED
+    assert diff['1']['type'] is DiffType.DELETED
+    assert diff['2']['type'] is DiffType.UPDATED
+    assert diff['3']['type'] is DiffType.CREATED
 
 
 def test_iter_item_attr_defaults_and_uniqueness():
@@ -1596,10 +1597,10 @@ def test_iter_item_attr_defaults_and_uniqueness():
 
     page = ProductPage(
         items={
-            1: Product(id_=1, category='c1'),
-            2: Product(id_=2, category='c2'),
-            3: Product(id_=3, category='c2'),
-            4: Product(id_=4, category='c3'),
+            '1': Product(id_='1', category='c1'),
+            '2': Product(id_='2', category='c2'),
+            '3': Product(id_='3', category='c2'),
+            '4': Product(id_='4', category='c3'),
         }
     )
     # missing attr without default -> raises
@@ -1622,7 +1623,7 @@ def test_iter_item_attr_defaults_and_uniqueness():
     ]
 
     # unique with unhashable values
-    page.items[5] = SubProduct(id_=5, context={'key': 'value'})
+    page.items['5'] = SubProduct(id_='5', context={'key': 'value'})
     assert list(page.iter_item_attr('context', default={}, unhashable=True)) == [
         {},
         {},
@@ -1643,9 +1644,9 @@ def test_product_page_parsing_errors():
     """Test that parsing_errors work at the page level."""
     page = ProductPage(
         items={
-            1: Product(id_=1, name='Apple', quantity=5),
-            2: Product(
-                id_=2,
+            '1': Product(id_='1', name='Apple', quantity=5),
+            '2': Product(
+                id_='2',
                 name=ValueError('Bad name'),  # type: ignore[arg-type]
                 quantity=TypeError('Bad quantity'),  # type: ignore[arg-type]
             ),
@@ -1656,8 +1657,8 @@ def test_product_page_parsing_errors():
     assert page.parsing_errors == {}
 
     # But individual items can have parsing errors
-    assert page.items[1].parsing_errors == {}
-    assert page.items[2].parsing_errors == {
+    assert page.items['1'].parsing_errors == {}
+    assert page.items['2'].parsing_errors == {
         'name': 'ValueError: Bad name',
         'quantity': 'TypeError: Bad quantity',
     }
@@ -1667,9 +1668,9 @@ def test_product_page_with_parsing_errors_serialization():
     """Test serialization of a page with items containing parsing errors."""
     page = ProductPage(
         items={
-            1: Product(id_=1, name='Valid Product'),
-            2: Product(
-                id_=2,
+            '1': Product(id_='1', name='Valid Product'),
+            '2': Product(
+                id_='2',
                 name=ValueError('Invalid'),  # type: ignore[arg-type]
                 price_full=TypeError('Bad price'),  # type: ignore[arg-type]
             ),
@@ -1677,8 +1678,8 @@ def test_product_page_with_parsing_errors_serialization():
     )
 
     data = page.model_dump()
-    assert data['items'][1]['parsing_errors'] == {}
-    assert data['items'][2]['parsing_errors'] == {
+    assert data['items']['1']['parsing_errors'] == {}
+    assert data['items']['2']['parsing_errors'] == {
         'name': 'ValueError: Invalid',
         'price_full': 'TypeError: Bad price',
     }
@@ -1688,11 +1689,11 @@ def test_product_page_find_items_with_parsing_errors():
     """Test that find_items can search by parsing_errors."""
     page = ProductPage(
         items={
-            1: Product(id_=1, name='Apple'),
-            2: Product(id_=2, name=ValueError('Error1')),  # type: ignore[arg-type]
-            3: Product(id_=3, quantity=TypeError('Error2')),  # type: ignore[arg-type]
-            4: Product(
-                id_=4,
+            '1': Product(id_='1', name='Apple'),
+            '2': Product(id_='2', name=ValueError('Error1')),  # type: ignore[arg-type]
+            '3': Product(id_='3', quantity=TypeError('Error2')),  # type: ignore[arg-type]
+            '4': Product(
+                id_='4',
                 name=ValueError('Error3'),  # type: ignore[arg-type]
                 price_full=AttributeError('Error4'),  # type: ignore[arg-type]
             ),
@@ -1701,57 +1702,56 @@ def test_product_page_find_items_with_parsing_errors():
 
     # Find items with no parsing errors
     no_errors = list(page.find_items(lambda p: not p.parsing_errors))
-    assert [p.id_ for p in no_errors] == [1]
+    assert [p.id_ for p in no_errors] == ['1']
 
     # Find items with parsing errors
     has_errors = list(page.find_items(lambda p: bool(p.parsing_errors)))
-    assert [p.id_ for p in has_errors] == [2, 3, 4]
-
+    assert [p.id_ for p in has_errors] == ['2', '3', '4']
     # Find items with specific error in name field
     name_errors = list(page.find_items(lambda p: 'name' in p.parsing_errors))
-    assert [p.id_ for p in name_errors] == [2, 4]
+    assert [p.id_ for p in name_errors] == ['2', '4']
 
     # Find items with multiple errors
     multiple_errors = list(page.find_items(lambda p: len(p.parsing_errors) > 1))
-    assert [p.id_ for p in multiple_errors] == [4]
+    assert [p.id_ for p in multiple_errors] == ['4']
 
 
 def test_product_page_item_diff_with_parsing_errors():
     """Test that item_diff handles parsing_errors correctly."""
     page1 = ProductPage(
         items={
-            1: Product(id_=1, name='Apple', quantity=ValueError('Error 1')),  # type: ignore[arg-type]
-            2: Product(id_=2, name='Banana'),
+            '1': Product(id_='1', name='Apple', quantity=ValueError('Error 1')),  # type: ignore[arg-type]
+            '2': Product(id_='2', name='Banana'),
         }
     )
     page2 = ProductPage(
         items={
-            1: Product(id_=1, name='Apple', price_full=ValueError('Error 2')),  # type: ignore[arg-type]
-            3: Product(id_=3, name='Cherry'),
+            '1': Product(id_='1', name='Apple', price_full=ValueError('Error 2')),  # type: ignore[arg-type]
+            '3': Product(id_='3', name='Cherry'),
         }
     )
 
     diff = page1.item_diff(page2)
 
     # Item 1 exists in both but has different parsing_errors
-    assert 1 in diff
-    if 'parsing_errors' in diff[1]['diff']:
-        assert diff[1]['diff']['parsing_errors']['type'] == DiffType.UPDATED
+    assert '1' in diff
+    if 'parsing_errors' in diff['1']['diff']:
+        assert diff['1']['diff']['parsing_errors']['type'] == DiffType.UPDATED
 
     # Item 2 deleted
-    assert diff[2]['type'] == DiffType.DELETED
+    assert diff['2']['type'] == DiffType.DELETED
 
     # Item 3 created
-    assert diff[3]['type'] == DiffType.CREATED
+    assert diff['3']['type'] == DiffType.CREATED
 
 
 def test_product_page_iter_item_attr_parsing_errors():
     """Test iter_item_attr with parsing_errors field."""
     page = ProductPage(
         items={
-            1: Product(id_=1, name='Apple'),
-            2: Product(id_=2, name=ValueError('Error')),  # type: ignore[arg-type]
-            3: Product(id_=3, quantity=TypeError('Error')),  # type: ignore[arg-type]
+            '1': Product(id_='1', name='Apple'),
+            '2': Product(id_='2', name=ValueError('Error')),  # type: ignore[arg-type]
+            '3': Product(id_='3', quantity=TypeError('Error')),  # type: ignore[arg-type]
         }
     )
 

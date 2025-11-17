@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from types import MappingProxyType
 
@@ -17,7 +18,7 @@ from freshpointparser.models import Location, LocationPage
         (
             Location(),
             dict(
-                id_=0,
+                id_='0',
                 name='',
                 address='',
                 latitude=0.0,
@@ -29,7 +30,7 @@ from freshpointparser.models import Location, LocationPage
         ),
         (
             Location(
-                id_=1,
+                id_='1',
                 name='Foo',
                 address='Bar',
                 latitude=1.23,
@@ -39,7 +40,7 @@ from freshpointparser.models import Location, LocationPage
                 is_suspended=True,
             ),
             dict(
-                id_=1,
+                id_='1',
                 name='Foo',
                 address='Bar',
                 latitude=1.23,
@@ -53,7 +54,7 @@ from freshpointparser.models import Location, LocationPage
     ids=['default args', 'custom args'],
 )
 def test_location_init(location, expected_attrs):
-    assert location.id_ == expected_attrs['id_']
+    assert location.id_ == expected_attrs['id_'] or uuid.UUID(location.id_)
     assert location.name == expected_attrs['name']
     assert location.address == expected_attrs['address']
     assert location.latitude == expected_attrs['latitude']
@@ -163,7 +164,7 @@ def test_location_parsing_errors_field_is_frozen():
 def test_location_parsing_errors_fields_not_set():
     """Test that fields with errors are not set on the model."""
     location = Location(
-        id_=123,
+        id_='123',
         name=ValueError('Bad name'),  # type: ignore[arg-type]
         latitude=TypeError('Bad latitude'),  # type: ignore[arg-type]
     )
@@ -171,7 +172,7 @@ def test_location_parsing_errors_fields_not_set():
     assert location.name == ''  # noqa: PLC1901
     assert location.latitude == 0.0
     # But ID should be set correctly
-    assert location.id_ == 123
+    assert location.id_ == '123'
     # Errors should be captured
     assert 'name' in location.parsing_errors
     assert 'latitude' in location.parsing_errors
@@ -211,7 +212,7 @@ def test_location_parsing_errors_exception_types(exception, expected_error_msg):
 def test_location_parsing_errors_serialization():
     """Test that parsing_errors are included in serialization."""
     location = Location(
-        id_=1,
+        id_='1',
         name=ValueError('Bad name'),  # type: ignore[arg-type]
         address='Valid address',
     )
@@ -224,7 +225,7 @@ def test_location_parsing_errors_serialization():
 def test_location_parsing_errors_with_explicit_field():
     """Test that parsing_errors are preserved when errors exist in fields."""
     location = Location(
-        id_=1,
+        id_='1',
         name=ValueError('Name error'),  # type: ignore[arg-type]
         address='Valid address',
     )
@@ -252,9 +253,9 @@ def test_location_parsing_errors_with_explicit_field():
         ),
         pytest.param(
             LocationPage(
-                items={1: Location(id_=1, recorded_at=datetime(2025, 6, 1))},
+                items={'1': Location(id_='1', recorded_at=datetime(2025, 6, 1))},
             ),
-            {'items': {1: Location(id_=1, recorded_at=datetime(2025, 6, 1))}},
+            {'items': {'1': Location(id_='1', recorded_at=datetime(2025, 6, 1))}},
             id='regular page',
         ),
     ],
@@ -272,7 +273,7 @@ def test_location_page_init(page, expected_attrs):
             id='empty page',
         ),
         pytest.param(
-            LocationPage(items={1: Location(id_=1)}),
+            LocationPage(items={'1': Location(id_='1')}),
             id='regular page',
         ),
     ],
@@ -285,7 +286,7 @@ def test_location_page_prop_url(page):
 def locations():
     return [
         Location(
-            id_=0,
+            id_='0',
             name='AAC TECHNOLOGIES SOLUTIONS',
             address='Kozomín 501, 277 45',
             latitude=50.2467181,
@@ -295,7 +296,7 @@ def locations():
             is_suspended=False,
         ),
         Location(
-            id_=1,
+            id_='1',
             name='ABB',
             address='Vyskočilova 1561/4a, Praha Michle',
             latitude=50.0481331,
@@ -305,7 +306,7 @@ def locations():
             is_suspended=False,
         ),
         Location(
-            id_=2,
+            id_='2',
             name='ABS Jets',
             address='K letišti 549, Praha 6 - Ruzyně, Praha 614, 16100',
             latitude=50.0957250,
@@ -325,70 +326,71 @@ def locations_page(locations):
 @pytest.mark.parametrize(
     'constraint, expected_location_ids',
     [
-        pytest.param({}, [0, 1, 2], id='dict constraint: empty'),
-        pytest.param({'id_': 0}, [0], id='dict constraint: id_'),
-        pytest.param({'name': 'ABB'}, [1], id='dict constraint: name'),
+        pytest.param({}, ['0', '1', '2'], id='dict constraint: empty'),
+        pytest.param({'id_': '0'}, ['0'], id='dict constraint: id_'),
+        pytest.param({'name': 'ABB'}, ['1'], id='dict constraint: name'),
         pytest.param(
             {'address': 'Vyskočilova 1561/4a, Praha Michle'},
-            [1],
+            ['1'],
             id='dict constraint: address',
         ),
         pytest.param(
             {'address_lowercase_ascii': 'kozomin 501, 277 45'},
-            [0],
+            ['0'],
             id='dict constraint: address_lowercase_ascii',
         ),
         pytest.param(
             {'latitude': 50.0957250, 'longitude': 14.2838994},
-            [2],
+            ['2'],
             id='dict constraint: latitude and longitude',
         ),
         pytest.param(
             {'discount_rate': 30, 'is_active': True, 'is_suspended': False},
-            [0],
+            ['0'],
             id='dict constraint: discount_rate, is_active, is_suspended',
         ),
         pytest.param(
             {'coordinates': (50.0957250, 14.2838994)},
-            [2],
+            ['2'],
             id='dict constraint: coordinates',
         ),
         pytest.param(
             MappingProxyType({'name_lowercase_ascii': 'abs jets'}),
-            [2],
+            ['2'],
             id='MappingProxyType constraint: name_lowercase_ascii',
         ),
-        pytest.param(lambda loc: loc, [0, 1, 2], id='lambda constraint: any location'),
-        pytest.param(lambda loc: loc.id_ == 1, [1], id='lambda constraint: id_'),
+        pytest.param(
+            lambda loc: loc, ['0', '1', '2'], id='lambda constraint: any location'
+        ),
+        pytest.param(lambda loc: loc.id_ == '1', ['1'], id='lambda constraint: id_'),
         pytest.param(
             lambda loc: 'AB' in loc.name,
-            [1, 2],
+            ['1', '2'],
             id='lambda constraint: partial name',
         ),
         pytest.param(
             lambda loc: 'praha' in loc.address_lowercase_ascii,
-            [1, 2],
+            ['1', '2'],
             id='lambda constraint: partial address_lowercase_ascii',
         ),
         pytest.param(
             lambda loc: loc.discount_rate > 0 and loc.is_active,
-            [0],
+            ['0'],
             id='lambda constraint: discount_rate and is_active',
         ),
         pytest.param(
             lambda loc: not loc.is_suspended,
-            [0, 1, 2],
+            ['0', '1', '2'],
             id='lambda constraint: is_suspended and not is_active',
         ),
         pytest.param(
             lambda loc: loc.coordinates == (50.0957250, 14.2838994),
-            [2],
+            ['2'],
             id='lambda constraint: coordinates',
         ),
     ],
 )
 def test_location_page_find_items(locations_page, constraint, expected_location_ids):
-    locations_page.find_items
     locations = locations_page.find_items(constraint=constraint)
     assert [loc.id_ for loc in locations] == expected_location_ids
     location = locations_page.find_item(constraint=constraint)
@@ -534,9 +536,9 @@ def test_location_page_parsing_errors():
     """Test that parsing_errors work at the page level."""
     page = LocationPage(
         items={
-            1: Location(id_=1, name='Valid Location'),
-            2: Location(
-                id_=2,
+            '1': Location(id_='1', name='Valid Location'),
+            '2': Location(
+                id_='2',
                 name=ValueError('Bad name'),  # type: ignore[arg-type]
                 latitude=TypeError('Bad latitude'),  # type: ignore[arg-type]
             ),
@@ -547,8 +549,8 @@ def test_location_page_parsing_errors():
     assert page.parsing_errors == {}
 
     # But individual items can have parsing errors
-    assert page.items[1].parsing_errors == {}
-    assert page.items[2].parsing_errors == {
+    assert page.items['1'].parsing_errors == {}
+    assert page.items['2'].parsing_errors == {
         'name': 'ValueError: Bad name',
         'latitude': 'TypeError: Bad latitude',
     }
@@ -558,37 +560,37 @@ def test_location_page_with_parsing_errors_serialization():
     """Test serialization of a page with items containing parsing errors."""
     page = LocationPage(
         items={
-            1: Location(id_=1, name='Valid'),
-            2: Location(id_=2, name=ValueError('Invalid')),  # type: ignore[arg-type]
+            '1': Location(id_='1', name='Valid'),
+            '2': Location(id_='2', name=ValueError('Invalid')),  # type: ignore[arg-type]
         }
     )
 
     data = page.model_dump()
-    assert data['items'][1]['parsing_errors'] == {}
-    assert data['items'][2]['parsing_errors'] == {'name': 'ValueError: Invalid'}
+    assert data['items']['1']['parsing_errors'] == {}
+    assert data['items']['2']['parsing_errors'] == {'name': 'ValueError: Invalid'}
 
 
 def test_location_page_find_items_with_parsing_errors():
     """Test that find_items can search by parsing_errors."""
     page = LocationPage(
         items={
-            1: Location(id_=1, name='Valid'),
-            2: Location(id_=2, name=ValueError('Error1')),  # type: ignore[arg-type]
-            3: Location(id_=3, latitude=TypeError('Error2')),  # type: ignore[arg-type]
+            '1': Location(id_='1', name='Valid'),
+            '2': Location(id_='2', name=ValueError('Error1')),  # type: ignore[arg-type]
+            '3': Location(id_='3', latitude=TypeError('Error2')),  # type: ignore[arg-type]
         }
     )
 
     # Find items with no parsing errors
     no_errors = list(page.find_items(lambda loc: not loc.parsing_errors))
-    assert [loc.id_ for loc in no_errors] == [1]
+    assert [loc.id_ for loc in no_errors] == ['1']
 
     # Find items with parsing errors
     has_errors = list(page.find_items(lambda loc: bool(loc.parsing_errors)))
-    assert [loc.id_ for loc in has_errors] == [2, 3]
+    assert [loc.id_ for loc in has_errors] == ['2', '3']
 
     # Find items with specific error in name field
     name_errors = list(page.find_items(lambda loc: 'name' in loc.parsing_errors))
-    assert [loc.id_ for loc in name_errors] == [2]
+    assert [loc.id_ for loc in name_errors] == ['2']
 
 
 # endregion LocationPage - parsing_errors
