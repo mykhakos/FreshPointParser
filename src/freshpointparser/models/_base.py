@@ -333,11 +333,6 @@ class BaseItem(BaseRecord):
             return value
         return value
 
-    @property
-    def is_default_id(self) -> bool:
-        """Check if the item ID is a default generated UUID value."""
-        return 'id_' not in self.model_fields_set
-
     def diff(
         self,
         other: BaseItem,
