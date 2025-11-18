@@ -13,6 +13,7 @@ from typing import (
     Iterator,
     List,
     Literal,
+    MutableMapping,
     Optional,
     Protocol,
     Set,
@@ -33,6 +34,7 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
+from .._utils import format_exception
 from ..exceptions import FreshPointParserTypeError, FreshPointParserValueError
 
 if sys.version_info >= (3, 11):
@@ -219,13 +221,13 @@ class BaseRecord(BaseModel):
     @model_validator(mode='before')
     @classmethod
     def _filter_parsing_errors(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-        if not isinstance(data, dict):
+        if not isinstance(data, MutableMapping):
             return data
 
         parsing_errors = data.setdefault('parsing_errors', {})
         for key, value in data.items():
             if isinstance(value, Exception):
-                parsing_errors[key] = f'{type(value).__name__}: {value!s}'
+                parsing_errors[key] = format_exception(value)
         for key in parsing_errors:
             del data[key]
 
@@ -431,6 +433,30 @@ class BasePage(BaseRecord, Generic[TItem]):
         ),
     )
     """Dictionary of item IDs as keys and data models on the page as values."""
+
+    @model_validator(mode='before')
+    @classmethod
+    def _filter_parsing_errors_from_items(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(data, MutableMapping):
+            return data
+
+        if 'items' in data and 'Items' in data:
+            raise FreshPointParserTypeError(
+                'Both "items" and "Items" keys are present in the data. '
+                'Only one of them should be used.'
+            )
+
+        items = data.get('items') or data.get('Items') or {}
+        if not isinstance(items, MutableMapping) or not items:
+            return data
+
+        parsing_errors = data.setdefault('parsing_errors', {})
+        for item_id, item_data in items.items():
+            if isinstance(item_data, Exception):
+                parsing_errors[f'items.{item_id}'] = format_exception(item_data)
+        for item_id in parsing_errors:
+            del items[item_id]
+        return data
 
     @property
     def item_list(self) -> List[TItem]:

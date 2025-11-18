@@ -103,3 +103,17 @@ def normalize_text(text: Any) -> str:  # noqa: ANN401
         return unidecode(str(text).strip()).casefold()
     except Exception as e:
         raise FreshPointParserValueError(f'Failed to normalize text "{text}".') from e
+
+
+def format_exception(exc: Exception) -> str:
+    """Format an exception into a string that includes the exception type
+    and message.
+
+    Args:
+        exc (Exception): The exception to be formatted.
+
+    Returns:
+        str: A string representation of the exception, including its type
+            and message.
+    """
+    return f'{type(exc).__name__}: {exc!s}'
