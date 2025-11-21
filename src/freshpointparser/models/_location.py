@@ -4,7 +4,7 @@ import sys
 
 from pydantic import AliasChoices, Field
 
-from .._utils import LOCATION_PAGE_URL, normalize_text
+from .._utils import normalize_text
 from ._base import BaseItem, BasePage
 
 if sys.version_info >= (3, 11):
@@ -91,6 +91,18 @@ class Location(BaseItem):
     def coordinates(self) -> LocationCoordinates:
         """Coordinates of the location as tuple (latitude, longitude)."""
         return LocationCoordinates(self.latitude, self.longitude)
+
+
+LOCATION_PAGE_URL = 'https://my.freshpoint.cz'
+
+
+def get_location_page_url() -> str:
+    """Get the FreshPoint.cz location page HTTPS URL.
+
+    Returns:
+        str: The FreshPoint.cz location page URL.
+    """
+    return LOCATION_PAGE_URL
 
 
 class LocationPage(BasePage[Location]):

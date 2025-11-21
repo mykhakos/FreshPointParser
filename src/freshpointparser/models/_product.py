@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Union
 
 from pydantic import Field, NonNegativeFloat, NonNegativeInt
 
-from .._utils import get_product_page_url, normalize_text
+from freshpointparser.exceptions import FreshPointParserValueError
+
+from .._utils import normalize_text
 from ._base import BaseItem, BasePage
 
 
@@ -337,6 +340,31 @@ class Product(BaseItem):
             has_sale_started=(not self.is_on_sale and new.is_on_sale),
             has_sale_ended=(self.is_on_sale and not new.is_on_sale),
         )
+
+
+def get_product_page_url(location_id: Union[int, str]) -> str:
+    """Generate a FreshPoint.cz product page HTTPS URL for a given location ID.
+
+    Args:
+        location_id (Union[int, str]): The ID of the location (also known as
+            the page ID and the device ID) for which to generate the URL. This is
+            the number that uniquely identifies the location in the FreshPoint.cz
+            system. It is the last part of the product page URL, after the last slash.
+            For example, in https://my.freshpoint.cz/device/product-list/296,
+            the ID is 296.
+
+    Raises:
+        FreshPointParserValueError: If the object does not represent a non-negative
+            integer (e.g., a negative integer, a float, or a non-numeric string).
+
+    Returns:
+        str: The full page URL for the given location ID.
+    """
+    if not str(location_id).isdigit():
+        raise FreshPointParserValueError(
+            f'Location ID must respresent a non-negative integer, got: {location_id!r}'
+        )
+    return f'https://my.freshpoint.cz/device/product-list/{location_id}'
 
 
 class ProductPage(BasePage[Product]):

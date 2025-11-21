@@ -159,6 +159,7 @@ def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMap
     left_asdict = left.model_dump(**kwargs)
     right_asdict = right.model_dump(**kwargs)
     diff = {}
+
     # compare left to right
     for field, value_left in left_asdict.items():
         if field in right_asdict:
@@ -172,6 +173,7 @@ def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMap
                 type=diff_type,
                 values=DiffValues(left=value_left, right=value_right),
             )
+
     # compare right to left
     if right_asdict.keys() != left_asdict.keys():
         for field, value_right in right_asdict.items():
@@ -554,8 +556,10 @@ class BasePage(BaseRecord, Generic[TItem]):
             context = dict(kwargs.get('context', {}))
             context['__exclude_recorded_at__'] = True
             kwargs['context'] = context
+
         item_missing = DynamicFieldsModel()
         diff = {}
+
         # compare self to other
         for item_id, item_self in self.items.items():
             item_other = other.items.get(item_id, None)
@@ -571,6 +575,7 @@ class BasePage(BaseRecord, Generic[TItem]):
                         type=DiffType.UPDATED,
                         diff=item_diff,
                     )
+
         # compare other to self
         if other.items.keys() != self.items.keys():
             for item_id, item_other in other.items.items():
@@ -579,6 +584,7 @@ class BasePage(BaseRecord, Generic[TItem]):
                         type=DiffType.CREATED,
                         diff=model_diff(item_missing, item_other, **kwargs),
                     )
+
         return diff
 
     @overload
@@ -640,6 +646,7 @@ class BasePage(BaseRecord, Generic[TItem]):
             values = (getattr(item, attr) for item in items)
         else:
             values = (getattr(item, attr, default) for item in items)
+
         if unique:
             if unhashable:
                 seen_unhashable: List[Any] = []
