@@ -28,8 +28,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    SerializationInfo,
-    field_serializer,
     model_validator,
 )
 from pydantic.alias_generators import to_camel
@@ -132,7 +130,12 @@ ModelDiffMapping: TypeAlias = Dict[str, ModelDiff]
 """Mapping of item IDs to their differences."""
 
 
-def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMapping:
+def model_diff(
+    left: BaseModel,
+    right: BaseModel,
+    ignore_fields: Optional[Set[str]] = None,
+    **kwargs: Any,
+) -> FieldDiffMapping:
     """Compare the left model with the right model to identify which model
     fields have different values.
 
@@ -148,6 +151,10 @@ def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMap
     Args:
         left (model): The model to compare.
         right (model): The model to compare with.
+        ignore_fields (Optional[Set[str]]): Field names to ignore during comparison.
+            Works similar to the standard ``exclude`` Pydantic serialization
+            argument, but has less type variability and a higher priority.
+            Defaults to None.
         **kwargs: Additional keyword arguments to pass to the ``model_dump``
             calls to control the serialization process, such as ``exclude``,
             ``include``, ``by_alias``, and others.
@@ -160,8 +167,21 @@ def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMap
     right_asdict = right.model_dump(**kwargs)
     diff = {}
 
+    # prepare ignored fields
+    if ignore_fields is None:
+        ignore_fields = set()
+    else:
+        ignore_field_aliases = set()
+        for field in ignore_fields:
+            field_info = type(left).model_fields.get(field)
+            if field_info and field_info.serialization_alias is not None:
+                ignore_field_aliases.add(field_info.serialization_alias)
+        ignore_fields.update(ignore_field_aliases)
+
     # compare left to right
     for field, value_left in left_asdict.items():
+        if field in ignore_fields:
+            continue
         if field in right_asdict:
             diff_type = DiffType.UPDATED
             value_right = right_asdict[field]
@@ -177,6 +197,8 @@ def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMap
     # compare right to left
     if right_asdict.keys() != left_asdict.keys():
         for field, value_right in right_asdict.items():
+            if field in ignore_fields:
+                continue
             if field not in left_asdict:
                 diff_type = DiffType.CREATED
                 value_left = None
@@ -184,6 +206,7 @@ def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMap
                     type=diff_type,
                     values=DiffValues(left=value_left, right=value_right),
                 )
+
     return diff
 
 
@@ -315,28 +338,6 @@ class BaseItem(BaseRecord):
     )
     """Unique item identifier (usually numeric unless undefined)."""
 
-    @field_serializer('recorded_at')
-    def _serialize_recorded_at(  # noqa: PLR6301
-        self, value: datetime, info: SerializationInfo
-    ) -> Optional[datetime]:
-        """Exclude the ``recorded_at`` field from serialization if the context indicates
-        that it should not be recorded.
-        """
-        # This method could be a part of the BaseRecord class, but at the moment
-        # there are no use cases to exclude the ``recorded_at`` field there.
-        if not info.context:
-            return value
-        try:
-            if info.context.get('__exclude_recorded_at__'):
-                return None
-        except AttributeError:
-            logger.debug(
-                "Could not determine if 'recorded_at' should be excluded "
-                'from serialization. Returning the value as is.'
-            )
-            return value
-        return value
-
     def diff(
         self,
         other: BaseItem,
@@ -402,11 +403,14 @@ class BaseItem(BaseRecord):
             ... }
 
         """
-        if exclude_recorded_at:
-            context = dict(kwargs.get('context', {}))
-            context['__exclude_recorded_at__'] = True
-            kwargs['context'] = context
-        return model_diff(self, other, **kwargs)
+        if self is other:
+            return {}
+        return model_diff(
+            self,
+            other,
+            ignore_fields={'recorded_at'} if exclude_recorded_at else None,
+            **kwargs,
+        )
 
 
 # default values for the type variables are only available in pydantic>=2.11,
@@ -552,13 +556,9 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...     },
             ... }
         """
-        if exclude_recorded_at:
-            context = dict(kwargs.get('context', {}))
-            context['__exclude_recorded_at__'] = True
-            kwargs['context'] = context
-
         item_missing = DynamicFieldsModel()
         diff = {}
+        ignore_fields = {'recorded_at'} if exclude_recorded_at else None
 
         # compare self to other
         for item_id, item_self in self.items.items():
@@ -566,10 +566,20 @@ class BasePage(BaseRecord, Generic[TItem]):
             if item_other is None:
                 diff[item_id] = ModelDiff(
                     type=DiffType.DELETED,
-                    diff=model_diff(item_self, item_missing, **kwargs),
+                    diff=model_diff(
+                        item_self,
+                        item_missing,
+                        exclude_recorded_at=exclude_recorded_at,
+                        **kwargs,
+                    ),
                 )
             else:
-                item_diff = model_diff(item_self, item_other, **kwargs)
+                item_diff = model_diff(
+                    item_self,
+                    item_other,
+                    ignore_fields=ignore_fields,
+                    **kwargs,
+                )
                 if item_diff:
                     diff[item_id] = ModelDiff(
                         type=DiffType.UPDATED,
@@ -582,7 +592,12 @@ class BasePage(BaseRecord, Generic[TItem]):
                 if item_id not in self.items:
                     diff[item_id] = ModelDiff(
                         type=DiffType.CREATED,
-                        diff=model_diff(item_missing, item_other, **kwargs),
+                        diff=model_diff(
+                            item_missing,
+                            item_other,
+                            ignore_fields=ignore_fields,
+                            **kwargs,
+                        ),
                     )
 
         return diff
