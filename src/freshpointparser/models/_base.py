@@ -57,15 +57,10 @@ class ToCamel:
         return to_camel(string)
 
 
-class DynamicFieldsModel(BaseModel):
-    """Wraps arbitrary fields in a model to capture unknown or unstructured data."""
+class EmptyModel(BaseModel):
+    """An empty Pydantic model with no fields."""
 
-    model_config = ConfigDict(
-        alias_generator=ToCamel(),
-        populate_by_name=True,
-        extra='allow',
-        arbitrary_types_allowed=True,
-    )
+    model_config = ConfigDict(frozen=True)
 
 
 # region Diff
@@ -128,7 +123,7 @@ ModelDiffMapping: TypeAlias = Dict[str, ModelDiff]
 def model_diff(
     left: BaseModel,
     right: BaseModel,
-    **kwargs: Any,
+    model_dump_kwargs: Dict[str, Any],
 ) -> FieldDiffMapping:
     """Compare the left model with the right model to identify which model
     fields have different values.
@@ -145,20 +140,15 @@ def model_diff(
     Args:
         left (model): The model to compare.
         right (model): The model to compare with.
-        ignore_fields (Optional[Set[str]]): Field names to ignore during comparison.
-            Works similar to the standard ``exclude`` Pydantic serialization
-            argument, but has less type variability and a higher priority.
-            Defaults to None.
-        **kwargs: Additional keyword arguments to pass to the ``model_dump``
-            calls to control the serialization process, such as ``exclude``,
-            ``include``, ``by_alias``, and others.
+        model_dump_kwargs (Dict[str, Any]): Additional keyword arguments to pass to
+            the ``model_dump`` calls to control the serialization process.
 
     Returns:
         FieldDiffMapping: A dictionary mapping field names to their differences,
         each containing the diff type and a pair of left/right values.
     """
-    left_asdict = left.model_dump(**kwargs)
-    right_asdict = right.model_dump(**kwargs)
+    left_asdict = left.model_dump(**model_dump_kwargs)
+    right_asdict = right.model_dump(**model_dump_kwargs)
     diff = {}
 
     # compare left to right
@@ -373,7 +363,7 @@ class BaseItem(BaseRecord):
         """
         if self is other:
             return {}
-        return model_diff(self, other, **kwargs)
+        return model_diff(self, other, kwargs)
 
 
 # default values for the type variables are only available in pydantic>=2.11,
@@ -485,7 +475,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         """
         items_as_dict_self = self.items_as_dict
         items_as_dict_other = other.items_as_dict
-        item_missing = DynamicFieldsModel()
+        item_missing = EmptyModel()
         diff = {}
 
         # compare self to other
@@ -494,10 +484,10 @@ class BasePage(BaseRecord, Generic[TItem]):
             if item_other is None:
                 diff[item_id] = ModelDiff(
                     type=DiffType.DELETED,
-                    diff=model_diff(item_self, item_missing, **kwargs),
+                    diff=model_diff(item_self, item_missing, kwargs),
                 )
             else:
-                item_diff = model_diff(item_self, item_other, **kwargs)
+                item_diff = model_diff(item_self, item_other, kwargs)
                 if item_diff:
                     diff[item_id] = ModelDiff(
                         type=DiffType.UPDATED,
@@ -510,7 +500,7 @@ class BasePage(BaseRecord, Generic[TItem]):
                 if item_id not in items_as_dict_self:
                     diff[item_id] = ModelDiff(
                         type=DiffType.CREATED,
-                        diff=model_diff(item_missing, item_other, **kwargs),
+                        diff=model_diff(item_missing, item_other, kwargs),
                     )
 
         return diff
