@@ -20,7 +20,6 @@ from typing import (
     Union,
     overload,
 )
-from uuid import uuid4
 
 from pydantic import (
     BaseModel,
@@ -203,17 +202,17 @@ class RecordMetadata(BaseModel):
 
     recorded_at: datetime = Field(
         default_factory=datetime.now,
+        frozen=True,
         title='Recorded At',
         description='Datetime when the data has been recorded.',
-        frozen=True,
     )
     """Datetime when the data has been recorded."""
 
     parsing_errors: Dict[str, str] = Field(
         default_factory=dict,
+        frozen=True,
         title='Parse Errors',
         description='Mapping of field names to error messages encountered during parsing.',
-        frozen=True,
     )
     """Mapping of field names to error messages encountered during parsing."""
 
@@ -225,10 +224,10 @@ class BaseRecord(BaseModel):
 
     metadata: RecordMetadata = Field(
         default_factory=RecordMetadata,
-        title='Record Metadata',
-        description='Metadata of the record.',
         frozen=True,
         exclude=True,
+        title='Record Metadata',
+        description='Metadata of the record.',
     )
     """Metadata of the record."""
 
@@ -305,15 +304,15 @@ class BaseRecord(BaseModel):
 class BaseItem(BaseRecord):
     """Base model of a FreshPoint item."""
 
-    id_: str = Field(
-        default_factory=lambda: str(uuid4()),
+    id_: Optional[str] = Field(
+        default=None,
         serialization_alias='id',  # not using 'alias' to bypass
         validation_alias='id',  # Pyright / Pylance limitations
         coerce_numbers_to_str=True,
         title='ID',
-        description='Unique item identifier (usually numeric unless undefined).',
+        description='Unique item identifier (numeric unless undefined).',
     )
-    """Unique item identifier (usually numeric unless undefined)."""
+    """Unique item identifier (numeric unless undefined)."""
 
     def diff(
         self,
@@ -394,38 +393,28 @@ TItem = TypeVar(
 class BasePage(BaseRecord, Generic[TItem]):
     """Base data model of a FreshPoint page."""
 
-    items: Dict[str, TItem] = Field(
-        default_factory=dict,
+    items: List[TItem] = Field(
+        default_factory=list,
         repr=False,
         title='Items',
-        description=(
-            'Dictionary of item IDs as keys and data models on the page as values.'
-        ),
+        description='Data models on the page.',
     )
-    """Dictionary of item IDs as keys and data models on the page as values."""
+    """Data models on the page."""
 
     @property
-    def item_list(self) -> List[TItem]:
-        """Items listed on the page."""
-        return list(self.items.values())
+    def items_as_dict(self) -> Dict[str, TItem]:
+        """Items on the page as a mapping of item IDs to item models.
 
-    @property
-    def item_ids(self) -> List[str]:
-        """IDs of the items listed on the page."""
-        return list(self.items.keys())
+        Items with missing IDs are excluded.
+        """
+        return {item.id_: item for item in self.items if item.id_ is not None}
 
     @property
     def item_count(self) -> int:
         """Total number of items on the page."""
         return len(self.items)
 
-    def item_diff(
-        self,
-        other: BasePage,
-        *,
-        exclude_recorded_at: bool = True,
-        **kwargs: Any,
-    ) -> ModelDiffMapping:
+    def item_diff(self, other: BasePage, **kwargs: Any) -> ModelDiffMapping:
         """Compare items between this page and another one to identify which
         items differ. Items are matched by their ID.
 
@@ -444,8 +433,6 @@ class BasePage(BaseRecord, Generic[TItem]):
 
         Args:
             other (BasePage): The page to compare against.
-            exclude_recorded_at (bool): If True, the ``recorded_at`` field is
-                excluded from the comparison. Defaults to True.
             **kwargs: Additional keyword arguments passed to each item model's
                 ``model_dump`` call, such as ``exclude``, ``include``,
                 ``by_alias``, and others.
@@ -496,12 +483,14 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...     },
             ... }
         """
+        items_as_dict_self = self.items_as_dict
+        items_as_dict_other = other.items_as_dict
         item_missing = DynamicFieldsModel()
         diff = {}
 
         # compare self to other
-        for item_id, item_self in self.items.items():
-            item_other = other.items.get(item_id, None)
+        for item_id, item_self in items_as_dict_self.items():
+            item_other = items_as_dict_other.get(item_id, None)
             if item_other is None:
                 diff[item_id] = ModelDiff(
                     type=DiffType.DELETED,
@@ -516,9 +505,9 @@ class BasePage(BaseRecord, Generic[TItem]):
                     )
 
         # compare other to self
-        if other.items.keys() != self.items.keys():
-            for item_id, item_other in other.items.items():
-                if item_id not in self.items:
+        if other.items_as_dict.keys() != self.items_as_dict.keys():
+            for item_id, item_other in items_as_dict_other.items():
+                if item_id not in items_as_dict_self:
                     diff[item_id] = ModelDiff(
                         type=DiffType.CREATED,
                         diff=model_diff(item_missing, item_other, **kwargs),
@@ -580,11 +569,10 @@ class BasePage(BaseRecord, Generic[TItem]):
             Iterator[Union[Any, T]]: Attribute values collected from each item
             on the page.
         """
-        items = self.items.values()
         if default is _NO_DEFAULT:
-            values = (getattr(item, attr) for item in items)
+            values = (getattr(item, attr) for item in self.items)
         else:
-            values = (getattr(item, attr, default) for item in items)
+            values = (getattr(item, attr, default) for item in self.items)
 
         if unique:
             if unhashable:
@@ -696,7 +684,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         if callable(constraint):
 
             def _filter_callable() -> Iterator[TItem]:
-                for item in self.items.values():
+                for item in self.items:
                     try:
                         if constraint(item):
                             yield item
@@ -710,7 +698,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         if isinstance(constraint, Mapping):
 
             def _filter_mapping() -> Iterator[TItem]:
-                for item in self.items.values():
+                for item in self.items:
                     try:
                         if all(
                             getattr(item, attr, _NO_DEFAULT) == value
