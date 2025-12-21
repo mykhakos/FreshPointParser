@@ -1,7 +1,8 @@
 """Main entry point for the ``freshpointparser`` library."""
 
 from . import exceptions, models, parsers
-from ._utils import get_location_page_url, get_product_page_url, logger
+from ._utils import logger
+from .models import get_location_page_url, get_product_page_url
 from .parsers import parse_location_page, parse_product_page
 
 __all__ = [
