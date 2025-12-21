@@ -29,7 +29,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
 
     def __init__(self) -> None:
         """Initialize a parser instance with an empty state."""
-        self._parse_datetime = datetime.now()
+        self._last_parsed_at = datetime.now()
         self._html_hash_sha1 = self._hash_html_sha1('')
         self._parse_status: Union[bool, None] = None
 
@@ -88,7 +88,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         html_hash_sha1 = self._hash_html_sha1(page_html)
         if force or html_hash_sha1 != self._html_hash_sha1:
             self._html_hash_sha1 = html_hash_sha1
-            self._parse_datetime = datetime.now()
+            self._last_parsed_at = datetime.now()
             logger.debug('HTML hash updated: %s', html_hash_sha1)
             return True
         return False
@@ -140,7 +140,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         return self._construct_page()
 
     @property
-    def parse_datetime(self) -> datetime:
+    def last_parsed_at(self) -> datetime:
         """Timestamp of the last successful or skipped parse.
 
         If the parser has never parsed any HTML content, this property will
@@ -148,7 +148,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         """
         if self._parse_status is None:
             raise FreshPointParserAttributeError('Parser has not parsed any HTML yet.')
-        return self._parse_datetime
+        return self._last_parsed_at
 
     @property
     def parse_status(self) -> Optional[bool]:
