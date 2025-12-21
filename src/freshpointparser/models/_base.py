@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import sys
 from collections.abc import Mapping
 from datetime import date, datetime
@@ -13,6 +12,7 @@ from typing import (
     Iterator,
     List,
     Literal,
+    MutableMapping,
     Optional,
     Set,
     TypedDict,
@@ -25,9 +25,14 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    ValidationError,
+    ValidationInfo,
+    ValidatorFunctionWrapHandler,
+    field_validator,
 )
 from pydantic.alias_generators import to_camel
 
+from .._utils import logger
 from ..exceptions import FreshPointParserTypeError, FreshPointParserValueError
 
 if sys.version_info >= (3, 11):
@@ -35,8 +40,6 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import TypeAlias
 
-logger = logging.getLogger('freshpointparser.models')
-"""Logger of the ``freshpointparser.models`` package."""
 
 _NoDefaultType = Enum('_NoDefaultType', 'NO_DEFAULT')
 _NO_DEFAULT = _NoDefaultType.NO_DEFAULT
@@ -185,8 +188,11 @@ def model_diff(
 # region BaseRecord
 
 
-class RecordMetadata(BaseModel):
-    """Metadata model for FreshPoint records."""
+PYDANTIC_VALIDATION_ERRORS_CONTEXT_KEY = '__pydantic_validation_errors__'
+
+
+class BaseRecord(BaseModel):
+    """Base model of a FreshPoint record."""
 
     model_config = ConfigDict(alias_generator=ToCamel(), populate_by_name=True)
 
@@ -198,28 +204,31 @@ class RecordMetadata(BaseModel):
     )
     """Datetime when the data has been recorded."""
 
-    parsing_errors: Dict[str, str] = Field(
-        default_factory=dict,
-        frozen=True,
-        title='Parse Errors',
-        description='Mapping of field names to error messages encountered during parsing.',
-    )
-    """Mapping of field names to error messages encountered during parsing."""
+    @field_validator('*', mode='wrap')
+    @classmethod
+    def _log_failed_validation(
+        cls,
+        value: Any,
+        handler: ValidatorFunctionWrapHandler,
+        info: ValidationInfo,
+    ) -> Any:
+        try:
+            return handler(value)
+        except ValidationError as err:
+            logger.warning(err)
 
+            if isinstance(info.context, MutableMapping):
+                errors = info.context.setdefault(
+                    PYDANTIC_VALIDATION_ERRORS_CONTEXT_KEY, []
+                )
+                errors.append(err)
+            else:
+                logger.warning(
+                    'Validation context is not a mutable mapping; '
+                    'cannot store validation errors.'
+                )
 
-class BaseRecord(BaseModel):
-    """Base model of a FreshPoint record."""
-
-    model_config = ConfigDict(alias_generator=ToCamel(), populate_by_name=True)
-
-    metadata: RecordMetadata = Field(
-        default_factory=RecordMetadata,
-        frozen=True,
-        exclude=True,
-        title='Record Metadata',
-        description='Metadata of the record.',
-    )
-    """Metadata of the record."""
+            return None
 
     def is_newer_than(
         self,
@@ -255,28 +264,24 @@ class BaseRecord(BaseModel):
         recorded_at_self: Union[datetime, date]
         recorded_at_other: Union[datetime, date]
         if precision is None:
-            recorded_at_self = self.metadata.recorded_at
-            recorded_at_other = other.metadata.recorded_at
+            recorded_at_self = self.recorded_at
+            recorded_at_other = other.recorded_at
         elif precision == 's':
-            recorded_at_self = self.metadata.recorded_at.replace(microsecond=0)
-            recorded_at_other = other.metadata.recorded_at.replace(microsecond=0)
+            recorded_at_self = self.recorded_at.replace(microsecond=0)
+            recorded_at_other = other.recorded_at.replace(microsecond=0)
         elif precision == 'm':
-            recorded_at_self = self.metadata.recorded_at.replace(
-                second=0, microsecond=0
-            )
-            recorded_at_other = other.metadata.recorded_at.replace(
-                second=0, microsecond=0
-            )
+            recorded_at_self = self.recorded_at.replace(second=0, microsecond=0)
+            recorded_at_other = other.recorded_at.replace(second=0, microsecond=0)
         elif precision == 'h':
-            recorded_at_self = self.metadata.recorded_at.replace(
+            recorded_at_self = self.recorded_at.replace(
                 minute=0, second=0, microsecond=0
             )
-            recorded_at_other = other.metadata.recorded_at.replace(
+            recorded_at_other = other.recorded_at.replace(
                 minute=0, second=0, microsecond=0
             )
         elif precision == 'd':
-            recorded_at_self = self.metadata.recorded_at.date()
-            recorded_at_other = other.metadata.recorded_at.date()
+            recorded_at_self = self.recorded_at.date()
+            recorded_at_other = other.recorded_at.date()
         else:
             raise FreshPointParserValueError(
                 f"Invalid precision '{precision}'. Expected one of: 's', 'm', 'h', 'd'."
@@ -366,6 +371,11 @@ class BaseItem(BaseRecord):
         return model_diff(self, other, kwargs)
 
 
+# endregion BaseItem
+
+# region BasePage
+
+
 # default values for the type variables are only available in pydantic>=2.11,
 # https://github.com/pydantic/pydantic/pull/10789
 TItem = TypeVar(
@@ -374,10 +384,6 @@ TItem = TypeVar(
     # default=BaseItem,
 )
 """Type variable to annotate item models."""
-
-# endregion BaseItem
-
-# region BasePage
 
 
 class BasePage(BaseRecord, Generic[TItem]):
