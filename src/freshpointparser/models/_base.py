@@ -398,19 +398,11 @@ class BasePage(BaseRecord, Generic[TItem]):
     """Data models on the page."""
 
     @property
-    def items_as_dict(self) -> Dict[str, TItem]:
-        """Items on the page as a mapping of item IDs to item models.
-
-        Items with missing IDs are excluded.
-        """
-        return {item.id_: item for item in self.items if item.id_ is not None}
-
-    @property
     def item_count(self) -> int:
         """Total number of items on the page."""
         return len(self.items)
 
-    def item_diff(self, other: BasePage, **kwargs: Any) -> ModelDiffMapping:
+    def item_diff(self, other: BasePage[TItem], **kwargs: Any) -> ModelDiffMapping:
         """Compare items between this page and another one to identify which
         items differ. Items are matched by their ID.
 
@@ -479,8 +471,12 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...     },
             ... }
         """
-        items_as_dict_self = self.items_as_dict
-        items_as_dict_other = other.items_as_dict
+        items_as_dict_self = {
+            item.id_: item for item in self.items if item.id_ is not None
+        }
+        items_as_dict_other = {
+            item.id_: item for item in other.items if item.id_ is not None
+        }
         item_missing = EmptyModel()
         diff = {}
 
@@ -501,7 +497,7 @@ class BasePage(BaseRecord, Generic[TItem]):
                     )
 
         # compare other to self
-        if other.items_as_dict.keys() != self.items_as_dict.keys():
+        if items_as_dict_other.keys() != items_as_dict_self.keys():
             for item_id, item_other in items_as_dict_other.items():
                 if item_id not in items_as_dict_self:
                     diff[item_id] = ModelDiff(
