@@ -275,12 +275,12 @@ def test_find_product_data_by_id_errors():
     parser = ProductPageHTMLParser()
     parser.parse(html)
     with pytest.raises(FreshPointParserValueError):
-        parser._find_product_data_by_id(1)
+        parser._find_product_data_by_id(1)  # type: ignore[call-arg]
 
     html = "<div class='product' data-id='abc'></div>"
     parser.parse(html)
     with pytest.raises(FreshPointParserValueError):
-        parser._find_product_data_by_id(1)
+        parser._find_product_data_by_id(1)  # type: ignore[call-arg]
 
 
 # endregion Find by ID
@@ -379,7 +379,7 @@ def test_parse_data_from_internet(product_page_html_parser_persistent, product_p
         if retries <= 0:
             raise RuntimeError(f'Failed to fetch location from {url}')
         try:
-            response = httpx.get(url)
+            response = httpx.get(url, timeout=60.0)
             if response.is_redirect:
                 logger.warning(f'Location {loc_url} does not exist (redirected)')
                 return response
