@@ -12,7 +12,6 @@ from typing import (
     Iterator,
     List,
     Literal,
-    MutableMapping,
     Optional,
     Set,
     TypedDict,
@@ -188,9 +187,6 @@ def model_diff(
 # region BaseRecord
 
 
-PYDANTIC_VALIDATION_ERRORS_CONTEXT_KEY = '__pydantic_validation_errors__'
-
-
 class BaseRecord(BaseModel):
     """Base model of a FreshPoint record."""
 
@@ -214,21 +210,31 @@ class BaseRecord(BaseModel):
     ) -> Any:
         try:
             return handler(value)
-        except ValidationError as err:
-            logger.warning(err)
+        except ValidationError as validation_err:
+            logger.info(
+                "Validation error in field '%s': %s",
+                info.field_name,
+                validation_err,
+            )
 
-            if isinstance(info.context, MutableMapping):
-                errors = info.context.setdefault(
-                    PYDANTIC_VALIDATION_ERRORS_CONTEXT_KEY, []
-                )
-                errors.append(err)
-            else:
-                logger.warning(
-                    'Validation context is not a mutable mapping; '
-                    'cannot store validation errors.'
+            try:
+                # context is expected to be of type 'parsers._base.ParseContext'
+                info.context.errors.append(validation_err)  # type: ignore[attr-defined]
+            except Exception as context_err:
+                logger.info(
+                    'Cannot store validation errors in context: %s',
+                    context_err,
                 )
 
-            return None
+            try:
+                return handler(None)
+            except ValidationError as fallback_err:
+                logger.info(
+                    "Fallback validation error in field '%s': %s",
+                    info.field_name,
+                    fallback_err,
+                )
+                raise validation_err from None
 
     def is_newer_than(
         self,
