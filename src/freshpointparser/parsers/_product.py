@@ -1,24 +1,13 @@
 import html
 import re
-from typing import (
-    Callable,
-    List,
-    Optional,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import Any, Callable, Dict, List, Tuple, TypeVar, Union
 
 import bs4
 
-from .._utils import normalize_text, validate_id
-from ..exceptions import (
-    FreshPointParserKeyError,
-    FreshPointParserTypeError,
-    FreshPointParserValueError,
-)
+from .._utils import normalize_text
+from ..exceptions import FreshPointParserKeyError, FreshPointParserValueError
 from ..models import Product, ProductPage
-from ._base import BasePageHTMLParser, logger
+from ._base import BasePageHTMLParser, ParseContext, logger
 
 T = TypeVar('T')
 
@@ -259,165 +248,105 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         """Initialize a ProductPageHTMLParser instance with an empty state."""
         super().__init__()
         self._bs4_parser = bs4.BeautifulSoup()
-        self._page = ProductPage()
-        self._all_products_found: bool = False
 
-    def _parse_page_html(self, page_html: Union[str, bytes]) -> None:
+    def _parse_product(self, product_data: bs4.Tag, context: ParseContext) -> Product:
+        """Parse the product data to a Product model.
+
+        Args:
+            product_data (bs4.Tag): The Tag containing the product data.
+            context (ParseContext): A context object that can be used
+                to store additional information during parsing.
+
+        Returns:
+            Product: An instance of the Product model
+                containing the parsed and validated data.
+        """
+        parsed_data: Dict[str, Any] = {'recorded_at': context.parsed_at}
+
+        location_id = self._safe_parse(self.parse_location_id, context)
+        if location_id is not None:
+            parsed_data['location_id'] = location_id
+
+        for field, parser in (
+            ('id_', ProductHTMLParser.find_id),
+            ('name', ProductHTMLParser.find_name),
+            ('category', ProductHTMLParser.find_category),
+            ('is_vegetarian', ProductHTMLParser.find_is_vegetarian),
+            ('is_gluten_free', ProductHTMLParser.find_is_gluten_free),
+            ('is_promo', ProductHTMLParser.find_is_promo),
+            ('quantity', ProductHTMLParser.find_quantity),
+            ('info', ProductHTMLParser.find_info),
+            ('pic_url', ProductHTMLParser.find_pic_url),
+        ):
+            value = self._safe_parse(parser, context, product_data=product_data)
+            if value is not None:
+                parsed_data[field] = value
+
+        value = self._safe_parse(
+            ProductHTMLParser.find_price, context, product_data=product_data
+        )
+        if value is not None:
+            parsed_data['price_full'] = value[0]
+            parsed_data['price_curr'] = value[1]
+
+        return Product.model_validate(parsed_data, context=context)
+
+    def _parse_products(self, context: ParseContext) -> List[Product]:
+        """All products parsed and validated from the page HTML content.
+
+        The data is cached after the first extraction until the page HTML
+        changes. The returned ``Product`` instances are detached from the
+        parser's cached data, so mutating them does not affect the parser's
+        state.
+        """
+        products = []
+        for product_data in self._bs4_parser.find_all('div', class_='product'):
+            product = self._safe_parse(
+                self._parse_product, context, product_data=product_data
+            )
+            if product is not None:
+                products.append(product)
+        return products
+
+    def _parse_page_content(
+        self, page_content: Union[str, bytes], context: ParseContext
+    ) -> ProductPage:
         """Parse HTML content of a product page.
 
         This method initializes the BeautifulSoup parser with the provided
         HTML content and invalidates the cached page data.
 
         Args:
-            page_html (Union[str, bytes]): HTML content of
+            page_content (Union[str, bytes]): HTML content of
                 the product page to parse.
+            context (ParseContext): A context object that can be used
+                to store additional information during parsing.
         """
-        self._bs4_parser = bs4.BeautifulSoup(page_html, 'lxml')
-        self._page = ProductPage()
-        self._all_products_found = False
+        self._bs4_parser = bs4.BeautifulSoup(page_content, 'lxml')
 
-    def _construct_page(self) -> ProductPage:
-        """Return the product page data parsed from the HTML content.
+        parsed_data: Dict[str, Any] = {'recorded_at': context.parsed_at}
 
-        A new :class:`ProductPage` model is created on each call using the
-        cached product list and metadata. Modifying the returned instance does
-        not change the parser's internal cache. The data is cached after the
-        first extraction until the page HTML changes. If parsing fails,
-        a ValueError is raised.
+        location_id = self._safe_parse(self.parse_location_id, context)
+        if location_id is not None:
+            parsed_data['location_id'] = location_id
 
-        Returns:
-            ProductPage: Parsed and validated page data.
-        """
-        return ProductPage(
-            recorded_at=self._parse_datetime,
-            items={product.id_: product for product in self.products},
-            location_id=self.location_id,
-            location_name=self.location_name,
-        )
+        location_name = self._safe_parse(self.parse_location_name, context)
+        if location_name is not None:
+            parsed_data['location_name'] = location_name
 
-    def _find_product_data(self) -> bs4.ResultSet[bs4.Tag]:
-        """Find all product data elements in the page HTML.
+        items = self._safe_parse(self._parse_products, context, context=context)
+        if items is not None:
+            parsed_data['items'] = items
 
-        Returns:
-            bs4.ResultSet: A ResultSet containing the data of all products
-                as Tags.
-        """
-        result = self._bs4_parser.find_all('div', class_='product')
-        return result  # type: ignore
+        return ProductPage.model_validate(parsed_data, context=context)
 
-    def _find_product_data_by_id(self, id_: int) -> Optional[bs4.Tag]:
-        """Find product data matching in the page HTML the specified ID.
-        The data is checked for uniqueness.
-
-        Args:
-            id_ (int): The ID of the product to search for.
-
-        Raises:
-            FreshPointParserValueError: If the product with the specified ID is not unique.
-
-        Returns:
-            Optional[bs4.Tag]: A Tag containing the data of the matched product.
-                If the product is not found, returns None.
-        """
-
-        def attr_filter_id(value: str) -> bool:
-            if not value:
-                return False  # assuming zero is not a valid ID
-            try:
-                return int(value) == id_
-            except (ValueError, TypeError) as e:
-                raise FreshPointParserValueError(
-                    f'Unable to parse the product ID "{value}".'
-                ) from e
-
-        result = self._bs4_parser.find_all(
-            'div',
-            attrs={'class': 'product', 'data-id': attr_filter_id},  # type: ignore[arg-type]
-        )
-        if len(result) == 0:
-            return None
-        if len(result) != 1:
-            raise FreshPointParserValueError(f'ID="{id_}" is not unique.')
-        return result[0]  # type: ignore
-
-    def _find_product_data_by_name(
-        self, name: str, partial_match: bool
-    ) -> bs4.ResultSet[bs4.Tag]:
-        """Find product data in the page HTML matching the specified name.
-
-        Args:
-            name (str): The name of the product(s) to search for.
-            partial_match (bool): If True, the name match can be partial
-                (case-insensitive). If False, the name match must be exact
-                (case-insensitive).
-
-        Returns:
-            bs4.ResultSet: The ResultSet containing the data of the matched
-                products as Tags.
-        """
-
-        def attr_filter_name(value: str) -> bool:
-            try:
-                return self._match_strings(name, value, partial_match)
-            except FreshPointParserTypeError as exc:
-                raise exc
-            except Exception as e:
-                raise FreshPointParserValueError(
-                    f'Unable to parse the product name "{value}".'
-                ) from e
-
-        result = self._bs4_parser.find_all(
-            'div',
-            attrs={'class': 'product', 'data-name': attr_filter_name},  # type: ignore[arg-type]
-        )
-        return result  # type: ignore
-
-    def _parse_product_data(self, data: bs4.Tag) -> Product:
-        """Parse the product data to a Product model.
-
-        Args:
-            data (bs4.Tag): The Tag containing the product data.
-
-        Returns:
-            Product: An instance of the Product model
-                containing the parsed and validated data.
-        """
-        price_full, price_curr = ProductHTMLParser.find_price(data)
-        return Product(
-            recorded_at=self._parse_datetime,
-            id_=ProductHTMLParser.find_id(data),
-            name=ProductHTMLParser.find_name(data),
-            category=ProductHTMLParser.find_category(data),
-            is_vegetarian=ProductHTMLParser.find_is_vegetarian(data),
-            is_gluten_free=ProductHTMLParser.find_is_gluten_free(data),
-            is_promo=ProductHTMLParser.find_is_promo(data),
-            quantity=ProductHTMLParser.find_quantity(data),
-            price_curr=price_curr,
-            price_full=price_full,
-            info=ProductHTMLParser.find_info(data),
-            pic_url=ProductHTMLParser.find_pic_url(data),
-            location_id=self.location_id,
-        )
-
-    def _update_product_cache(self, product: Product) -> None:
-        """Update the product cache with the given product model. The product
-        model deep copy is added to the cache with the product ID as the key.
-
-        Args:
-            product (Product): The product data to be added to the cache.
-        """
-        self._page.items[product.id_] = product.model_copy(deep=True)
-
-    @property
-    def location_id(self) -> int:
+    def parse_location_id(self) -> int:
         """ID number of the location (also known as the page ID or
         the device ID) extracted from the page HTML content.
 
         The value is cached after the first extraction until the page HTML
         changes. If the value cannot be parsed, a FreshPointParserValueError is raised.
         """
-        if 'location_id' in self._page.model_fields_set:  # cached
-            return self._page.location_id
         script = self._bs4_parser.find(string=self._RE_PATTERN_DEVICE_ID)
         if script is None:
             raise FreshPointParserValueError(
@@ -431,187 +360,35 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
                 '("deviceId" text within the script tag was not matched).'
             )
         try:
-            location_id = int(match.group(1))
-            self._page.location_id = location_id
-            return location_id
+            return int(match.group(1))
         except Exception as e:
             raise FreshPointParserValueError('Unable to parse page ID.') from e
 
-    @property
-    def location_name(self) -> str:
+    def parse_location_name(self) -> str:
         """The name of the location (also known as the page title) extracted
         from the page HTML content.
 
         The value is cached after the first extraction until the page HTML
         changes. If the value cannot be parsed, a FreshPointParserValueError is raised.
         """
-        if 'location_name' in self._page.model_fields_set:  # cached
-            return self._page.location_name
         title_tag = self._bs4_parser.find('title')
         if not title_tag:
             raise FreshPointParserValueError(
                 'Unable to parse location name (<title/> tag  was not found).'
             )
-        title_text = title_tag.get_text()
         try:
-            location_name = title_text.split('|')[0].strip()
-            self._page.location_name = location_name
-            return location_name
+            return title_tag.get_text().split('|')[0].strip()
         except Exception as e:
             raise FreshPointParserValueError('Unable to parse location name.') from e
 
-    @property
-    def products(self) -> List[Product]:
-        """All products parsed and validated from the page HTML content.
 
-        The data is cached after the first extraction until the page HTML
-        changes. The returned ``Product`` instances are detached from the
-        parser's cached data, so mutating them does not affect the parser's
-        state.
-        """
-        if self._all_products_found:
-            return [
-                product.model_copy(deep=True)  # copy for cache immutability
-                for product in self._page.items.values()
-            ]
-        products = []
-        for product_data in self._find_product_data():
-            product_id = ProductHTMLParser.find_id(product_data)
-            if product_id in self._page.items:
-                product = self._page.items[product_id]
-                product = product.model_copy(deep=True)
-            else:
-                product = self._parse_product_data(product_data)
-                self._update_product_cache(product)
-            products.append(product)
-        self._all_products_found = True
-        return products
-
-    def find_product_by_id(self, id_: Union[int, str]) -> Optional[Product]:
-        """Find a single product based on the specified ID.
-
-        Args:
-            id_ (Union[int, str]): The ID of the product to search for.
-                The ID is expected to be a unique non-negative integer or
-                a string representation of a non-negative integer.
-
-        Raises:
-            FreshPointParserValueError: If the ID is an integer but is negative.
-            FreshPointParserTypeError: If the ID is not an integer and cannot be
-                converted to an integer.
-
-        Returns:
-            Optional[Product]: Product with the specified ID or ``None`` if it
-            is not found. The returned instance is independent of the parser's
-            cached data.
-        """
-        try:
-            id_ = validate_id(id_)
-        except ValueError as exc:
-            raise FreshPointParserValueError(str(exc)) from exc
-        except TypeError as exc:
-            raise FreshPointParserTypeError(str(exc)) from exc
-        product = self._page.items.get(id_)
-        if product is not None:  # found in cache
-            return product.model_copy(deep=True)  # copy for cache immutability
-        if self._all_products_found:  # no new products to parse, cache is final
-            return None
-        product_data = self._find_product_data_by_id(id_)
-        if product_data is None:  # not found in the HTML
-            return None
-        product = self._parse_product_data(product_data)
-        self._update_product_cache(product)
-        return product
-
-    def find_product_by_name(
-        self, name: str, partial_match: bool = True
-    ) -> Optional[Product]:
-        """Find a single product based on the specified name.
-
-        Args:
-            name (str): The name of the product to search for. Note that product
-                names are normalized to lowercase ASCII characters. The match
-                is case-insensitive and ignores diacritics regardless of the
-                ``partial_match`` value.
-            partial_match (bool): If True, the name match can be partial
-                (case-insensitive). If False, the name match must be exact
-                (case-insensitive). Defaults to True.
-
-        Raises:
-            FreshPointParserTypeError: If the product name is not a string.
-
-        Returns:
-            Optional[Product]: Product matching the specified name or ``None``
-            if no product is found. The returned instance does not modify the
-            parser's cached data. If multiple products match, the first one is
-            returned.
-        """
-        if not isinstance(name, str):
-            raise FreshPointParserTypeError(
-                f'Expected a string for product name, got {type(name)}.'
-            )
-        product = self._page.find_item(
-            lambda pr: self._match_strings(name, pr.name, partial_match)
-        )
-        if product is not None:  # found in cache
-            return product.model_copy(deep=True)  # copy for cache immutability
-        if self._all_products_found:  # no new products to parse, cache is final
-            return None
-        product_data = self._find_product_data_by_name(name, partial_match)
-        if len(product_data) == 0:  # no products found in the HTML
-            return None
-        product = self._parse_product_data(product_data[0])  # first match
-        self._update_product_cache(product)
-        return product
-
-    def find_products_by_name(
-        self, name: str, partial_match: bool = True
-    ) -> List[Product]:
-        """Find all products that match the specified name.
-
-        Args:
-            name (str): The name of the product to filter by. Note that product
-                names are normalized to lowercase ASCII characters. The match
-                is case-insensitive and ignores diacritics regardless of the
-                ``partial_match`` value.
-            partial_match (bool): If True, the name match can be partial
-                (case-insensitive). If False, the name match must be exact
-                (case-insensitive). Defaults to True.
-
-        Raises:
-            TypeError: If the product name is not a string.
-
-        Returns:
-            List[Product]: Products matching the specified name. Items in
-            the returned list are independent of the parser's cache. If no
-            products are found, an empty list is returned.
-        """
-        if not isinstance(name, str):
-            raise FreshPointParserTypeError(
-                f'Expected a string for product name, got {type(name)}.'
-            )
-        if self._all_products_found:  # use cache if all products are parsed
-            iter_products = self._page.find_items(
-                lambda pr: self._match_strings(name, pr.name, partial_match)
-            )
-            # copy for cache immutability
-            return [product.model_copy(deep=True) for product in iter_products]
-        products = []
-        product_data_tags = self._find_product_data_by_name(name, partial_match)
-        for product_data in product_data_tags:
-            product = self._parse_product_data(product_data)
-            self._update_product_cache(product)
-            products.append(product)
-        return products
-
-
-def parse_product_page(page_html: Union[str, bytes]) -> ProductPage:
+def parse_product_page(page_content: Union[str, bytes]) -> ProductPage:
     """Parse the HTML content of a FreshPoint product webpage
     ``my.freshpoint.cz/device/product-list/<pageId>`` to a structured
     ProductPage model.
 
     Args:
-        page_html (Union[str, bytes]): HTML content of the product page.
+        page_content (Union[str, bytes]): HTML content of the product page.
 
     Raises:
         FreshPointParserError: If the HTML does not match the expected structure.
@@ -619,6 +396,4 @@ def parse_product_page(page_html: Union[str, bytes]) -> ProductPage:
     Returns:
         ProductPage: Parsed and validated product page data.
     """
-    parser = ProductPageHTMLParser()
-    parser.parse(page_html)
-    return parser.page
+    return ProductPageHTMLParser().parse(page_content)

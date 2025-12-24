@@ -1,24 +1,44 @@
-import hashlib
-import logging
-import operator
-import sys
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Generic, Optional, TypeVar, Union
+from typing import Any, Callable, Generic, List, Optional, TypeVar, Union
 
-from .._utils import normalize_text
-from ..exceptions import FreshPointParserAttributeError, FreshPointParserTypeError
-from ..models import BasePage
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
-
-logger = logging.getLogger('freshpointparser.parsers')
-"""Logger of the ``freshpointparser.parsers`` package."""
+from .._utils import hash_sha1, logger
+from ..exceptions import FreshPointParserError, FreshPointParserValueError
+from ..models._base import BasePage
 
 TPage = TypeVar('TPage', bound=BasePage)
+
+
+@dataclass(frozen=True, eq=True)
+class ParseMetadata:
+    """Holds the result of parsing a FreshPoint.cz page HTML content."""
+
+    content_digest: bytes
+    """SHA-1 hash digest of the page HTML content that was parsed."""
+
+    last_updated_at: datetime
+    """Timestamp of when the page HTML content was last updated."""
+
+    last_parsed_at: datetime
+    """Timestamp of when the page HTML content was last parsed."""
+
+    was_last_parse_from_cache: bool = False
+    """Indicates whether the last parsing operation used cached data."""
+
+    parse_errors: List[Exception] = field(default_factory=list)
+    """List of exceptions encountered during the page HTML parsing."""
+
+
+@dataclass(frozen=True, eq=True)
+class ParseContext:
+    """Holds context information about the parsing operation."""
+
+    parsed_at: datetime = field(default_factory=datetime.now)
+    """Timestamp of when the parsing operation was performed."""
+
+    errors: List[Exception] = field(default_factory=list)
+    """List of exceptions encountered during the parsing operation."""
 
 
 class BasePageHTMLParser(ABC, Generic[TPage]):
@@ -29,159 +49,109 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
 
     def __init__(self) -> None:
         """Initialize a parser instance with an empty state."""
-        self._last_parsed_at = datetime.now()
-        self._html_hash_sha1 = self._hash_html_sha1('')
-        self._parse_status: Union[bool, None] = None
-
-    @staticmethod
-    def _match_strings(needle: str, haystack: str, partial_match: bool) -> bool:
-        """Check if the needle string is contained in the haystack string
-        ignoring case and diacritics.
-
-        Args:
-            needle (str): String to search for.
-            haystack (str): String to search in.
-            partial_match (bool): If True, checks if ``needle`` is a substring of
-                ``haystack`` (``needle in haystack``). If False, checks for exact
-                match (``needle == haystack``). In both cases, the match is
-                case-insensitive and ignores diacritics.
-
-        Raises:
-            FreshPointParserTypeError: If the needle is not a string.
-
-        Returns:
-            bool: True if the needle is found in the haystack, False otherwise.
-        """
-        if not isinstance(needle, str):
-            raise FreshPointParserTypeError(f'Expected a string, got {type(needle)}.')
-        op = operator.contains if partial_match else operator.eq
-        return op(normalize_text(haystack), normalize_text(needle))
-
-    @staticmethod
-    def _hash_html_sha1(page_html: Union[str, bytes]) -> str:
-        """Hash the given text using the SHA-1 algorithm and return the
-        hexadecimal representation of the hash.
-
-        Args:
-            page_html (Union[str, bytes]): The text to be hashed.
-
-        Returns:
-            str: The hexadecimal representation of the SHA-1 hash of the text.
-        """
-        if isinstance(page_html, str):
-            page_html = page_html.encode('utf-8')
-        return hashlib.sha1(page_html).hexdigest()  # noqa: S324
-
-    def _update_html_hash(self, page_html: Union[str, bytes], force: bool) -> bool:
-        """Update the HTML hash if the page HTML has changed.
-
-        Args:
-            page_html (Union[str, bytes]): The HTML content of
-                the page.
-            force (bool): If True, forces the parser to re-parse the HTML
-                content even if the hash of the content matches the previous
-                hash.
-
-        Returns:
-            bool: True if the HTML hash was updated, False otherwise.
-        """
-        html_hash_sha1 = self._hash_html_sha1(page_html)
-        if force or html_hash_sha1 != self._html_hash_sha1:
-            self._html_hash_sha1 = html_hash_sha1
-            self._last_parsed_at = datetime.now()
-            logger.debug('HTML hash updated: %s', html_hash_sha1)
-            return True
-        return False
+        now = datetime.now()
+        self._metadata = ParseMetadata(
+            content_digest=hash_sha1(b''), last_updated_at=now, last_parsed_at=now
+        )
+        self._parsed_page: Optional[TPage] = None
 
     @abstractmethod
-    def _parse_page_html(self, page_html: Union[str, bytes]) -> None:
-        """Parse the HTML content of the page.
+    def _parse_page_content(
+        self, page_content: Union[str, bytes], context: ParseContext
+    ) -> TPage:
+        """Parse the HTML content of the page to a Pydantic model.
 
         Implementations should extract relevant data from the HTML content
-        and store it in the parser's internal state. This method is called
+        and construct a page model instance. This method is called
         when the HTML content is updated or when the parser is forced to
         re-parse the content.
 
+        This method should not raise exceptions directly. Instead, any parsing errors
+        should be collected in the `context` dictionary under the key defined by
+        :data:`freshpointparser.models.PARSE_ERRORS_CONTEXT_KEY`.
+
         Args:
-            page_html (Union[str, bytes]): HTML content of the page.
-        """
-        pass
-
-    @abstractmethod
-    def _construct_page(self) -> TPage:
-        """Construct a page model from the parsed HTML content.
-
-        Implementations should build a **new** page model instance
-        using the data extracted from :meth:`_parse_page_html`.  The returned
-        model does not have to be cached and repeated calls may therefore yield
-        a different object with the same data.  Mutating the returned object has
-        no effect on the parser's internal state.
+            page_content (Union[str, bytes]): The HTML content of the page.
+            context (Dict[str, Any]): A context dictionary that can be used
+                to store additional information during parsing. For example,
+                parsing errors can be collected in a list provided in the
+                context under the key defined by
+                :data:`freshpointparser.models.PARSE_ERRORS_CONTEXT_KEY`.
 
         Returns:
             TPage: A page model containing the parsed data.
         """
         pass
 
-    @property
-    def page(self) -> TPage:
-        """Page model containing the parsed HTML data.
-
-        ``parse()`` must be called at least once before accessing this property
-        to ensure that the parser has valid HTML data to construct the page model.
-
-        Accessing full parsed page data may require additional computation. If you are
-        only interested in a subset of the parsed data, consider using
-        specific properties or methods of the parser that return only
-        the relevant information (see specific parser implementations for details).
-
-        A fresh page model instance is created on every access. Consequently, modifying
-        the returned object does not affect the cached parser state.
-        """
-        return self._construct_page()
+    @staticmethod
+    def _safe_parse(
+        parser_func: Callable, _context: ParseContext, **kwargs: Any
+    ) -> Any:
+        try:
+            return parser_func(**kwargs)
+        except FreshPointParserError as err:
+            logger.info('Parsing error occurred: %s', err)
+            _context.errors.append(err)
+            return None
 
     @property
-    def last_parsed_at(self) -> datetime:
-        """Timestamp of the last successful or skipped parse.
+    def metadata(self) -> ParseMetadata:
+        """Get metadata about the last parsing operation.
 
-        If the parser has never parsed any HTML content, this property will
-        raise a :pyexc:`FreshPointParserAttributeError`.
+        Returns:
+            ParseMetadata: Metadata about the last parsing operation.
         """
-        if self._parse_status is None:
-            raise FreshPointParserAttributeError('Parser has not parsed any HTML yet.')
-        return self._last_parsed_at
+        return self._metadata
 
     @property
-    def parse_status(self) -> Optional[bool]:
-        """Tri-state parse status.
+    def parsed_page(self) -> TPage:
+        """Get the page data parsed from the HTML content.
 
-        - ``None``: Never parsed (no data available).
-        - ``True``: Last parse applied (data changed or parse was forced).
-        - ``False``: Last parse skipped (data unchanged).
+        The page is fully parsed during :meth:`parse`. A deep copy of the
+        cached model is returned to keep the internal state immutable. Every
+        access therefore yields a new :class:`TPage` instance.
+
+        Returns:
+            TPage: Parsed data from the HTML content.
+
+        Raises:
+            FreshPointParserValueError: If the page has not been parsed yet.
         """
-        return self._parse_status
+        if self._parsed_page is None:
+            raise FreshPointParserValueError('Page has not been parsed yet.')
+        return self._parsed_page.model_copy(deep=True)
 
-    def parse(self, page_html: Union[str, bytes], force: bool = False) -> Self:
+    def parse(self, page_content: Union[str, bytes], force: bool = False) -> TPage:
         """Parse page HTML content.
 
-        **Note**: This method returns the parser instance itself, allowing for
-        method call chaining. It does **not** return the parsed page model.
-        The result of the parse is cached and can be accessed via the
-        :pyattr:`parse_status` property.
-
         Args:
-            page_html (Union[str, bytes]): HTML content of the page.
+            page_content (Union[str, bytes]): HTML content of the page.
             force (bool): If True, forces the parser to re-parse the HTML
                 content even if the hash of the content matches the hash of the
                 previous content. If False, the parser will only re-parse the
                 content if the hash has changed. Defaults to False.
 
         Returns:
-            Self: The parser instance.
+            TPage: A page model containing the parsed data.
         """
-        if self._update_html_hash(page_html, force):
-            self._parse_page_html(page_html)
-            self._parse_status = True
+        content_digest = hash_sha1(page_content)
+        if force or content_digest != self._metadata.content_digest:
+            logger.debug('Parsing HTML content (force=%s).', force)
+            context = ParseContext()
+            self._parsed_page = self._parse_page_content(page_content, context)
+            self._metadata = replace(
+                self._metadata,
+                content_digest=content_digest,
+                last_updated_at=context.parsed_at,
+                last_parsed_at=context.parsed_at,
+                was_last_parse_from_cache=False,
+                parse_errors=context.errors,
+            )
         else:
-            logger.debug('HTML content unchanged, skipping parsing.')
-            self._parse_status = False
-        return self
+            logger.debug('HTML content is unchanged, skipping parsing.')
+            self._metadata = replace(
+                self._metadata,
+                last_parsed_at=datetime.now(),
+                was_last_parse_from_cache=True,
+            )
+        return self.parsed_page
