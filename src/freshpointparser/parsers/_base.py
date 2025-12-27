@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any, Callable, Generic, List, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union
 
 from .._utils import hash_sha1, logger
 from ..exceptions import FreshPointParserError, FreshPointParserValueError
@@ -37,7 +37,7 @@ class ParseContext:
     parsed_at: datetime = field(default_factory=datetime.now)
     """Timestamp of when the parsing operation was performed."""
 
-    errors: List[Exception] = field(default_factory=list)
+    parse_errors: List[Exception] = field(default_factory=list)
     """List of exceptions encountered during the parsing operation."""
 
 
@@ -55,6 +55,18 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         )
         self._parsed_page: Optional[TPage] = None
 
+    @staticmethod
+    def _new_base_record_data_from_context(context: ParseContext) -> Dict[str, Any]:
+        """Create a new base record data dictionary from the parsing context.
+
+        Args:
+            context (ParseContext): The parsing context containing metadata.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing base record data.
+        """
+        return {'recorded_at': context.parsed_at}
+
     @abstractmethod
     def _parse_page_content(
         self, page_content: Union[str, bytes], context: ParseContext
@@ -67,12 +79,11 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         re-parse the content.
 
         This method should not raise exceptions directly. Instead, any parsing errors
-        should be collected in the `context` dictionary under the key defined by
-        :data:`freshpointparser.models.PARSE_ERRORS_CONTEXT_KEY`.
+        should be collected in the `context.parse_errors` list.
 
         Args:
             page_content (Union[str, bytes]): The HTML content of the page.
-            context (Dict[str, Any]): A context dictionary that can be used
+            context (ParseContext): A context dictionary that can be used
                 to store additional information during parsing. For example,
                 parsing errors can be collected in a list provided in the
                 context under the key defined by
@@ -91,7 +102,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
             return parser_func(**kwargs)
         except FreshPointParserError as err:
             logger.info('Parsing error occurred: %s', err)
-            _context.errors.append(err)
+            _context.parse_errors.append(err)
             return None
 
     @property
@@ -145,7 +156,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
                 last_updated_at=context.parsed_at,
                 last_parsed_at=context.parsed_at,
                 was_last_parse_from_cache=False,
-                parse_errors=context.errors,
+                parse_errors=context.parse_errors,
             )
         else:
             logger.debug('HTML content is unchanged, skipping parsing.')
