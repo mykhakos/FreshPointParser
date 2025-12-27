@@ -219,7 +219,8 @@ class BaseRecord(BaseModel):
 
             try:
                 # context is expected to be of type 'parsers._base.ParseContext'
-                info.context.errors.append(validation_err)  # type: ignore[attr-defined]
+                errors = info.context.parsing_errors  # type: ignore[attr-defined]
+                errors.append(validation_err)
             except Exception as context_err:
                 logger.info(
                     'Cannot store validation errors in context: %s',
