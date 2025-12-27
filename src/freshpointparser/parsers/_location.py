@@ -1,25 +1,14 @@
 import json
 import re
-from typing import (
-    Any,
-    Dict,
-    List,
-    Union,
-)
+from typing import Any, Dict, List, Union
 
-from .._utils import logger
-from ..exceptions import (
-    FreshPointParserValueError,
-)
+from ..exceptions import FreshPointParserValueError
 from ..models import Location, LocationPage
 from ._base import BasePageHTMLParser, ParseContext
 
 
 class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
-    """Parses HTML content of a FreshPoint location webpage ``my.freshpoint.cz``.
-    Allows accessing the parsed webpage data and searching for locations by name
-    or ID.
-    """
+    """Parses HTML content of a FreshPoint location webpage ``my.freshpoint.cz``."""
 
     _RE_SEARCH_PATTERN_STR = re.compile(r'devices\s*=\s*("\[.*\]");')
     """Regex pattern to search for the location data in the HTML string."""
@@ -31,15 +20,14 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         super().__init__()
 
     def _load_json(self, page_content: Union[str, bytes]) -> List[Dict]:
-        r"""Extract and parse the JSON location data embedded in the HTML.
+        r"""Extract the JSON location data embedded in the HTML.
 
         The location data is stored in the page HTML as a JavaScript string
         variable: ``devices = "[{\"prop\":{...}}]";``
 
-        This method uses regex to find this variable assignment and extract
-        the JSON string. A double JSON parsing approach is used because the data
-        is essentially double-quoted in the source
-        (a JSON string within a JavaScript string).
+        Regex is used to find this variable assignment and extract the JSON string.
+        A double JSON parsing approach is used because the data is essentially
+        double-quoted in the source (a JSON string within a JavaScript string).
 
         Args:
             page_content (Union[str, bytes]): The HTML content of the
@@ -49,8 +37,8 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             FreshPointParserValueError: If the location data cannot be found or parsed.
 
         Returns:
-            List[Dict]: A list of location data dictionaries extracted from the
-                JavaScript variable in the HTML.
+            List[Dict]: A list of raw location data dictionaries extracted from
+                the JavaScript variable in the HTML content.
         """
         match_: Union[re.Match[str], re.Match[bytes], None]
         if isinstance(page_content, str):
@@ -66,82 +54,109 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             # double JSON parsing is required because of how the data is
             # embedded in the HTML (a JSON string inside a JavaScript string)
             data = json.loads(json.loads(match_.group(1)))
-        except IndexError as e:
+        except IndexError as err:
             raise FreshPointParserValueError(
                 'Unable to parse the location data in the HTML '
                 '(regex data group is missing).'
-            ) from e
-        except Exception as e:
+            ) from err
+        except Exception as exc:
             raise FreshPointParserValueError(
                 'Unable to parse the location data in the HTML '
                 '(Unexpected error during JSON parsing).'
-            ) from e
+            ) from exc
         if not isinstance(data, list):
             raise FreshPointParserValueError(
                 'Unable to parse the location data in the HTML (data is not a list).'
             )
         return data
 
-    def _parse_json(self, page_data: List[Dict[str, Any]]) -> LocationPage:
-        """Convert the extracted JSON data into a structured LocationPage model.
+    def _parse_location(
+        self, location_data: Dict[str, Any], context: ParseContext
+    ) -> Location:
+        """Parse a single location item from the raw location data.
 
-        This method transforms the raw JSON data extracted from the HTML into
-        a structured LocationPage model. Each location item in the raw data
-        contains both 'prop' and 'location' keys, but we only use the 'prop'
-        data as it contains all necessary information.
-
-        The method:
-        1. Extracts the 'prop' object from each item in the data list
-        2. Adds a timestamp for when the data was recorded
-        3. Creates a dictionary of locations keyed by their IDs
-        4. Constructs and validates a LocationPage model with the locations
+        The data is expected to contain both 'prop' and 'location' keys, but only
+        the 'prop' data is used for parsing as it contains all necessary information.
+        The 'recorded_at' timestamp is added to the data before validation.
 
         Args:
-            page_data (List[Dict]): The extracted location data from _load_json.
-                Expected format: [{'prop': {...}, 'location': {...}}, ...]
+            location_data (Dict[str, Any]): Raw location data dictionary.
+            context (ParseContext): Parsing context containing metadata.
+
+        Raises:
+            FreshPointParserValueError: Raised when the 'prop' key is missing or
+                when other parsing errors occur.
 
         Returns:
-            LocationPage: The structured location page model containing all
-                parsed locations.
+            Location: Parsed Location model instance.
+        """
+        parsed_data = self._new_base_record_data_from_context(context)
+        try:
+            parsed_data.update(location_data['prop'])
+            return Location.model_validate(parsed_data, context=context)
+        except KeyError as err:
+            raise FreshPointParserValueError(
+                f"Missing 'prop' key in location item: {location_data}"
+            ) from err
+        except Exception as exc:
+            raise FreshPointParserValueError(
+                f'Error parsing location item: {location_data}'
+            ) from exc
+
+    def _parse_locations(
+        self, locations_data: List[Dict[str, Any]], context: ParseContext
+    ) -> List[Location]:
+        """Parse multiple location items from the raw location data list.
+
+        Args:
+            locations_data (List[Dict[str, Any]]): Raw list of
+                location data dictionaries.
+            context (ParseContext): Parsing context containing metadata.
+
+        Returns:
+            List[Location]: List of parsed Location model instances.
         """
         locations = []
-        for item in page_data:
-            try:
-                item_data: Dict[str, Any] = item['prop']
-                item_data['recorded_at'] = self._metadata.last_parsed_at
-                location = Location.model_validate(item_data)
+        for location_data in locations_data:
+            location = self._safe_parse(
+                self._parse_location,
+                context,
+                location_data=location_data,
+                context=context,
+            )
+            if location is not None:
                 locations.append(location)
-            except KeyError:
-                logger.warning(
-                    "Skipping location item due to missing 'prop' key: %s", item
-                )
-            except Exception as exc:
-                logger.warning(
-                    'Error parsing location item %s: %s', item, exc, exc_info=True
-                )
-        return LocationPage(recorded_at=self._metadata.last_parsed_at, items=locations)
+        return locations
 
     def _parse_page_content(
         self, page_content: Union[str, bytes], context: ParseContext
     ) -> LocationPage:
-        """Parse HTML content of a location page.
+        """Parse the HTML content of the location page to a Pydantic model.
 
-        This method is fully parses the HTML content to a structured
-        LocationPage model.
+        This method fully parses the raw JSON data extracted from the HTML content to
+        a structured LocationPage model.
 
         Args:
             page_content (Union[str, bytes]): HTML content of
                 the location page to parse.
-            context (Dict[str, Any]): A context dictionary that can be used
-                to store additional information during parsing.
+            context (ParseContext): Parsing context containing metadata.
+
+        Returns:
+            LocationPage: The location page model containing all parsed locations.
         """
-        page_data = self._safe_parse(
+        parsed_data = self._new_base_record_data_from_context(context)
+
+        locations_data = self._safe_parse(
             self._load_json, context, page_content=page_content
         )
-        if page_data is None:
-            return LocationPage(recorded_at=context.parsed_at)
+        if locations_data is not None:
+            locations = self._safe_parse(
+                self._parse_locations, context, locations_data=locations_data
+            )
+            if locations is not None:
+                parsed_data['items'] = locations
 
-        return self._parse_json(page_data)
+        return LocationPage.model_validate(parsed_data, context=context)
 
 
 def parse_location_page(page_content: Union[str, bytes]) -> LocationPage:
@@ -150,9 +165,6 @@ def parse_location_page(page_content: Union[str, bytes]) -> LocationPage:
 
     Args:
         page_content (Union[str, bytes]): HTML content of the location page.
-
-    Raises:
-        FreshPointParserError: If the HTML does not match the expected structure.
 
     Returns:
         LocationPage: Parsed and validated location page data.
