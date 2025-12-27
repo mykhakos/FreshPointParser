@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from datetime import date, datetime
 from enum import Enum
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -39,6 +40,9 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import TypeAlias
 
+if TYPE_CHECKING:
+    from ..parsers._base import ParseContext
+
 
 _NoDefaultType = Enum('_NoDefaultType', 'NO_DEFAULT')
 _NO_DEFAULT = _NoDefaultType.NO_DEFAULT
@@ -46,7 +50,6 @@ _NO_DEFAULT = _NoDefaultType.NO_DEFAULT
 
 
 T = TypeVar('T')
-"""Type variable to annotate arbitrary generic types."""
 
 
 class ToCamel:
@@ -218,9 +221,8 @@ class BaseRecord(BaseModel):
             )
 
             try:
-                # context is expected to be of type 'parsers._base.ParseContext'
-                errors = info.context.parsing_errors  # type: ignore[attr-defined]
-                errors.append(validation_err)
+                context: 'ParseContext' = info.context  # type: ignore[attr-defined]  # noqa: UP037
+                context.parse_errors.append(validation_err)
             except Exception as context_err:
                 logger.info(
                     'Cannot store validation errors in context: %s',
