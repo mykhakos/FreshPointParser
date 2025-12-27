@@ -1,20 +1,16 @@
-import uuid
 from datetime import datetime
 from types import MappingProxyType
 from typing import Dict
 
 import pytest
-from pydantic import Field, ValidationError
+from pydantic import Field
 
 from freshpointparser import get_product_page_url
 from freshpointparser.exceptions import (
     FreshPointParserTypeError,
     FreshPointParserValueError,
 )
-from freshpointparser.models import (
-    Product,
-    ProductPage,
-)
+from freshpointparser.models import Product, ProductPage
 from freshpointparser.models.types import (
     DiffType,
     ProductPriceUpdateInfo,
@@ -35,17 +31,17 @@ DEFAULT_PRODUCT_PIC_URL = (
         pytest.param(
             Product(),
             dict(
-                id_='0',
-                name='',
-                category='',
-                is_vegetarian=False,
-                is_gluten_free=False,
-                quantity=0,
-                price_full=0,
-                price_curr=0,
-                info='',
+                id_=None,
+                name=None,
+                category=None,
+                is_vegetarian=None,
+                is_gluten_free=None,
+                quantity=None,
+                price_full=None,
+                price_curr=None,
+                info=None,
                 pic_url=DEFAULT_PRODUCT_PIC_URL,
-                location_id=0,
+                location_id=None,
             ),
             id='default args',
         ),
@@ -57,8 +53,8 @@ DEFAULT_PRODUCT_PIC_URL = (
                 is_vegetarian=True,
                 is_gluten_free=True,
                 quantity=2,
-                price_full=3.0,
-                price_curr=4.0,
+                price_full=4.0,
+                price_curr=3.0,
                 info='Info',
                 pic_url='https://example.com/pic.jpg',
                 location_id=5,
@@ -70,8 +66,8 @@ DEFAULT_PRODUCT_PIC_URL = (
                 is_vegetarian=True,
                 is_gluten_free=True,
                 quantity=2,
-                price_full=3.0,
-                price_curr=4.0,
+                price_full=4.0,
+                price_curr=3.0,
                 info='Info',
                 pic_url='https://example.com/pic.jpg',
                 location_id=5,
@@ -81,7 +77,7 @@ DEFAULT_PRODUCT_PIC_URL = (
     ],
 )
 def test_product_init(product, expected_attrs):
-    assert product.id_ == expected_attrs['id_'] or uuid.UUID(product.id_)
+    assert product.id_ == expected_attrs['id_']
     assert product.name == expected_attrs['name']
     assert product.category == expected_attrs['category']
     assert product.is_vegetarian == expected_attrs['is_vegetarian']
@@ -97,9 +93,9 @@ def test_product_init(product, expected_attrs):
 @pytest.mark.parametrize(
     'product, expected_price_full, expected_price_curr',
     [
-        pytest.param(Product(), 0.0, 0.0, id='no price args'),
-        pytest.param(Product(price_full=1.0), 1.0, 1.0, id='price_full'),
-        pytest.param(Product(price_curr=2.0), 2.0, 2.0, id='price_curr'),
+        pytest.param(Product(), None, None, id='no price args'),
+        pytest.param(Product(price_full=1.0), 1.0, None, id='price_full'),
+        pytest.param(Product(price_curr=2.0), None, 2.0, id='price_curr'),
         pytest.param(
             Product(price_full=0.0, price_curr=0.0),
             0.0,
@@ -113,9 +109,9 @@ def test_product_init(product, expected_attrs):
             id='both prices (same)',
         ),
         pytest.param(
-            Product(price_full=3.0, price_curr=4.0),
-            3.0,
+            Product(price_full=4.0, price_curr=3.0),
             4.0,
+            3.0,
             id='both prices (different)',
         ),
     ],
@@ -128,6 +124,7 @@ def test_product_init_price_resolve(product, expected_price_full, expected_price
 @pytest.mark.parametrize(
     'name, expected_name_lowercase_ascii',
     [
+        pytest.param(None, '', id='None name'),
         pytest.param('', '', id='empty name'),
         pytest.param(
             'BIO Zahradní limonáda bezový květ & meduňka',
@@ -144,6 +141,7 @@ def test_product_prop_name_lowercase_ascii(name, expected_name_lowercase_ascii):
 @pytest.mark.parametrize(
     'category, expected_category_lowercase_ascii',
     [
+        pytest.param(None, '', id='None category'),
         pytest.param('', '', id='empty category'),
         pytest.param(
             'Nápoje',
@@ -168,22 +166,16 @@ def test_product_prop_category_lowercase_ascii(
     'product, rate',
     [
         pytest.param(Product(price_full=0, price_curr=0), 0, id='both prices (zero)'),
-        pytest.param(Product(price_full=0, price_curr=10), 0, id='price_curr only'),
-        pytest.param(
-            Product(price_full=5, price_curr=10),
-            0,
-            id='price_full < price_curr',
-        ),
         pytest.param(Product(price_full=10, price_curr=0), 1, id='price_full only'),
         pytest.param(
             Product(price_full=10, price_curr=5),
             0.5,
-            id='price_full < price_curr',
+            id='price_full > price_curr',
         ),
         pytest.param(
             Product(price_full=10, price_curr=10 * 2 / 3),
             0.33,
-            id='price_full = 2/3 * price_full',
+            id='price_curr = 2/3 * price_full',
         ),
         pytest.param(
             Product(price_full=10, price_curr=10),
@@ -959,228 +951,6 @@ def test_compare_price(product_this, product_other, info):
     assert product_this.compare_price(product_this) == info_no_diff
 
 
-# region Product - parsing_errors
-
-
-@pytest.mark.parametrize(
-    'product_data, expected_parsing_errors',
-    [
-        pytest.param(
-            {},
-            {},
-            id='no errors - empty data',
-        ),
-        pytest.param(
-            {'id_': 1, 'name': 'Apple', 'quantity': 5},
-            {},
-            id='no errors - valid data',
-        ),
-        pytest.param(
-            {'id_': 1, 'name': ValueError('Invalid name')},
-            {'name': 'ValueError: Invalid name'},
-            id='single parsing error - name',
-        ),
-        pytest.param(
-            {
-                'id_': 1,
-                'name': ValueError('Invalid name'),
-                'quantity': TypeError('Invalid quantity'),
-            },
-            {
-                'name': 'ValueError: Invalid name',
-                'quantity': 'TypeError: Invalid quantity',
-            },
-            id='multiple parsing errors',
-        ),
-        pytest.param(
-            {
-                'id_': 1,
-                'price_full': AttributeError('Cannot parse price'),
-                'category': 'Fruit',
-            },
-            {'price_full': 'AttributeError: Cannot parse price'},
-            id='parsing error with valid fields',
-        ),
-        pytest.param(
-            {
-                'id_': 1,
-                'price_curr': RuntimeError('Price error'),
-                'quantity': KeyError('Quantity missing'),
-            },
-            {
-                'price_curr': 'RuntimeError: Price error',
-                'quantity': "KeyError: 'Quantity missing'",
-            },
-            id='multiple different error types',
-        ),
-    ],
-)
-def test_product_parsing_errors_initialization(product_data, expected_parsing_errors):
-    """Test that parsing errors are correctly captured during initialization."""
-    product = Product(**product_data)
-    assert product.parsing_errors == expected_parsing_errors
-
-
-def test_product_parsing_errors_field_is_frozen():
-    """Test that parsing_errors field is frozen and cannot be modified."""
-    product = Product()
-    with pytest.raises(ValidationError, match='frozen_field'):
-        product.parsing_errors = {}  # type: ignore[misc]
-
-
-def test_product_parsing_errors_fields_not_set():
-    """Test that fields with errors are not set on the model (use defaults)."""
-    product = Product(
-        id_='123',
-        name=ValueError('Bad name'),  # type: ignore[arg-type]
-        quantity=TypeError('Bad quantity'),  # type: ignore[arg-type]
-        price_full=10.0,
-    )
-    # Fields with errors should use default values
-    assert not product.name
-    assert product.quantity == 0
-    # But ID and price_full should be set correctly
-    assert product.id_ == '123'
-    assert product.price_full == 10.0
-    # Errors should be captured
-    assert 'name' in product.parsing_errors
-    assert 'quantity' in product.parsing_errors
-
-
-@pytest.mark.parametrize(
-    'exception, expected_error_msg',
-    [
-        pytest.param(
-            ValueError('Test error'),
-            'ValueError: Test error',
-            id='ValueError',
-        ),
-        pytest.param(
-            TypeError('Type mismatch'),
-            'TypeError: Type mismatch',
-            id='TypeError',
-        ),
-        pytest.param(
-            AttributeError('Missing attribute'),
-            'AttributeError: Missing attribute',
-            id='AttributeError',
-        ),
-        pytest.param(
-            RuntimeError('Runtime issue'),
-            'RuntimeError: Runtime issue',
-            id='RuntimeError',
-        ),
-        pytest.param(
-            KeyError('key'),
-            "KeyError: 'key'",
-            id='KeyError',
-        ),
-    ],
-)
-def test_product_parsing_errors_exception_types(exception, expected_error_msg):
-    """Test that different exception types are correctly formatted."""
-    product = Product(name=exception)  # type: ignore[arg-type]
-    assert product.parsing_errors['name'] == expected_error_msg
-
-
-def test_product_parsing_errors_serialization():
-    """Test that parsing_errors are included in serialization."""
-    product = Product(
-        id_='1',
-        name=ValueError('Bad name'),  # type: ignore[arg-type]
-        category='Fruit',
-        quantity=5,
-    )
-    data = product.model_dump()
-    assert 'parsing_errors' in data
-    assert data['parsing_errors'] == {'name': 'ValueError: Bad name'}
-    assert data['category'] == 'Fruit'
-    assert data['quantity'] == 5
-
-
-def test_product_parsing_errors_json_serialization():
-    """Test that parsing_errors work with JSON mode serialization."""
-    product = Product(
-        id_='1',
-        name=ValueError('Bad name'),  # type: ignore[arg-type]
-        price_full=TypeError('Bad price'),  # type: ignore[arg-type]
-        category='Fruit',
-    )
-    data = product.model_dump(mode='json')
-    assert 'parsing_errors' in data
-    assert data['parsing_errors'] == {
-        'name': 'ValueError: Bad name',
-        'price_full': 'TypeError: Bad price',
-    }
-
-
-def test_product_parsing_errors_with_explicit_field():
-    """Test that parsing_errors are preserved when errors exist in fields."""
-    product = Product(
-        id_='1',
-        name=ValueError('Name error'),  # type: ignore[arg-type]
-        category='Fruit',
-    )
-    # The error should be captured
-    assert 'name' in product.parsing_errors
-    assert product.parsing_errors['name'] == 'ValueError: Name error'
-    # Other fields should work normally
-    assert product.category == 'Fruit'
-
-
-def test_product_parsing_errors_in_diff():
-    """Test that parsing_errors field can be included or excluded in diff."""
-    p1 = Product(
-        id_='1',
-        name='Apple',
-        quantity=ValueError('Error 1'),  # type: ignore[arg-type]
-    )
-    p2 = Product(
-        id_='1',
-        name='Apple',
-        price_full=ValueError('Error 2'),  # type: ignore[arg-type]
-    )
-
-    # By default, parsing_errors should be in the diff
-    diff_default = p1.diff(p2, exclude_recorded_at=True)
-    # parsing_errors is a dict, so it should show as different
-    if 'parsing_errors' in diff_default:
-        assert diff_default['parsing_errors']['type'] == DiffType.UPDATED
-
-    # Can explicitly exclude parsing_errors
-    diff_excluded = p1.diff(p2, exclude_recorded_at=True, exclude={'parsing_errors'})
-    assert 'parsing_errors' not in diff_excluded
-
-
-def test_product_parsing_errors_multiple_fields():
-    """Test handling of parsing errors across multiple fields."""
-    product = Product(
-        id_='1',
-        name=ValueError('Bad name'),  # type: ignore[arg-type]
-        category=TypeError('Bad category'),  # type: ignore[arg-type]
-        quantity=AttributeError('Bad quantity'),  # type: ignore[arg-type]
-        price_full=RuntimeError('Bad price_full'),  # type: ignore[arg-type]
-        price_curr=KeyError('Bad price_curr'),  # type: ignore[arg-type]
-    )
-
-    assert len(product.parsing_errors) == 5
-    assert 'name' in product.parsing_errors
-    assert 'category' in product.parsing_errors
-    assert 'quantity' in product.parsing_errors
-    assert 'price_full' in product.parsing_errors
-    assert 'price_curr' in product.parsing_errors
-
-    # All fields should have default values
-    assert not product.name
-    assert not product.category
-    assert product.quantity == 0
-    assert product.price_full == 0
-    assert product.price_curr == 0
-
-
-# endregion Product - parsing_errors
-
-
 # endregion Product
 
 # region ProductPage
@@ -1192,28 +962,24 @@ def test_product_parsing_errors_multiple_fields():
         pytest.param(
             ProductPage(),
             {
-                'items': {},
-                'location_id': 0,
-                'location_name': '',
+                'items': [],
+                'location_id': None,
+                'location_name': None,
             },
             id='empty page',
         ),
         pytest.param(
             ProductPage(
-                items={
-                    '1': Product(
-                        id_='1', location_id=296, recorded_at=datetime(2025, 1, 1)
-                    )
-                },
+                items=[
+                    Product(id_='1', location_id=296, recorded_at=datetime(2025, 1, 1))
+                ],
                 location_id=296,
                 location_name='foo',
             ),
             {
-                'items': {
-                    '1': Product(
-                        id_='1', location_id=296, recorded_at=datetime(2025, 1, 1)
-                    )
-                },
+                'items': [
+                    Product(id_='1', location_id=296, recorded_at=datetime(2025, 1, 1))
+                ],
                 'location_id': 296,
                 'location_name': 'foo',
             },
@@ -1241,6 +1007,7 @@ def test_product_page_prop_url(location_id, expected_url):
 @pytest.mark.parametrize(
     'location_name, expected_location_name_lowercase_ascii',
     [
+        pytest.param(None, '', id='None location name'),
         pytest.param('', '', id='empty location name'),
         pytest.param('foo', 'foo', id='location name with ascii charactersonly'),
         pytest.param(
@@ -1274,8 +1041,8 @@ def products():
             name='cheesecake',
             category='dessert',
             quantity=5,
-            price_full=1.5,
-            price_curr=2.2,
+            price_full=3.2,
+            price_curr=2.5,
         ),
         Product(
             id_='2',
@@ -1300,6 +1067,7 @@ def products():
             name='carrot',
             category='vegetable',
             quantity=15,
+            price_curr=2.0,
             price_full=2.0,
             is_gluten_free=True,
         ),
@@ -1368,13 +1136,11 @@ def products():
 
 @pytest.fixture(scope='module')
 def product_page(products):
-    return ProductPage(items={p.id_: p for p in products})
+    return ProductPage(items=products)
 
 
 def test_page_item_helpers(product_page):
     assert product_page.item_count == len(product_page.items)
-    assert set(product_page.item_ids) == set(product_page.items)
-    assert product_page.item_list == list(product_page.items.values())
 
 
 @pytest.mark.parametrize(
@@ -1574,16 +1340,16 @@ def test_product_page_find_items_invalid_lambda_attribute(product_page, constrai
 
 def test_item_diff_created_updated_deleted():
     p_old = ProductPage(
-        items={
-            '1': Product(id_='1', name='Banana'),
-            '2': Product(id_='2', name='Apple', quantity=2),
-        }
+        items=[
+            Product(id_='1', name='Banana'),
+            Product(id_='2', name='Apple', quantity=2),
+        ]
     )
     p_new = ProductPage(
-        items={
-            '2': Product(id_='2', name='Apple', quantity=1),
-            '3': Product(id_='3', name='Orange'),
-        }
+        items=[
+            Product(id_='2', name='Apple', quantity=1),
+            Product(id_='3', name='Orange'),
+        ]
     )
     diff = p_old.item_diff(p_new)
     assert diff['1']['type'] is DiffType.DELETED
@@ -1596,12 +1362,12 @@ def test_iter_item_attr_defaults_and_uniqueness():
         context: Dict[str, str] = Field(default_factory=dict)
 
     page = ProductPage(
-        items={
-            '1': Product(id_='1', category='c1'),
-            '2': Product(id_='2', category='c2'),
-            '3': Product(id_='3', category='c2'),
-            '4': Product(id_='4', category='c3'),
-        }
+        items=[
+            Product(id_='1', category='c1'),
+            Product(id_='2', category='c2'),
+            Product(id_='3', category='c2'),
+            Product(id_='4', category='c3'),
+        ]
     )
     # missing attr without default -> raises
     with pytest.raises(AttributeError):
@@ -1623,7 +1389,7 @@ def test_iter_item_attr_defaults_and_uniqueness():
     ]
 
     # unique with unhashable values
-    page.items['5'] = SubProduct(id_='5', context={'key': 'value'})
+    page.items.append(SubProduct(id_='5', context={'key': 'value'}))
     assert list(page.iter_item_attr('context', default={}, unhashable=True)) == [
         {},
         {},
@@ -1635,135 +1401,6 @@ def test_iter_item_attr_defaults_and_uniqueness():
     # TypeError on unhashable unique without flag
     with pytest.raises(AttributeError):
         list(page.iter_item_attr('context', unique=True))
-
-
-# region ProductPage - parsing_errors
-
-
-def test_product_page_parsing_errors():
-    """Test that parsing_errors work at the page level."""
-    page = ProductPage(
-        items={
-            '1': Product(id_='1', name='Apple', quantity=5),
-            '2': Product(
-                id_='2',
-                name=ValueError('Bad name'),  # type: ignore[arg-type]
-                quantity=TypeError('Bad quantity'),  # type: ignore[arg-type]
-            ),
-        }
-    )
-
-    # The page itself should have no parsing errors
-    assert page.parsing_errors == {}
-
-    # But individual items can have parsing errors
-    assert page.items['1'].parsing_errors == {}
-    assert page.items['2'].parsing_errors == {
-        'name': 'ValueError: Bad name',
-        'quantity': 'TypeError: Bad quantity',
-    }
-
-
-def test_product_page_with_parsing_errors_serialization():
-    """Test serialization of a page with items containing parsing errors."""
-    page = ProductPage(
-        items={
-            '1': Product(id_='1', name='Valid Product'),
-            '2': Product(
-                id_='2',
-                name=ValueError('Invalid'),  # type: ignore[arg-type]
-                price_full=TypeError('Bad price'),  # type: ignore[arg-type]
-            ),
-        }
-    )
-
-    data = page.model_dump()
-    assert data['items']['1']['parsing_errors'] == {}
-    assert data['items']['2']['parsing_errors'] == {
-        'name': 'ValueError: Invalid',
-        'price_full': 'TypeError: Bad price',
-    }
-
-
-def test_product_page_find_items_with_parsing_errors():
-    """Test that find_items can search by parsing_errors."""
-    page = ProductPage(
-        items={
-            '1': Product(id_='1', name='Apple'),
-            '2': Product(id_='2', name=ValueError('Error1')),  # type: ignore[arg-type]
-            '3': Product(id_='3', quantity=TypeError('Error2')),  # type: ignore[arg-type]
-            '4': Product(
-                id_='4',
-                name=ValueError('Error3'),  # type: ignore[arg-type]
-                price_full=AttributeError('Error4'),  # type: ignore[arg-type]
-            ),
-        }
-    )
-
-    # Find items with no parsing errors
-    no_errors = list(page.find_items(lambda p: not p.parsing_errors))
-    assert [p.id_ for p in no_errors] == ['1']
-
-    # Find items with parsing errors
-    has_errors = list(page.find_items(lambda p: bool(p.parsing_errors)))
-    assert [p.id_ for p in has_errors] == ['2', '3', '4']
-    # Find items with specific error in name field
-    name_errors = list(page.find_items(lambda p: 'name' in p.parsing_errors))
-    assert [p.id_ for p in name_errors] == ['2', '4']
-
-    # Find items with multiple errors
-    multiple_errors = list(page.find_items(lambda p: len(p.parsing_errors) > 1))
-    assert [p.id_ for p in multiple_errors] == ['4']
-
-
-def test_product_page_item_diff_with_parsing_errors():
-    """Test that item_diff handles parsing_errors correctly."""
-    page1 = ProductPage(
-        items={
-            '1': Product(id_='1', name='Apple', quantity=ValueError('Error 1')),  # type: ignore[arg-type]
-            '2': Product(id_='2', name='Banana'),
-        }
-    )
-    page2 = ProductPage(
-        items={
-            '1': Product(id_='1', name='Apple', price_full=ValueError('Error 2')),  # type: ignore[arg-type]
-            '3': Product(id_='3', name='Cherry'),
-        }
-    )
-
-    diff = page1.item_diff(page2)
-
-    # Item 1 exists in both but has different parsing_errors
-    assert '1' in diff
-    if 'parsing_errors' in diff['1']['diff']:
-        assert diff['1']['diff']['parsing_errors']['type'] == DiffType.UPDATED
-
-    # Item 2 deleted
-    assert diff['2']['type'] == DiffType.DELETED
-
-    # Item 3 created
-    assert diff['3']['type'] == DiffType.CREATED
-
-
-def test_product_page_iter_item_attr_parsing_errors():
-    """Test iter_item_attr with parsing_errors field."""
-    page = ProductPage(
-        items={
-            '1': Product(id_='1', name='Apple'),
-            '2': Product(id_='2', name=ValueError('Error')),  # type: ignore[arg-type]
-            '3': Product(id_='3', quantity=TypeError('Error')),  # type: ignore[arg-type]
-        }
-    )
-
-    # Get all parsing_errors (unhashable, so need unhashable=True for unique)
-    all_errors = list(page.iter_item_attr('parsing_errors'))
-    assert len(all_errors) == 3
-    assert all_errors[0] == {}
-    assert 'name' in all_errors[1]
-    assert 'quantity' in all_errors[2]
-
-
-# endregion ProductPage - parsing_errors
 
 
 # endregion ProductPage
