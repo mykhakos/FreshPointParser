@@ -1,6 +1,6 @@
 import html
 import re
-from typing import Any, Callable, Dict, List, Tuple, TypeVar, Union
+from typing import Callable, List, Tuple, TypeVar, Union
 
 import bs4
 
@@ -237,8 +237,7 @@ class ProductHTMLParser:
 
 class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
     """Parses HTML content of a FreshPoint product webpage
-    ``my.freshpoint.cz/device/product-list/<pageId>``. Allows accessing
-    the parsed webpage data and searching for products by name or ID.
+    ``my.freshpoint.cz/device/product-list/<pageId>``.
     """
 
     _RE_PATTERN_DEVICE_ID = re.compile(r'deviceId\s*=\s*\"(.*?)\"')
@@ -250,18 +249,16 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         self._bs4_parser = bs4.BeautifulSoup()
 
     def _parse_product(self, product_data: bs4.Tag, context: ParseContext) -> Product:
-        """Parse the product data to a Product model.
+        """Parse the a single product item to a Product model.
 
         Args:
             product_data (bs4.Tag): The Tag containing the product data.
-            context (ParseContext): A context object that can be used
-                to store additional information during parsing.
+            context (ParseContext): Parsing context containing metadata.
 
         Returns:
-            Product: An instance of the Product model
-                containing the parsed and validated data.
+            Product: Parsed and validated Product model instance.
         """
-        parsed_data: Dict[str, Any] = {'recorded_at': context.parsed_at}
+        parsed_data = self._new_base_record_data_from_context(context)
 
         location_id = self._safe_parse(self.parse_location_id, context)
         if location_id is not None:
@@ -292,17 +289,21 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         return Product.model_validate(parsed_data, context=context)
 
     def _parse_products(self, context: ParseContext) -> List[Product]:
-        """All products parsed and validated from the page HTML content.
+        """Parse all products from the page HTML content.
 
-        The data is cached after the first extraction until the page HTML
-        changes. The returned ``Product`` instances are detached from the
-        parser's cached data, so mutating them does not affect the parser's
-        state.
+        Args:
+            context (ParseContext): Parsing context containing metadata.
+
+        Returns:
+            List[Product]: Parsed and validated Product model instances.
         """
         products = []
         for product_data in self._bs4_parser.find_all('div', class_='product'):
             product = self._safe_parse(
-                self._parse_product, context, product_data=product_data
+                self._parse_product,
+                context,
+                product_data=product_data,
+                context=context,
             )
             if product is not None:
                 products.append(product)
@@ -311,20 +312,18 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
     def _parse_page_content(
         self, page_content: Union[str, bytes], context: ParseContext
     ) -> ProductPage:
-        """Parse HTML content of a product page.
+        """Parse the HTML content of a product page to a Pydantic model.
 
-        This method initializes the BeautifulSoup parser with the provided
-        HTML content and invalidates the cached page data.
+        A new BeautifulSoup parser is initialized with the provided HTML content.
 
         Args:
             page_content (Union[str, bytes]): HTML content of
                 the product page to parse.
-            context (ParseContext): A context object that can be used
-                to store additional information during parsing.
+            context (ParseContext): Parsing context containing metadata.
         """
         self._bs4_parser = bs4.BeautifulSoup(page_content, 'lxml')
 
-        parsed_data: Dict[str, Any] = {'recorded_at': context.parsed_at}
+        parsed_data = self._new_base_record_data_from_context(context)
 
         location_id = self._safe_parse(self.parse_location_id, context)
         if location_id is not None:
@@ -341,11 +340,14 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         return ProductPage.model_validate(parsed_data, context=context)
 
     def parse_location_id(self) -> int:
-        """ID number of the location (also known as the page ID or
-        the device ID) extracted from the page HTML content.
+        """Extract the ID number of the location (also known as the page ID or
+        the device ID) from the page HTML content.
 
-        The value is cached after the first extraction until the page HTML
-        changes. If the value cannot be parsed, a FreshPointParserValueError is raised.
+        Raises:
+            FreshPointParserValueError: If the page ID cannot be parsed.
+
+        Returns:
+            int: The ID number of the location.
         """
         script = self._bs4_parser.find(string=self._RE_PATTERN_DEVICE_ID)
         if script is None:
@@ -365,11 +367,14 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             raise FreshPointParserValueError('Unable to parse page ID.') from e
 
     def parse_location_name(self) -> str:
-        """The name of the location (also known as the page title) extracted
+        """Extract the name of the location (also known as the page title)
         from the page HTML content.
 
-        The value is cached after the first extraction until the page HTML
-        changes. If the value cannot be parsed, a FreshPointParserValueError is raised.
+        Raises:
+            FreshPointParserValueError: If the location name cannot be parsed.
+
+        Returns:
+            str: The name of the location.
         """
         title_tag = self._bs4_parser.find('title')
         if not title_tag:
@@ -389,9 +394,6 @@ def parse_product_page(page_content: Union[str, bytes]) -> ProductPage:
 
     Args:
         page_content (Union[str, bytes]): HTML content of the product page.
-
-    Raises:
-        FreshPointParserError: If the HTML does not match the expected structure.
 
     Returns:
         ProductPage: Parsed and validated product page data.
