@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union
 
 from .._utils import hash_sha1, logger
-from ..exceptions import FreshPointParserError, FreshPointParserValueError
+from ..exceptions import FreshPointParserAttributeError, FreshPointParserError
 from ..models._base import BasePage
 
 TPage = TypeVar('TPage', bound=BasePage)
@@ -129,10 +129,10 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         The page is fully parsed during :meth:`parse`. A deep copy of the
         cached model is returned to keep the internal state immutable. Every
         access therefore yields a new :class:`TPage` instance. If the page
-        has not been parsed yet, a :class:`FreshPointParserValueError` is raised.
+        has not been parsed yet, a :class:`FreshPointParserAttributeError` is raised.
         """
         if self._parsed_page is None:
-            raise FreshPointParserValueError('Page has not been parsed yet.')
+            raise FreshPointParserAttributeError('Page has not been parsed yet.')
         return self._parsed_page.model_copy(deep=True)
 
     def parse(self, page_content: Union[str, bytes], force: bool = False) -> TPage:
@@ -164,7 +164,7 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
             logger.debug('HTML content is unchanged, skipping parsing.')
             self._metadata = replace(
                 self._metadata,
-                last_parsed_at=datetime.now(),
+                last_updated_at=datetime.now(),
                 was_last_parse_from_cache=True,
             )
         return self.parsed_page
