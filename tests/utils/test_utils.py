@@ -1,6 +1,6 @@
 import pytest
 
-from freshpointparser._utils import normalize_text, validate_id
+from freshpointparser._utils import hash_sha1, normalize_text
 
 
 @pytest.mark.parametrize(
@@ -26,65 +26,22 @@ def test_normalize_text(text, expected):
 
 
 @pytest.mark.parametrize(
-    'input_value, expected_output',
+    'content, expected_hex',
     [
-        ('123', 123),
-        (0, 0),
-        (456, 456),
-        ('0', 0),
-        ('999999999999999999999', 999999999999999999999),
-        (999999999999999999999, 999999999999999999999),
-    ],
-    ids=[
-        'valid numeric string',
-        'zero',
-        'valid positive integer',
-        'numeric string for zero',
-        'large numeric string',
-        'large integer',
+        ('hello', 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'),
+        (b'hello', 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'),
+        ('', 'da39a3ee5e6b4b0d3255bfef95601890afd80709'),
+        (b'', 'da39a3ee5e6b4b0d3255bfef95601890afd80709'),
+        (
+            'The quick brown fox jumps over the lazy dog',
+            '2fd4e1c67a2d28fced849ee1bb76e7391b93eb12',
+        ),
+        (
+            b'The quick brown fox jumps over the lazy dog',
+            '2fd4e1c67a2d28fced849ee1bb76e7391b93eb12',
+        ),
     ],
 )
-def test_validate_id(input_value, expected_output):
-    assert validate_id(input_value) == expected_output
-
-
-@pytest.mark.parametrize(
-    'input_value, expected_exception, exception_message',
-    [
-        # Negative cases
-        (
-            '-123',
-            ValueError,
-            'ID must be a numeric string representing a non-negative integer (got "-123").',
-        ),
-        (-1, ValueError, 'ID must be a non-negative integer.'),
-        # Invalid string formats
-        (
-            'abc',
-            ValueError,
-            'ID must be a numeric string representing a non-negative integer (got "abc").',
-        ),
-        (
-            '12.34',
-            ValueError,
-            'ID must be a numeric string representing a non-negative integer (got "12.34").',
-        ),
-        # Unsupported types
-        ([], TypeError, "unhashable type: 'list'"),  # due to @lru_cache
-        ({}, TypeError, "unhashable type: 'dict'"),  # due to @lru_cache
-        (None, TypeError, "ID must be an integer (got <class 'NoneType'>)."),
-    ],
-    ids=[
-        'negative numeric string',
-        'negative integer',
-        'non-numeric string',
-        'float string',
-        'list',
-        'dict',
-        'None',
-    ],
-)
-def test_validate_id_invalid(input_value, expected_exception, exception_message):
-    with pytest.raises(expected_exception) as excinfo:
-        validate_id(input_value)
-    assert str(excinfo.value) == exception_message
+def test_hash_sha1(content, expected_hex):
+    result = hash_sha1(content)
+    assert result.hex() == expected_hex
