@@ -37,7 +37,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             FreshPointParserValueError: If the location data cannot be found or parsed.
 
         Returns:
-            List[Dict]: A list of raw location data dictionaries extracted from
+            List[Dict]: Raw location data dictionaries extracted from
                 the JavaScript variable in the HTML content.
         """
         match_: Union[re.Match[str], re.Match[bytes], None]
@@ -88,7 +88,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
                 when other parsing errors occur.
 
         Returns:
-            Location: Parsed Location model instance.
+            Location: Parsed and validated Location model instance.
         """
         parsed_data = self._new_base_record_data_from_context(context)
         try:
@@ -114,7 +114,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             context (ParseContext): Parsing context containing metadata.
 
         Returns:
-            List[Location]: List of parsed Location model instances.
+            List[Location]: Parsed and validated Location model instances.
         """
         locations = []
         for location_data in locations_data:
@@ -151,7 +151,10 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         )
         if locations_data is not None:
             locations = self._safe_parse(
-                self._parse_locations, context, locations_data=locations_data
+                self._parse_locations,
+                context,
+                locations_data=locations_data,
+                context=context,
             )
             if locations is not None:
                 parsed_data['items'] = locations

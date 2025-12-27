@@ -12,7 +12,7 @@ TPage = TypeVar('TPage', bound=BasePage)
 
 @dataclass(frozen=True, eq=True)
 class ParseMetadata:
-    """Holds the result of parsing a FreshPoint.cz page HTML content."""
+    """Holds the metadata of a FreshPoint.cz page HTML content parsing operation."""
 
     content_digest: bytes
     """SHA-1 hash digest of the page HTML content that was parsed."""
@@ -98,6 +98,18 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
     def _safe_parse(
         parser_func: Callable, _context: ParseContext, **kwargs: Any
     ) -> Any:
+        """Wrap a parsing function call to safely handle exceptions. The exceptions
+        are recorded in the parsing context instead of being raised.
+
+        Args:
+            parser_func (Callable): The parsing function to be called.
+            _context (ParseContext): The parsing context to record errors.
+                Intended as a positional-only argument.
+            **kwargs: Additional keyword arguments to pass to the parsing function.
+
+        Returns:
+            Any: The result of the parsing function, or None if an error occurred.
+        """
         try:
             return parser_func(**kwargs)
         except FreshPointParserError as err:
@@ -107,43 +119,33 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
 
     @property
     def metadata(self) -> ParseMetadata:
-        """Get metadata about the last parsing operation.
-
-        Returns:
-            ParseMetadata: Metadata about the last parsing operation.
-        """
+        """Metadata of the last parsing operation."""
         return self._metadata
 
     @property
     def parsed_page(self) -> TPage:
-        """Get the page data parsed from the HTML content.
+        """Page data extracted from the HTML content in the last parsing operation.
 
         The page is fully parsed during :meth:`parse`. A deep copy of the
         cached model is returned to keep the internal state immutable. Every
-        access therefore yields a new :class:`TPage` instance.
-
-        Returns:
-            TPage: Parsed data from the HTML content.
-
-        Raises:
-            FreshPointParserValueError: If the page has not been parsed yet.
+        access therefore yields a new :class:`TPage` instance. If the page
+        has not been parsed yet, a :class:`FreshPointParserValueError` is raised.
         """
         if self._parsed_page is None:
             raise FreshPointParserValueError('Page has not been parsed yet.')
         return self._parsed_page.model_copy(deep=True)
 
     def parse(self, page_content: Union[str, bytes], force: bool = False) -> TPage:
-        """Parse page HTML content.
+        """Parse the HTML content of a FreshPoint webpage.
 
         Args:
             page_content (Union[str, bytes]): HTML content of the page.
-            force (bool): If True, forces the parser to re-parse the HTML
-                content even if the hash of the content matches the hash of the
-                previous content. If False, the parser will only re-parse the
-                content if the hash has changed. Defaults to False.
+            force (bool): Force the parser to re-parse the content even if
+                its hash digest matches the one of the previous content.
+                Defaults to False.
 
         Returns:
-            TPage: A page model containing the parsed data.
+            TPage: Parsed and validated page data.
         """
         content_digest = hash_sha1(page_content)
         if force or content_digest != self._metadata.content_digest:
