@@ -12,7 +12,7 @@ from freshpointparser.models._base import BasePage
 from freshpointparser.parsers._base import BasePageHTMLParser, ParseContext
 
 
-class TestPageHTMLParser(BasePageHTMLParser[BasePage]):
+class DummyPageHTMLParser(BasePageHTMLParser[BasePage]):
     def _parse_page_content(
         self, page_content: Union[str, bytes], context: ParseContext
     ) -> BasePage:
@@ -20,7 +20,7 @@ class TestPageHTMLParser(BasePageHTMLParser[BasePage]):
         return BasePage.model_validate(data, context=context)
 
 
-class TestPageHTMLParserWithErrors(BasePageHTMLParser[BasePage]):
+class DummyPageHTMLParserWithErrors(BasePageHTMLParser[BasePage]):
     """Parser that collects errors during parsing."""
 
     def _parse_page_content(
@@ -37,20 +37,20 @@ class TestPageHTMLParserWithErrors(BasePageHTMLParser[BasePage]):
 
 
 def test_parse_empty_data():
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     parser.parse('<html></html>')
     assert parser.parsed_page.recorded_at == parser.metadata.last_parsed_at
     assert not parser.metadata.parse_errors
 
 
 def test_parse_datetime_access_before_parse():
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     with pytest.raises(FreshPointParserAttributeError):
         _ = parser.parsed_page
 
 
 def test_parse_caching():
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
 
     # first call should parse and cache
     parser.parse('<html></html>')
@@ -65,7 +65,7 @@ def test_parse_caching():
 
 
 def test_parse_force():
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
 
     # first call should parse and cache
     parser.parse('<html></html>')
@@ -80,7 +80,7 @@ def test_parse_force():
 
 def test_parse_with_bytes_content():
     """Test parsing with bytes instead of string."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     content_bytes = b'<html><body>Test</body></html>'
     parser.parse(content_bytes)
     assert parser.parsed_page is not None
@@ -89,7 +89,7 @@ def test_parse_with_bytes_content():
 
 def test_parse_with_string_content():
     """Test parsing with string content."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     content_str = '<html><body>Test</body></html>'
     parser.parse(content_str)
     assert parser.parsed_page is not None
@@ -98,7 +98,7 @@ def test_parse_with_string_content():
 
 def test_parse_content_digest_changes():
     """Test that content_digest changes when content changes."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
 
     parser.parse('<html>v1</html>')
     digest1 = parser.metadata.content_digest
@@ -111,7 +111,7 @@ def test_parse_content_digest_changes():
 
 def test_parse_content_digest_same_for_identical_content():
     """Test that content_digest remains the same for identical content."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
 
     parser.parse('<html>test</html>')
     digest1 = parser.metadata.content_digest
@@ -124,7 +124,7 @@ def test_parse_content_digest_same_for_identical_content():
 
 def test_parse_returns_deep_copy():
     """Test that parse returns a deep copy of the parsed page."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     page1 = parser.parse('<html></html>')
     page2 = parser.parse('<html></html>')
 
@@ -135,7 +135,7 @@ def test_parse_returns_deep_copy():
 
 def test_parsed_page_property_returns_new_instance():
     """Test that each access to parsed_page returns a new instance."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     parser.parse('<html></html>')
 
     page1 = parser.parsed_page
@@ -147,7 +147,7 @@ def test_parsed_page_property_returns_new_instance():
 
 def test_parse_empty_content():
     """Test parsing with empty content."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     # Need to force parse since empty string hash matches initial empty bytes hash
     result = parser.parse('', force=True)
     assert result is not None
@@ -156,7 +156,7 @@ def test_parse_empty_content():
 
 def test_parse_large_content():
     """Test parsing with large HTML content."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     large_content = '<html>' + 'x' * 100000 + '</html>'
     parser.parse(large_content)
     assert parser.parsed_page is not None
@@ -164,7 +164,7 @@ def test_parse_large_content():
 
 def test_parse_special_characters():
     """Test parsing content with special characters."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     content = '<html>Special: äöü ñ 中文 🎉</html>'
     parser.parse(content)
     assert parser.parsed_page is not None
@@ -172,7 +172,7 @@ def test_parse_special_characters():
 
 def test_parse_errors_collected_in_metadata():
     """Test that parsing errors are collected in metadata."""
-    parser = TestPageHTMLParserWithErrors()
+    parser = DummyPageHTMLParserWithErrors()
     parser.parse('<html>error here</html>')
 
     assert len(parser.metadata.parse_errors) == 1
@@ -181,7 +181,7 @@ def test_parse_errors_collected_in_metadata():
 
 def test_parse_errors_cleared_on_successful_parse():
     """Test that parse errors are replaced when parsing new content."""
-    parser = TestPageHTMLParserWithErrors()
+    parser = DummyPageHTMLParserWithErrors()
 
     # First parse with errors (contains 'error' keyword)
     parser.parse('<html>error here</html>')
@@ -201,7 +201,7 @@ def test_parse_errors_cleared_on_successful_parse():
 
 def test_parse_multiple_sequential_different_content():
     """Test multiple sequential parses with different content."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
 
     contents = ['<html>v1</html>', '<html>v2</html>', '<html>v3</html>']
     for content in contents:
@@ -212,7 +212,7 @@ def test_parse_multiple_sequential_different_content():
 
 def test_metadata_last_updated_at_updates_on_cache_hit():
     """Test that last_updated_at is updated even when using cache."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
 
     parser.parse('<html></html>')
     updated_at_first = parser.metadata.last_updated_at
@@ -228,7 +228,7 @@ def test_metadata_last_updated_at_updates_on_cache_hit():
 
 def test_metadata_timestamps_order():
     """Test that metadata timestamps have correct ordering."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     parser.parse('<html></html>')
 
     metadata = parser.metadata
@@ -243,7 +243,7 @@ def test_safe_parse_method():
     def success_func(value: int) -> int:
         return value * 2
 
-    result = TestPageHTMLParser._safe_parse(success_func, context, value=5)
+    result = DummyPageHTMLParser._safe_parse(success_func, context, value=5)
     assert result == 10
     assert len(context.parse_errors) == 0
 
@@ -251,7 +251,7 @@ def test_safe_parse_method():
     def error_func() -> None:
         raise FreshPointParserValueError('Test error')
 
-    result = TestPageHTMLParser._safe_parse(error_func, context)
+    result = DummyPageHTMLParser._safe_parse(error_func, context)
     assert result is None
     assert len(context.parse_errors) == 1
     assert isinstance(context.parse_errors[0], FreshPointParserValueError)
@@ -265,12 +265,12 @@ def test_safe_parse_non_freshpoint_error_propagates():
         raise ValueError('Regular ValueError')
 
     with pytest.raises(ValueError):
-        TestPageHTMLParser._safe_parse(error_func, context)
+        DummyPageHTMLParser._safe_parse(error_func, context)
 
 
 def test_metadata_initialization():
     """Test that parser initializes with correct metadata."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     metadata = parser.metadata
 
     assert metadata.content_digest is not None
@@ -282,7 +282,7 @@ def test_metadata_initialization():
 
 def test_parse_with_unicode_bytes():
     """Test parsing with unicode encoded as bytes."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     content = '<html>Unicode: 中文</html>'.encode()
     parser.parse(content)
     assert parser.parsed_page is not None
@@ -290,7 +290,7 @@ def test_parse_with_unicode_bytes():
 
 def test_parse_alternating_content():
     """Test parsing with alternating content to verify cache behavior."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
     content_a = '<html>A</html>'
     content_b = '<html>B</html>'
 
@@ -318,7 +318,7 @@ def test_parse_alternating_content():
 def test_new_base_record_data_from_context():
     """Test the _new_base_record_data_from_context static method."""
     context = ParseContext()
-    data = TestPageHTMLParser._new_base_record_data_from_context(context)
+    data = DummyPageHTMLParser._new_base_record_data_from_context(context)
 
     assert 'recorded_at' in data
     assert isinstance(data['recorded_at'], datetime)
@@ -327,7 +327,7 @@ def test_new_base_record_data_from_context():
 
 def test_parse_whitespace_content():
     """Test parsing with various whitespace content."""
-    parser = TestPageHTMLParser()
+    parser = DummyPageHTMLParser()
 
     contents = [
         ' ',
