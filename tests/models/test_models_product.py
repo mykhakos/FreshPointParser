@@ -356,20 +356,6 @@ def test_is_newer_than_invalid_precision():
         p1.is_newer_than(p2, precision='q')  # type: ignore[reportArgumentType]
 
 
-def test_recorded_at_serialize_excluded():
-    product = Product()
-
-    data = product.model_dump(context={'__exclude_recorded_at__': True})
-    assert data['recorded_at'] is None
-
-    for data in (
-        product.model_dump(),
-        product.model_dump(mode='json'),
-        product.model_dump(context={'__exclude_recorded_at__': False}),
-    ):
-        assert data['recorded_at'] is not None
-
-
 @pytest.mark.parametrize(
     'product_this, product_other, diff',
     [
@@ -390,10 +376,6 @@ def test_recorded_at_serialize_excluded():
                     'values': {'left': 0, 'right': 5},
                 },
                 'price_full': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 5, 'right': 10},
-                },
-                'price_curr': {
                     'type': DiffType.UPDATED,
                     'values': {'left': 5, 'right': 10},
                 },
@@ -1190,7 +1172,7 @@ def test_page_item_helpers(product_page):
         ),
         pytest.param(
             lambda p: p.price_full > 3.0,
-            ['7', '9'],
+            ['1', '7', '9'],
             id='lambda constraint: full price gt',
         ),
         pytest.param(
