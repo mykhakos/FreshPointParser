@@ -172,6 +172,7 @@ class Product(BaseItem):
     """URL of the illustrative product image."""
     location_id: Optional[str] = Field(
         default=None,
+        coerce_numbers_to_str=True,
         title='Location ID',
         description=(
             'Unique identifier or the product location (also known as '
@@ -389,6 +390,7 @@ class ProductPage(BasePage[Product]):
 
     location_id: Optional[str] = Field(
         default=None,
+        coerce_numbers_to_str=True,
         title='Location ID',
         description=(
             'Unique identifier or the product location '

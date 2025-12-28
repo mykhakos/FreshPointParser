@@ -57,7 +57,7 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_curr=3.0,
                 info='Info',
                 pic_url='https://example.com/pic.jpg',
-                location_id=5,
+                location_id=5,  # type: ignore
             ),
             dict(
                 id_='1',
@@ -70,7 +70,7 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_curr=3.0,
                 info='Info',
                 pic_url='https://example.com/pic.jpg',
-                location_id=5,
+                location_id='5',
             ),
             id='custom args',
         ),
@@ -953,16 +953,20 @@ def test_compare_price(product_this, product_other, info):
         pytest.param(
             ProductPage(
                 items=[
-                    Product(id_='1', location_id=296, recorded_at=datetime(2025, 1, 1))
+                    Product(
+                        id_='1', location_id='296', recorded_at=datetime(2025, 1, 1)
+                    )
                 ],
-                location_id=296,
+                location_id=296,  # type: ignore[reportGeneralTypeIssues]
                 location_name='foo',
             ),
             {
                 'items': [
-                    Product(id_='1', location_id=296, recorded_at=datetime(2025, 1, 1))
+                    Product(
+                        id_='1', location_id='296', recorded_at=datetime(2025, 1, 1)
+                    )
                 ],
-                'location_id': 296,
+                'location_id': '296',
                 'location_name': 'foo',
             },
             id='regular page',

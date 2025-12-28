@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class ProductPageMeta(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-    product_page_location_id: int
+    product_page_location_id: str
     product_page_location_name: str
     product_quantity_total: int
     product_quantity_available: int
@@ -402,7 +402,7 @@ def test_parse_product_success():
     assert product.is_vegetarian is True
     assert product.price_full == 50.0
     assert product.quantity == 2
-    assert product.location_id == 10
+    assert product.location_id == '10'
 
 
 def test_parse_product_minimal_data():
@@ -493,7 +493,7 @@ def test_parse_page_content_success():
     page = parser._parse_page_content(html, context)
 
     assert isinstance(page, ProductPage)
-    assert page.location_id == 10
+    assert page.location_id == '10'
     assert page.location_name == 'Test Location'
     assert len(page.items) == 1
 
