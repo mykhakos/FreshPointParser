@@ -198,7 +198,6 @@ class BaseRecord(BaseModel):
 
     recorded_at: datetime = Field(
         default_factory=datetime.now,
-        frozen=True,
         title='Recorded At',
         description='Datetime when the data has been recorded.',
     )
