@@ -13,6 +13,7 @@ from typing import (
     Iterator,
     List,
     Literal,
+    MutableMapping,
     Optional,
     Set,
     TypedDict,
@@ -300,6 +301,24 @@ class BaseRecord(BaseModel):
         return recorded_at_self > recorded_at_other
 
 
+def remove_recorded_at_from_mapping(
+    mapping: MutableMapping[str, Any],
+) -> MutableMapping[str, Any]:
+    """Remove the ``recorded_at`` field or its CamelCase alias from the given mapping
+    if present.
+
+    Args:
+        mapping (MutableMapping[str, Any]): The mapping to modify.
+
+    Returns:
+        MutableMapping[str, Any]: The modified mapping.
+    """
+    field_name = 'recorded_at'
+    mapping.pop(field_name, None)
+    mapping.pop(to_camel(field_name), None)
+    return mapping
+
+
 # endregion BaseRecord
 
 # region BaseItem
@@ -321,6 +340,8 @@ class BaseItem(BaseRecord):
     def diff(
         self,
         other: BaseItem,
+        *,
+        exclude_recorded_at: bool = True,
         **kwargs: Any,
     ) -> FieldDiffMapping:
         """Compare this item with another one to identify which item fields
@@ -337,6 +358,11 @@ class BaseItem(BaseRecord):
 
         Args:
             other (BaseItem): The item to compare against.
+            exclude_recorded_at (bool): If True, the ``recorded_at`` field is
+                excluded from comparison. This argument is a shortcut for
+                ``exclude={'recorded_at': ...}``. It takes precedence over any
+                standard exclusion and inclusion parameters passed via ``kwargs``.
+                Defaults to True.
             **kwargs: Additional keyword arguments passed to each item model's
                 ``model_dump`` call, such as ``exclude``, ``include``,
                 ``by_alias``, and others.
@@ -377,7 +403,10 @@ class BaseItem(BaseRecord):
         """
         if self is other:
             return {}
-        return model_diff(self, other, kwargs)
+        diff = model_diff(self, other, kwargs)
+        if exclude_recorded_at:
+            remove_recorded_at_from_mapping(diff)
+        return diff
 
 
 # endregion BaseItem
@@ -411,7 +440,13 @@ class BasePage(BaseRecord, Generic[TItem]):
         """Total number of items on the page."""
         return len(self.items)
 
-    def item_diff(self, other: BasePage[TItem], **kwargs: Any) -> ModelDiffMapping:
+    def item_diff(
+        self,
+        other: BasePage[TItem],
+        *,
+        exclude_recorded_at: bool = True,
+        **kwargs: Any,
+    ) -> ModelDiffMapping:
         """Compare items between this page and another one to identify which
         items differ. Items are matched by their ID.
 
@@ -430,6 +465,10 @@ class BasePage(BaseRecord, Generic[TItem]):
 
         Args:
             other (BasePage): The page to compare against.
+            exclude_recorded_at (bool): If True, the ``recorded_at`` field is
+                excluded from comparison. This argument is a shortcut for
+                ``exclude={'recorded_at': ...}``. It takes precedence over any
+                standard exclusion and inclusion parameters passed via ``kwargs``.
             **kwargs: Additional keyword arguments passed to each item model's
                 ``model_dump`` call, such as ``exclude``, ``include``,
                 ``by_alias``, and others.
@@ -492,27 +531,32 @@ class BasePage(BaseRecord, Generic[TItem]):
         # compare self to other
         for item_id, item_self in items_as_dict_self.items():
             item_other = items_as_dict_other.get(item_id, None)
+
             if item_other is None:
-                diff[item_id] = ModelDiff(
-                    type=DiffType.DELETED,
-                    diff=model_diff(item_self, item_missing, kwargs),
-                )
+                item_diff_type = DiffType.DELETED
+                item_diff = model_diff(item_self, item_missing, kwargs)
             else:
+                item_diff_type = DiffType.UPDATED
                 item_diff = model_diff(item_self, item_other, kwargs)
-                if item_diff:
-                    diff[item_id] = ModelDiff(
-                        type=DiffType.UPDATED,
-                        diff=item_diff,
-                    )
+
+            if exclude_recorded_at:
+                remove_recorded_at_from_mapping(item_diff)
+
+            if item_diff:
+                diff[item_id] = ModelDiff(type=item_diff_type, diff=item_diff)
 
         # compare other to self
         if items_as_dict_other.keys() != items_as_dict_self.keys():
             for item_id, item_other in items_as_dict_other.items():
                 if item_id not in items_as_dict_self:
-                    diff[item_id] = ModelDiff(
-                        type=DiffType.CREATED,
-                        diff=model_diff(item_missing, item_other, kwargs),
-                    )
+                    item_diff_type = DiffType.CREATED
+                    item_diff = model_diff(item_missing, item_other, kwargs)
+
+                    if exclude_recorded_at:
+                        remove_recorded_at_from_mapping(item_diff)
+
+                    if item_diff:
+                        diff[item_id] = ModelDiff(type=item_diff_type, diff=item_diff)
 
         return diff
 
