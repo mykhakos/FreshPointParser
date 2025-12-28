@@ -170,7 +170,7 @@ class Product(BaseItem):
         description='URL of the illustrative product image.',
     )
     """URL of the illustrative product image."""
-    location_id: Optional[int] = Field(
+    location_id: Optional[str] = Field(
         default=None,
         title='Location ID',
         description=(
@@ -387,7 +387,7 @@ def get_product_page_url(location_id: Union[int, str]) -> str:
 class ProductPage(BasePage[Product]):
     """Data model of a FreshPoint product webpage."""
 
-    location_id: Optional[int] = Field(
+    location_id: Optional[str] = Field(
         default=None,
         title='Location ID',
         description=(
