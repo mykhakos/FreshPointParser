@@ -40,6 +40,17 @@ class ParseContext:
     parse_errors: List[Exception] = field(default_factory=list)
     """List of exceptions encountered during the parsing operation."""
 
+    def register_error(self, error: Exception) -> None:
+        """Register a parsing error in the context.
+
+        NOTE: This method is an implementation of the interface required by
+        the validation context used in model validation.
+
+        Args:
+            error (Exception): The exception to register.
+        """
+        self.parse_errors.append(error)
+
 
 class BasePageHTMLParser(ABC, Generic[TPage]):
     """Provides common functionality for parsing HTML content of FreshPoint.cz pages.
