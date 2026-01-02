@@ -66,6 +66,17 @@ class ParseResult(Generic[TPage]):
     metadata: ParseMetadata
     """Metadata of the parsing operation."""
 
+    @property
+    def errors(self) -> List[Exception]:
+        """List of exceptions encountered during the parsing operation.
+
+        This is a convenience property that forwards to the metadata's errors.
+
+        Returns:
+            List[Exception]: List of parsing exceptions.
+        """
+        return self.metadata.errors
+
 
 class BasePageHTMLParser(ABC, Generic[TPage]):
     """Provides common functionality for parsing HTML content of FreshPoint.cz pages.
