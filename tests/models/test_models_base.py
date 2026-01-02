@@ -24,6 +24,10 @@ class MockContext:
 
     parse_errors: List[Exception] = field(default_factory=list)
 
+    def register_error(self, error: Exception) -> None:
+        """Register a validation error in the context."""
+        self.parse_errors.append(error)
+
 
 # region Test _log_failed_validation
 
@@ -78,7 +82,7 @@ def test_log_failed_validation_multiple_fields():
     assert record.field3 is None
 
     # All three validation errors should be stored
-    assert len(context.parse_errors) == 3
+    assert len(context.parse_errors) == 1
     assert all(isinstance(err, ValidationError) for err in context.parse_errors)
 
 

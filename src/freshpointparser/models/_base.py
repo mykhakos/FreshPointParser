@@ -5,7 +5,6 @@ from collections.abc import Mapping
 from datetime import date, datetime
 from enum import Enum
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -15,6 +14,7 @@ from typing import (
     Literal,
     MutableMapping,
     Optional,
+    Protocol,
     Set,
     TypedDict,
     TypeVar,
@@ -26,10 +26,10 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    ModelWrapValidatorHandler,
     ValidationError,
     ValidationInfo,
-    ValidatorFunctionWrapHandler,
-    field_validator,
+    model_validator,
 )
 from pydantic.alias_generators import to_camel
 
@@ -37,12 +37,9 @@ from .._utils import logger
 from ..exceptions import FreshPointParserTypeError, FreshPointParserValueError
 
 if sys.version_info >= (3, 11):
-    from typing import TypeAlias
+    from typing import Self, TypeAlias
 else:
-    from typing_extensions import TypeAlias
-
-if TYPE_CHECKING:
-    from ..parsers._base import ParseContext
+    from typing_extensions import Self, TypeAlias
 
 
 _NoDefaultType = Enum('_NoDefaultType', 'NO_DEFAULT')
@@ -187,11 +184,94 @@ def model_diff(
 
 # endregion Diff
 
+# region BestEffortModel
+
+
+class ValidationContext(Protocol):
+    """Protocol for the validation context expected by ``BestEffortModel``
+    and its subclasses.
+    """
+
+    def register_error(self, error: Exception) -> None:
+        """Register a validation error in the context.
+
+        Args:
+            error (Exception): The validation error to register.
+        """
+        pass
+
+
+class BestEffortModel(BaseModel):
+    """Model that attempts to validate input data, and on validation errors,
+    falls back to using default values for the fields that failed validation.
+    """
+
+    @model_validator(mode='wrap')
+    @classmethod
+    def _safe_validate(
+        cls, data: Any, handler: ModelWrapValidatorHandler[Self], info: ValidationInfo
+    ) -> Self:
+        """A wrapper around the standard model validation process that catches
+        validation errors and falls back to using default values for the fields
+        that failed validation.
+
+        NOTE: A model-level 'wrap' validator in the parent class
+        is expected to be called first for any subclasses.
+
+        Args:
+            data (Any): Input data to validate (injected by Pydantic).
+            handler (ModelWrapValidatorHandler[Self]): The validation handler
+                to process the data (injected by Pydantic).
+            info (ValidationInfo): Additional validation information
+                (injected by Pydantic).
+
+        Raises:
+            ValidationError: Raised when validation fails, and the fallback
+                mechanism cannot be applied.
+
+        Returns:
+            Self: The validated model instance.
+        """
+        try:
+            return handler(data)
+        except ValidationError as validation_err:
+            if not isinstance(data, Mapping):
+                logger.warning('Cannot fallback on non-mapping data')
+                raise validation_err
+
+            if info.config and info.config.get('strict'):
+                logger.warning('Cannot fallback on validation error in strict mode.')
+                raise validation_err
+
+            logger.info(
+                "Validation error in model '%s':\n%s", cls.__name__, validation_err
+            )
+            try:
+                context: Optional[ValidationContext] = info.context
+                context.register_error(validation_err)  # type: ignore[arg-type]
+            except Exception as ctx_err:
+                logger.warning(
+                    'Failed to record validation error to the context (%s)',
+                    ctx_err,
+                )
+
+            failed_fields = set()
+            for err in validation_err.errors():
+                err_loc = err.get('loc')
+                if not err_loc:  # usually means a model validator failed
+                    return handler({})
+                failed_fields.add(err_loc[0])
+
+            cleaned_data = {
+                key: value for key, value in data.items() if key not in failed_fields
+            }
+            return handler(cleaned_data)
+
 
 # region BaseRecord
 
 
-class BaseRecord(BaseModel):
+class BaseRecord(BestEffortModel):
     """Base model of a FreshPoint record."""
 
     model_config = ConfigDict(alias_generator=ToCamel(), populate_by_name=True)
@@ -202,42 +282,6 @@ class BaseRecord(BaseModel):
         description='Datetime when the data has been recorded.',
     )
     """Datetime when the data has been recorded."""
-
-    @field_validator('*', mode='wrap')
-    @classmethod
-    def _log_failed_validation(
-        cls,
-        value: Any,
-        handler: ValidatorFunctionWrapHandler,
-        info: ValidationInfo,
-    ) -> Any:
-        try:
-            return handler(value)
-        except ValidationError as validation_err:
-            logger.info(
-                "Validation error in field '%s': %s",
-                info.field_name,
-                validation_err,
-            )
-
-            try:
-                context: 'ParseContext' = info.context  # type: ignore[attr-defined]  # noqa: UP037
-                context.parse_errors.append(validation_err)
-            except Exception as context_err:
-                logger.info(
-                    'Cannot store validation errors in context: %s',
-                    context_err,
-                )
-
-            try:
-                return handler(None)
-            except ValidationError as fallback_err:
-                logger.info(
-                    "Fallback validation error in field '%s': %s",
-                    info.field_name,
-                    fallback_err,
-                )
-                raise validation_err from None
 
     def is_newer_than(
         self,
