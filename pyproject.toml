@@ -91,7 +91,9 @@ ignore = [
   "PLR0904", "PLR0911", "PLR0912", "PLR0913", "PLR0917", "PLR2004", "PLR1702",
   "PLR0915",
   # Ignore PEP 604 syntax suggestions, as they are not available in py38.
-  "UP006", "UP007", "UP045"
+  "UP006", "UP007", "UP045",
+  # Do not check that function arguments are annotated with a more specific type than Any
+  "ANN401"
 ]
 preview = true
 
