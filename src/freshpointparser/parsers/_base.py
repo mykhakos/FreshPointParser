@@ -1,12 +1,14 @@
 import hashlib
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union
 
-from .._utils import logger
 from ..exceptions import FreshPointParserError
 from ..models._base import BasePage
+
+logger = logging.getLogger('freshpointparser.parsers')
 
 TPage = TypeVar('TPage', bound=BasePage)
 
@@ -74,12 +76,13 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
     def __init__(self) -> None:
         """Initialize a parser instance with an empty state."""
         self._parsed_page: Optional[TPage] = None
-        self._metadata: ParseMetadata = ParseMetadata(
+        self._metadata = ParseMetadata(
             content_digest=b'',
             parsed_at=datetime.now(),
             from_cache=False,
             errors=[],
         )
+        self._context = ParseContext()
 
     @staticmethod
     def _hash_sha1(content: Union[str, bytes]) -> bytes:
@@ -108,33 +111,31 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         """
         return {'recorded_at': context.parsed_at}
 
-    @staticmethod
-    def _safe_parse(
-        parser_func: Callable, _context: ParseContext, **kwargs: Any
-    ) -> Any:
+    def _reset_context(self) -> None:
+        """Reset the internal parsing context to a new, empty state."""
+        self._context = ParseContext()
+
+    def _safe_parse(self, parser_func: Callable, *args: Any, **kwargs: Any) -> Any:
         """Wrap a parsing function call to safely handle exceptions. The exceptions
-        are recorded in the parsing context instead of being raised.
+        are recorded in the current parsing context instead of being raised.
 
         Args:
             parser_func (Callable): The parsing function to be called.
-            _context (ParseContext): The parsing context to record errors.
-                Intended as a positional-only argument.
+            *args: Positional arguments to pass to the parsing function.
             **kwargs: Additional keyword arguments to pass to the parsing function.
 
         Returns:
             Any: The result of the parsing function, or None if an error occurred.
         """
         try:
-            return parser_func(**kwargs)
+            return parser_func(*args, **kwargs)
         except FreshPointParserError as err:
             logger.info('Parsing error occurred: %s', err)
-            _context.register_error(err)
+            self._context.register_error(err)
             return None
 
     @abstractmethod
-    def _parse_page_content(
-        self, page_content: Union[str, bytes], context: ParseContext
-    ) -> TPage:
+    def _parse_page_content(self, page_content: Union[str, bytes]) -> TPage:
         """Parse the HTML content of the page to a Pydantic model.
 
         Implementations should extract relevant data from the HTML content
@@ -143,13 +144,10 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         re-parse the content.
 
         This method should not raise exceptions directly. Instead, any parsing errors
-        should be collected in the `context.parse_errors` list.
+        should be collected in the current parsing context.
 
         Args:
             page_content (Union[str, bytes]): The HTML content of the page.
-            context (ParseContext): Parsing context used to store metadata and
-                collect errors during parsing. Errors should be registered using
-                context.register_error() or by appending to context.errors.
 
         Returns:
             TPage: A page model containing the parsed data.
@@ -178,14 +176,14 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
             or content_digest != self._metadata.content_digest
         ):
             logger.debug('Parsing HTML content (force=%s).', force)
-            context = ParseContext()
-            self._parsed_page = self._parse_page_content(page_content, context)
+            self._reset_context()
+            self._parsed_page = self._parse_page_content(page_content)
             self._metadata = replace(
                 self._metadata,
                 content_digest=content_digest,
-                parsed_at=context.parsed_at,
+                parsed_at=self._context.parsed_at,
                 from_cache=False,
-                errors=context.errors,
+                errors=self._context.errors,
             )
         else:
             logger.debug('HTML content is unchanged, skipping parsing.')

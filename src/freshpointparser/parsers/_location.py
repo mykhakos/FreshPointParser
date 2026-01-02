@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 
 from ..exceptions import FreshPointParserValueError
 from ..models import Location, LocationPage
-from ._base import BasePageHTMLParser, ParseContext, ParseResult
+from ._base import BasePageHTMLParser, ParseResult
 
 
 class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
@@ -14,10 +14,6 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
     """Regex pattern to search for the location data in the HTML string."""
     _RE_SEARCH_PATTERN_BYTES = re.compile(rb'devices\s*=\s*("\[.*\]");')
     """Regex pattern to search for the location data in the HTML bytes."""
-
-    def __init__(self) -> None:
-        """Initialize a LocationPageHTMLParser instance with an empty state."""
-        super().__init__()
 
     def _load_json(self, page_content: Union[str, bytes]) -> List[Dict]:
         r"""Extract the JSON location data embedded in the HTML.
@@ -70,9 +66,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             )
         return data
 
-    def _parse_location(
-        self, location_data: Dict[str, Any], context: ParseContext
-    ) -> Location:
+    def _parse_location(self, location_data: Dict[str, Any]) -> Location:
         """Parse a single location item from the raw location data.
 
         The data is expected to contain both 'prop' and 'location' keys, but only
@@ -81,7 +75,6 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
 
         Args:
             location_data (Dict[str, Any]): Raw location data dictionary.
-            context (ParseContext): Parsing context containing metadata.
 
         Raises:
             FreshPointParserValueError: Raised when the 'prop' key is missing or
@@ -90,10 +83,10 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         Returns:
             Location: Parsed and validated Location model instance.
         """
-        parsed_data = self._new_base_record_data_from_context(context)
+        parsed_data = self._new_base_record_data_from_context(self._context)
         try:
             parsed_data.update(location_data['prop'])
-            return Location.model_validate(parsed_data, context=context)
+            return Location.model_validate(parsed_data, context=self._context)
         except KeyError as err:
             raise FreshPointParserValueError(
                 f"Missing 'prop' key in location item: {location_data}"
@@ -103,34 +96,26 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
                 f'Error parsing location item: {location_data}'
             ) from exc
 
-    def _parse_locations(
-        self, locations_data: List[Dict[str, Any]], context: ParseContext
-    ) -> List[Location]:
+    def _parse_locations(self, page_content: Union[str, bytes]) -> List[Location]:
         """Parse multiple location items from the raw location data list.
 
         Args:
-            locations_data (List[Dict[str, Any]]): Raw list of
-                location data dictionaries.
-            context (ParseContext): Parsing context containing metadata.
+            page_content (Union[str, bytes]): HTML content of
+                the location page to parse.
 
         Returns:
             List[Location]: Parsed and validated Location model instances.
         """
         locations = []
-        for location_data in locations_data:
+        for location_data in self._load_json(page_content):
             location = self._safe_parse(
-                self._parse_location,
-                context,
-                location_data=location_data,
-                context=context,
+                self._parse_location, location_data=location_data
             )
             if location is not None:
                 locations.append(location)
         return locations
 
-    def _parse_page_content(
-        self, page_content: Union[str, bytes], context: ParseContext
-    ) -> LocationPage:
+    def _parse_page_content(self, page_content: Union[str, bytes]) -> LocationPage:
         """Parse the HTML content of the location page to a Pydantic model.
 
         This method fully parses the raw JSON data extracted from the HTML content to
@@ -139,27 +124,17 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         Args:
             page_content (Union[str, bytes]): HTML content of
                 the location page to parse.
-            context (ParseContext): Parsing context containing metadata.
 
         Returns:
             LocationPage: The location page model containing all parsed locations.
         """
-        parsed_data = self._new_base_record_data_from_context(context)
+        parsed_data = self._new_base_record_data_from_context(self._context)
 
-        locations_data = self._safe_parse(
-            self._load_json, context, page_content=page_content
-        )
-        if locations_data is not None:
-            locations = self._safe_parse(
-                self._parse_locations,
-                context,
-                locations_data=locations_data,
-                context=context,
-            )
-            if locations is not None:
-                parsed_data['items'] = locations
+        locations = self._safe_parse(self._parse_locations, page_content=page_content)
+        if locations is not None:
+            parsed_data['items'] = locations
 
-        return LocationPage.model_validate(parsed_data, context=context)
+        return LocationPage.model_validate(parsed_data, context=self._context)
 
 
 def parse_location_page(page_content: Union[str, bytes]) -> ParseResult[LocationPage]:

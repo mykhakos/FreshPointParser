@@ -10,7 +10,6 @@ from freshpointparser.exceptions import (
 )
 from freshpointparser.models import Location, LocationPage
 from freshpointparser.parsers import LocationPageHTMLParser
-from freshpointparser.parsers._base import ParseContext
 
 
 class ProductPageMeta(BaseModel):
@@ -147,7 +146,6 @@ def test_load_json_with_complex_data():
 def test_parse_location_success():
     """Test _parse_location successfully parses valid location data."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
     location_data = {
         'prop': {
             'username': 'Test Location',
@@ -160,7 +158,7 @@ def test_parse_location_success():
         },
         'location': {},
     }
-    location = parser._parse_location(location_data, context)
+    location = parser._parse_location(location_data)
     assert isinstance(location, Location)
     assert location.name == 'Test Location'
     assert location.address == '123 Main St'
@@ -169,36 +167,33 @@ def test_parse_location_success():
     assert location.discount_rate == 0.2
     assert location.is_active is True
     assert location.is_suspended is False
-    assert location.recorded_at == context.parsed_at
+    assert location.recorded_at == parser._context.parsed_at
 
 
 def test_parse_location_minimal_data():
     """Test _parse_location with minimal required data."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
     location_data = {
         'prop': {},
         'location': {},
     }
-    location = parser._parse_location(location_data, context)
+    location = parser._parse_location(location_data)
     assert isinstance(location, Location)
-    assert location.recorded_at == context.parsed_at
+    assert location.recorded_at == parser._context.parsed_at
 
 
 def test_parse_location_missing_prop_key():
     """Test _parse_location raises error when 'prop' key is missing."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
     location_data = {'location': {}}
     with pytest.raises(FreshPointParserValueError) as exc_info:
-        parser._parse_location(location_data, context)
+        parser._parse_location(location_data)
     assert "Missing 'prop' key" in str(exc_info.value)
 
 
 def test_parse_location_with_alias_fields():
     """Test _parse_location handles field aliases correctly."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
     location_data = {
         'prop': {
             'username': 'Location',  # alias for name
@@ -210,7 +205,7 @@ def test_parse_location_with_alias_fields():
         },
         'location': {},
     }
-    location = parser._parse_location(location_data, context)
+    location = parser._parse_location(location_data)
     assert location.name == 'Location'
     assert location.latitude == 50.5
     assert location.longitude == 14.5
@@ -222,13 +217,8 @@ def test_parse_location_with_alias_fields():
 def test_parse_locations_success_multiple():
     """Test _parse_locations with multiple valid locations."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
-    locations_data = [
-        {'prop': {'username': 'Location 1'}, 'location': {}},
-        {'prop': {'username': 'Location 2'}, 'location': {}},
-        {'prop': {'username': 'Location 3'}, 'location': {}},
-    ]
-    locations = parser._parse_locations(locations_data, context)
+    html_content = 'devices = "[{\\"prop\\":{\\"username\\":\\"Location 1\\"},\\"location\\":{}},{\\"prop\\":{\\"username\\":\\"Location 2\\"},\\"location\\":{}},{\\"prop\\":{\\"username\\":\\"Location 3\\"},\\"location\\":{}}]";'
+    locations = parser._parse_locations(html_content)
     assert isinstance(locations, list)
     assert len(locations) == 3
     assert all(isinstance(loc, Location) for loc in locations)
@@ -240,9 +230,8 @@ def test_parse_locations_success_multiple():
 def test_parse_locations_empty_list():
     """Test _parse_locations with empty list."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
-    locations_data = []
-    locations = parser._parse_locations(locations_data, context)
+    html_content = 'devices = "[]";'
+    locations = parser._parse_locations(html_content)
     assert isinstance(locations, list)
     assert len(locations) == 0
 
@@ -250,83 +239,70 @@ def test_parse_locations_empty_list():
 def test_parse_locations_partial_failure():
     """Test _parse_locations skips invalid items but keeps valid ones."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
-    locations_data = [
-        {'prop': {'username': 'Valid 1'}, 'location': {}},
-        {'location': {}},  # Missing 'prop' key - should be skipped
-        {'prop': {'username': 'Valid 2'}, 'location': {}},
-    ]
-    locations = parser._parse_locations(locations_data, context)
+    html_content = 'devices = "[{\\"prop\\":{\\"username\\":\\"Valid 1\\"},\\"location\\":{}},{\\"location\\":{}},{\\"prop\\":{\\"username\\":\\"Valid 2\\"},\\"location\\":{}}]";'
+    locations = parser._parse_locations(html_content)
     assert len(locations) == 2
     assert locations[0].name == 'Valid 1'
     assert locations[1].name == 'Valid 2'
     # Error should be collected in context
-    assert len(context.errors) == 1
-    assert isinstance(context.errors[0], FreshPointParserValueError)
+    assert len(parser._context.errors) == 1
+    assert isinstance(parser._context.errors[0], FreshPointParserValueError)
 
 
 def test_parse_locations_all_invalid():
     """Test _parse_locations when all items are invalid."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
-    locations_data = [
-        {'location': {}},  # Missing 'prop'
-        {'location': {}},  # Missing 'prop'
-    ]
-    locations = parser._parse_locations(locations_data, context)
+    html_content = 'devices = "[{\\"location\\":{}},{\\"location\\":{}}]";'
+    locations = parser._parse_locations(html_content)
     assert len(locations) == 0
-    assert len(context.errors) == 2
+    assert len(parser._context.errors) == 2
 
 
 def test_parse_page_content_success():
     """Test _parse_page_content with valid HTML content."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
     html_content = (
         'devices = "[{\\"prop\\":{\\"username\\":\\"Test\\"},\\"location\\":{}}]";'
     )
-    page = parser._parse_page_content(html_content, context)
+    page = parser._parse_page_content(html_content)
     assert isinstance(page, LocationPage)
     assert len(page.items) == 1
     assert page.items[0].name == 'Test'
-    assert page.recorded_at == context.parsed_at
+    assert page.recorded_at == parser._context.parsed_at
 
 
 def test_parse_page_content_with_load_json_error():
     """Test _parse_page_content when _load_json fails."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
     html_content = '<html>no devices variable</html>'
-    page = parser._parse_page_content(html_content, context)
+    page = parser._parse_page_content(html_content)
     # Should still return a LocationPage, but empty
     assert isinstance(page, LocationPage)
     assert len(page.items) == 0
     # Error should be collected
-    assert len(context.errors) > 0
+    assert len(parser._context.errors) > 0
 
 
 def test_parse_page_content_with_parse_locations_error():
     """Test _parse_page_content when locations parsing fails."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
     # Valid JSON structure but all items invalid
     html_content = 'devices = "[{\\"location\\":{}},{\\"location\\":{}}]";'
-    page = parser._parse_page_content(html_content, context)
+    page = parser._parse_page_content(html_content)
     assert isinstance(page, LocationPage)
     assert len(page.items) == 0
     # Errors should be collected
-    assert len(context.errors) > 0
+    assert len(parser._context.errors) > 0
 
 
 def test_parse_page_content_empty_locations_list():
     """Test _parse_page_content with empty locations list."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
     html_content = 'devices = "[]";'
-    page = parser._parse_page_content(html_content, context)
+    page = parser._parse_page_content(html_content)
     assert isinstance(page, LocationPage)
     assert len(page.items) == 0
-    assert len(context.errors) == 0
+    assert len(parser._context.errors) == 0
 
 
 def test_regex_pattern_matching_variations():
@@ -390,22 +366,18 @@ def test_parse_bytes_content():
 def test_safe_parse_integration():
     """Test that _safe_parse correctly handles errors in location parsing."""
     parser = LocationPageHTMLParser()
-    context = ParseContext()
 
-    # Create data with one valid and one invalid location
-    locations_data = [
-        {'prop': {'username': 'Good'}, 'location': {}},
-        {'no_prop_key': {}},  # This will cause an error
-    ]
+    # Create HTML with one valid and one invalid location
+    html_content = 'devices = "[{\\"prop\\":{\\"username\\":\\"Good\\"},\\"location\\":{}},{\\"no_prop_key\\":{}}]";'
 
-    locations = parser._parse_locations(locations_data, context)
+    locations = parser._parse_locations(html_content)
 
     # Should have one valid location
     assert len(locations) == 1
     assert locations[0].name == 'Good'
 
     # Should have one error
-    assert len(context.errors) == 1
+    assert len(parser._context.errors) == 1
 
 
 # endregion Parser parsing

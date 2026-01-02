@@ -11,27 +11,23 @@ from freshpointparser.parsers._base import BasePageHTMLParser, ParseContext
 
 
 class DummyPageHTMLParser(BasePageHTMLParser[BasePage]):
-    def _parse_page_content(
-        self, page_content: Union[str, bytes], context: ParseContext
-    ) -> BasePage:
-        data = self._new_base_record_data_from_context(context)
-        return BasePage.model_validate(data, context=context)
+    def _parse_page_content(self, page_content: Union[str, bytes]) -> BasePage:
+        data = self._new_base_record_data_from_context(self._context)
+        return BasePage.model_validate(data, context=self._context)
 
 
 class DummyPageHTMLParserWithErrors(BasePageHTMLParser[BasePage]):
     """Parser that collects errors during parsing."""
 
-    def _parse_page_content(
-        self, page_content: Union[str, bytes], context: ParseContext
-    ) -> BasePage:
+    def _parse_page_content(self, page_content: Union[str, bytes]) -> BasePage:
         if isinstance(page_content, str):
             page_content = page_content.encode('utf-8', errors='ignore')
         if b'error' in page_content:
-            context.register_error(
+            self._context.register_error(
                 FreshPointParserValueError('Simulated parsing error')
             )
-        data = self._new_base_record_data_from_context(context)
-        return BasePage.model_validate(data, context=context)
+        data = self._new_base_record_data_from_context(self._context)
+        return BasePage.model_validate(data, context=self._context)
 
 
 def test_parse_empty_data():
@@ -205,35 +201,35 @@ def test_parse_multiple_sequential_different_content():
 
 def test_safe_parse_method():
     """Test the _safe_parse static method functionality."""
-    context = ParseContext()
 
     # Test successful parsing
     def success_func(value: int) -> int:
         return value * 2
 
-    result = DummyPageHTMLParser._safe_parse(success_func, context, value=5)
+    parser = DummyPageHTMLParser()
+    result = parser._safe_parse(success_func, value=5)
     assert result == 10
-    assert len(context.errors) == 0
+    assert len(parser._context.errors) == 0
 
     # Test with FreshPointParserError
     def error_func() -> None:
         raise FreshPointParserValueError('Test error')
 
-    result = DummyPageHTMLParser._safe_parse(error_func, context)
+    parser = DummyPageHTMLParser()
+    result = parser._safe_parse(error_func)
     assert result is None
-    assert len(context.errors) == 1
-    assert isinstance(context.errors[0], FreshPointParserValueError)
+    assert len(parser._context.errors) == 1
+    assert isinstance(parser._context.errors[0], FreshPointParserValueError)
 
 
 def test_safe_parse_non_freshpoint_error_propagates():
     """Test that non-FreshPointParser errors are not caught by _safe_parse."""
-    context = ParseContext()
 
     def error_func() -> None:
         raise ValueError('Regular ValueError')
 
     with pytest.raises(ValueError):
-        DummyPageHTMLParser._safe_parse(error_func, context)
+        DummyPageHTMLParser()._safe_parse(error_func)
 
 
 def test_parse_alternating_content():

@@ -13,7 +13,6 @@ from freshpointparser.exceptions import (
 )
 from freshpointparser.models import Product, ProductPage
 from freshpointparser.parsers import ProductPageHTMLParser
-from freshpointparser.parsers._base import ParseContext
 from freshpointparser.parsers._product import ProductHTMLParser
 
 logger = logging.getLogger(__name__)
@@ -330,18 +329,18 @@ def test_parse_location_id_success():
     """Test extracting location ID from script tag."""
     parser = ProductPageHTMLParser()
     html = '<script>var deviceId = "123";</script>'
-    parser._bs4_parser = bs4.BeautifulSoup(html, 'lxml')
-    location_id = parser.parse_location_id()
-    assert location_id == 123
+    bs4_parser = bs4.BeautifulSoup(html, 'lxml')
+    location_id = parser._parse_location_id(bs4_parser)
+    assert location_id == '123'
 
 
 def test_parse_location_id_no_script():
     """Test error when script with deviceId is not found."""
     parser = ProductPageHTMLParser()
     html = '<html></html>'
-    parser._bs4_parser = bs4.BeautifulSoup(html, 'lxml')
+    bs4_parser = bs4.BeautifulSoup(html, 'lxml')
     with pytest.raises(FreshPointParserValueError) as exc_info:
-        parser.parse_location_id()
+        parser._parse_location_id(bs4_parser)
     assert 'script tag' in str(exc_info.value)
 
 
@@ -349,9 +348,9 @@ def test_parse_location_id_no_match():
     """Test error when deviceId pattern doesn't match."""
     parser = ProductPageHTMLParser()
     html = '<script>var other = "123";</script>'
-    parser._bs4_parser = bs4.BeautifulSoup(html, 'lxml')
+    bs4_parser = bs4.BeautifulSoup(html, 'lxml')
     with pytest.raises(FreshPointParserValueError) as exc_info:
-        parser.parse_location_id()
+        parser._parse_location_id(bs4_parser)
     assert 'deviceId' in str(exc_info.value)
 
 
@@ -359,8 +358,8 @@ def test_parse_location_name_success():
     """Test extracting location name from title tag."""
     parser = ProductPageHTMLParser()
     html = '<title>Location Name | FreshPoint</title>'
-    parser._bs4_parser = bs4.BeautifulSoup(html, 'lxml')
-    location_name = parser.parse_location_name()
+    bs4_parser = bs4.BeautifulSoup(html, 'lxml')
+    location_name = parser._parse_location_name(bs4_parser)
     assert location_name == 'Location Name'
 
 
@@ -368,19 +367,15 @@ def test_parse_location_name_no_title():
     """Test error when title tag is missing."""
     parser = ProductPageHTMLParser()
     html = '<html></html>'
-    parser._bs4_parser = bs4.BeautifulSoup(html, 'lxml')
+    bs4_parser = bs4.BeautifulSoup(html, 'lxml')
     with pytest.raises(FreshPointParserValueError) as exc_info:
-        parser.parse_location_name()
+        parser._parse_location_name(bs4_parser)
     assert 'title' in str(exc_info.value).lower()
 
 
 def test_parse_product_success():
     """Test _parse_product successfully parses a product tag."""
     parser = ProductPageHTMLParser()
-    parser._bs4_parser = bs4.BeautifulSoup(
-        '<script>var deviceId = "10";</script>', 'lxml'
-    )
-    context = ParseContext()
 
     html = """
     <h2>Category</h2>
@@ -393,7 +388,7 @@ def test_parse_product_success():
     """
     tag = bs4.BeautifulSoup(html, 'lxml').find('div', class_='product')
     assert tag is not None
-    product = parser._parse_product(tag, context)
+    product = parser._parse_product(tag, location_id='10')
 
     assert isinstance(product, Product)
     assert product.id_ == '1'
@@ -407,17 +402,16 @@ def test_parse_product_success():
 def test_parse_product_minimal_data():
     """Test _parse_product with minimal required data."""
     parser = ProductPageHTMLParser()
-    parser._bs4_parser = bs4.BeautifulSoup('<html></html>', 'lxml')
-    context = ParseContext()
 
     html = '<div class="product" data-id="1" data-name="Test"></div>'
     tag = bs4.BeautifulSoup(html, 'lxml').find('div', class_='product')
     assert tag is not None
-    product = parser._parse_product(tag, context)
+    product = parser._parse_product(tag, location_id=None)
 
     assert isinstance(product, Product)
     assert product.id_ == '1'
     assert product.name == 'Test'
+    assert product.location_id is None
 
 
 def test_parse_products_multiple():
@@ -430,10 +424,9 @@ def test_parse_products_multiple():
     <div class="product" data-id="2" data-name="Product 2"></div>
     <div class="product" data-id="3" data-name="Product 3"></div>
     """
-    parser._bs4_parser = bs4.BeautifulSoup(html, 'lxml')
-    context = ParseContext()
+    bs4_parser = bs4.BeautifulSoup(html, 'lxml')
 
-    products = parser._parse_products(context)
+    products = parser._parse_products(bs4_parser, location_id=None)
     assert len(products) == 3
     assert products[0].id_ == '1'
     assert products[1].id_ == '2'
@@ -444,10 +437,9 @@ def test_parse_products_empty():
     """Test _parse_products with no product divs."""
     parser = ProductPageHTMLParser()
     html = '<html><body></body></html>'
-    parser._bs4_parser = bs4.BeautifulSoup(html, 'lxml')
-    context = ParseContext()
+    bs4_parser = bs4.BeautifulSoup(html, 'lxml')
 
-    products = parser._parse_products(context)
+    products = parser._parse_products(bs4_parser, location_id=None)
     assert len(products) == 0
 
 
@@ -461,23 +453,21 @@ def test_parse_products_partial_failure():
     <div class="product" data-id="2" data-name="Partial Product"></div>
     <div class="product" data-id="3" data-name="Another Valid" data-veggie="0" data-glutenfree="1" data-ispromo="0"></div>
     """
-    parser._bs4_parser = bs4.BeautifulSoup(html, 'lxml')
-    context = ParseContext()
+    bs4_parser = bs4.BeautifulSoup(html, 'lxml')
 
-    products = parser._parse_products(context)
+    products = parser._parse_products(bs4_parser, location_id=None)
     # All 3 products should be created - missing optional fields get defaults
     assert len(products) == 3
     assert products[0].id_ == '1'
     assert products[1].id_ == '2'
     assert products[2].id_ == '3'
     # Should have collected errors for missing optional fields in product 2
-    assert len(context.errors) > 0
+    assert len(parser._context.errors) > 0
 
 
 def test_parse_page_content_success():
     """Test _parse_page_content with valid HTML."""
     parser = ProductPageHTMLParser()
-    context = ParseContext()
 
     html = """
     <html>
@@ -489,7 +479,7 @@ def test_parse_page_content_success():
     </body>
     </html>
     """
-    page = parser._parse_page_content(html, context)
+    page = parser._parse_page_content(html)
 
     assert isinstance(page, ProductPage)
     assert page.location_id == '10'
@@ -497,36 +487,23 @@ def test_parse_page_content_success():
     assert len(page.items) == 1
 
 
-def test_parse_page_content_bs4_initialization():
-    """Test that _parse_page_content initializes BeautifulSoup."""
-    parser = ProductPageHTMLParser()
-    context = ParseContext()
-    html = '<html><title>Test | FreshPoint</title></html>'
-
-    parser._parse_page_content(html, context)
-    assert parser._bs4_parser is not None
-    assert isinstance(parser._bs4_parser, bs4.BeautifulSoup)
-
-
 def test_parse_page_content_with_location_id_error():
     """Test _parse_page_content when location ID parsing fails."""
     parser = ProductPageHTMLParser()
-    context = ParseContext()
     html = '<html><body></body></html>'
 
-    page = parser._parse_page_content(html, context)
+    page = parser._parse_page_content(html)
     assert isinstance(page, ProductPage)
     # Should still create page even if location_id fails
-    assert len(context.errors) > 0
+    assert len(parser._context.errors) > 0
 
 
 def test_parse_page_content_bytes():
     """Test _parse_page_content with bytes input."""
     parser = ProductPageHTMLParser()
-    context = ParseContext()
     html = b'<html><title>Test | FreshPoint</title></html>'
 
-    page = parser._parse_page_content(html, context)
+    page = parser._parse_page_content(html)
     assert isinstance(page, ProductPage)
 
 
