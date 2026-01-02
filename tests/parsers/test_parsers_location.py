@@ -46,17 +46,9 @@ def location_page_metadata_json_content():
 
 
 @pytest.fixture(scope='session')
-def location_page_html_parser_persistent(location_page_html_content):
+def location_page_html_parse_result(location_page_html_content):
     parser = LocationPageHTMLParser()
-    parser.parse(location_page_html_content)
-    return parser
-
-
-@pytest.fixture(scope='function')
-def location_page_html_parser_new(location_page_html_content):
-    parser = LocationPageHTMLParser()
-    parser.parse(location_page_html_content)
-    return parser
+    return parser.parse(location_page_html_content)
 
 
 @pytest.fixture(scope='session')
@@ -269,8 +261,8 @@ def test_parse_locations_partial_failure():
     assert locations[0].name == 'Valid 1'
     assert locations[1].name == 'Valid 2'
     # Error should be collected in context
-    assert len(context.parse_errors) == 1
-    assert isinstance(context.parse_errors[0], FreshPointParserValueError)
+    assert len(context.errors) == 1
+    assert isinstance(context.errors[0], FreshPointParserValueError)
 
 
 def test_parse_locations_all_invalid():
@@ -283,7 +275,7 @@ def test_parse_locations_all_invalid():
     ]
     locations = parser._parse_locations(locations_data, context)
     assert len(locations) == 0
-    assert len(context.parse_errors) == 2
+    assert len(context.errors) == 2
 
 
 def test_parse_page_content_success():
@@ -310,7 +302,7 @@ def test_parse_page_content_with_load_json_error():
     assert isinstance(page, LocationPage)
     assert len(page.items) == 0
     # Error should be collected
-    assert len(context.parse_errors) > 0
+    assert len(context.errors) > 0
 
 
 def test_parse_page_content_with_parse_locations_error():
@@ -323,7 +315,7 @@ def test_parse_page_content_with_parse_locations_error():
     assert isinstance(page, LocationPage)
     assert len(page.items) == 0
     # Errors should be collected
-    assert len(context.parse_errors) > 0
+    assert len(context.errors) > 0
 
 
 def test_parse_page_content_empty_locations_list():
@@ -334,7 +326,7 @@ def test_parse_page_content_empty_locations_list():
     page = parser._parse_page_content(html_content, context)
     assert isinstance(page, LocationPage)
     assert len(page.items) == 0
-    assert len(context.parse_errors) == 0
+    assert len(context.errors) == 0
 
 
 def test_regex_pattern_matching_variations():
@@ -357,10 +349,11 @@ def test_parse_with_special_characters_in_data():
     """Test parsing with special characters in location data."""
     parser = LocationPageHTMLParser()
     html_content = """devices = "[{\\"prop\\":{\\"username\\":\\"Café Ústí\\",\\"address\\":\\"Nám. 123\\"},\\"location\\":{}}]";"""
-    page = parser.parse(html_content)
-    assert isinstance(page, LocationPage)
-    assert len(page.items) == 1
-    assert page.items[0].name and 'Café' in page.items[0].name
+    result = parser.parse(html_content)
+    assert not result.metadata.errors
+    assert isinstance(result.page, LocationPage)
+    assert len(result.page.items) == 1
+    assert result.page.items[0].name and 'Café' in result.page.items[0].name
 
 
 def test_parse_errors_collected_in_metadata():
@@ -368,16 +361,17 @@ def test_parse_errors_collected_in_metadata():
     parser = LocationPageHTMLParser()
     # HTML with some invalid location items
     html_content = 'devices = "[{\\"prop\\":{\\"username\\":\\"Valid\\"},\\"location\\":{}},{\\"location\\":{}}]";'
-    parser.parse(html_content)
+    result = parser.parse(html_content)
     # Check that errors were collected
-    assert len(parser.metadata.parse_errors) > 0
-    assert isinstance(parser.metadata.parse_errors[0], FreshPointParserValueError)
+    assert len(result.metadata.errors) > 0
+    assert isinstance(result.metadata.errors[0], FreshPointParserValueError)
 
 
 def test_parse_location_page_function(location_page_html_content):
-    page = parse_location_page(location_page_html_content)
-    assert isinstance(page, LocationPage)
-    assert page.items  # some data parsed
+    result = parse_location_page(location_page_html_content)
+    assert isinstance(result.page, LocationPage)
+    assert result.page.items  # some data parsed
+    assert result.metadata.errors == []  # no errors
 
 
 def test_parse_bytes_content():
@@ -386,9 +380,11 @@ def test_parse_bytes_content():
     html_content = (
         b'devices = "[{\\"prop\\":{\\"username\\":\\"Test\\"},\\"location\\":{}}]";'
     )
-    page = parser.parse(html_content)
-    assert isinstance(page, LocationPage)
-    assert len(page.items) == 1
+    result = parser.parse(html_content)
+    assert isinstance(result.page, LocationPage)
+    assert len(result.page.items) == 1
+    assert result.page.items[0].name == 'Test'
+    assert result.metadata.errors == []
 
 
 def test_safe_parse_integration():
@@ -409,7 +405,7 @@ def test_safe_parse_integration():
     assert locations[0].name == 'Good'
 
     # Should have one error
-    assert len(context.parse_errors) == 1
+    assert len(context.errors) == 1
 
 
 # endregion Parser parsing
@@ -418,21 +414,21 @@ def test_safe_parse_integration():
 
 
 def test_validate_parsed_location_count(
-    location_page_html_parser_persistent, location_page_expected_meta
+    location_page_html_parse_result, location_page_expected_meta
 ):
     assert (
-        len(location_page_html_parser_persistent.parsed_page.items)
+        len(location_page_html_parse_result.page.items)
         == location_page_expected_meta.location_count
     )
 
 
 def test_validate_parsed_location_count_active(
-    location_page_html_parser_persistent, location_page_expected_meta
+    location_page_html_parse_result, location_page_expected_meta
 ):
     assert (
         len([
             location
-            for location in location_page_html_parser_persistent.parsed_page.items
+            for location in location_page_html_parse_result.page.items
             if location.is_active
         ])
         == location_page_expected_meta.location_count_active
@@ -440,12 +436,12 @@ def test_validate_parsed_location_count_active(
 
 
 def test_validate_parsed_location_count_suspended(
-    location_page_html_parser_persistent, location_page_expected_meta
+    location_page_html_parse_result, location_page_expected_meta
 ):
     assert (
         len([
             location
-            for location in location_page_html_parser_persistent.parsed_page.items
+            for location in location_page_html_parse_result.page.items
             if location.is_suspended
         ])
         == location_page_expected_meta.location_count_suspended
@@ -453,9 +449,9 @@ def test_validate_parsed_location_count_suspended(
 
 
 def test_validate_generated_location_page(
-    location_page_html_parser_persistent, location_page
+    location_page_html_parse_result, location_page
 ):
-    parser_page = location_page_html_parser_persistent.parsed_page
+    parser_page = location_page_html_parse_result.page
     assert not parser_page.item_diff(location_page, exclude={'recorded_at'})
 
 

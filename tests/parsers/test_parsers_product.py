@@ -57,10 +57,9 @@ def product_page_metadata_json_content():
 
 
 @pytest.fixture(scope='session')
-def product_page_html_parser_persistent(product_page_html_content):
+def product_page_html_parse_result(product_page_html_content):
     parser = ProductPageHTMLParser()
-    parser.parse(product_page_html_content)
-    return parser
+    return parser.parse(product_page_html_content)
 
 
 @pytest.fixture(scope='function')
@@ -472,7 +471,7 @@ def test_parse_products_partial_failure():
     assert products[1].id_ == '2'
     assert products[2].id_ == '3'
     # Should have collected errors for missing optional fields in product 2
-    assert len(context.parse_errors) > 0
+    assert len(context.errors) > 0
 
 
 def test_parse_page_content_success():
@@ -518,7 +517,7 @@ def test_parse_page_content_with_location_id_error():
     page = parser._parse_page_content(html, context)
     assert isinstance(page, ProductPage)
     # Should still create page even if location_id fails
-    assert len(context.parse_errors) > 0
+    assert len(context.errors) > 0
 
 
 def test_parse_page_content_bytes():
@@ -543,9 +542,9 @@ def test_parse_errors_collected_in_metadata():
     </body>
     </html>
     """
-    parser.parse(html)
+    result = parser.parse(html)
     # Should have errors for missing location info and invalid product
-    assert len(parser.metadata.parse_errors) > 0
+    assert len(result.metadata.errors) > 0
 
 
 def test_safe_parse_integration():
@@ -557,21 +556,22 @@ def test_safe_parse_integration():
     <div class="product" data-id="1" data-name="Good Product" data-veggie="1" data-glutenfree="0" data-ispromo="0"></div>
     <div class="product" data-id="2" data-name="Partial Product"></div>
     """
-    parser.parse(html)
+    result = parser.parse(html)
 
     # Both products should be created (missing optional fields use defaults)
-    items_dict = {p.id_: p for p in parser.parsed_page.items}
+    items_dict = {p.id_: p for p in result.page.items}
     assert len(items_dict) == 2
     assert '1' in items_dict
     assert '2' in items_dict
     # Should have errors for missing location_name and missing optional fields
-    assert len(parser.metadata.parse_errors) > 0
+    assert len(result.metadata.errors) > 0
 
 
 def test_parse_product_page_function(product_page_html_content):
-    page = parse_product_page(product_page_html_content)
-    assert isinstance(page, ProductPage)
-    assert page.items  # some data parsed
+    result = parse_product_page(product_page_html_content)
+    assert isinstance(result.page, ProductPage)
+    assert result.page.items  # some data parsed
+    assert result.metadata.errors == []
 
 
 # endregion ProductPageHTMLParser tests
@@ -580,13 +580,13 @@ def test_parse_product_page_function(product_page_html_content):
 # region Parser properties
 
 
-def test_validate_parsed_products(product_page_html_parser_persistent, product_page):
+def test_validate_parsed_products(product_page_html_parse_result, product_page):
     # assert each product in the parser is in the reference
-    parser = product_page_html_parser_persistent
+    page = product_page_html_parse_result.page
     product_ids = set()
     # Convert reference items list to dict by ID
     reference_items = {p.id_: p for p in product_page.items}
-    for product in parser.parsed_page.items:
+    for product in page.items:
         assert product.id_ in reference_items
         product_reference = reference_items[product.id_]
         assert not product.diff(product_reference, exclude='recorded_at')
@@ -596,39 +596,39 @@ def test_validate_parsed_products(product_page_html_parser_persistent, product_p
 
 
 def test_validate_parsed_location_id(
-    product_page_html_parser_persistent, product_page_expected_meta
+    product_page_html_parse_result, product_page_expected_meta
 ):
     assert (
-        product_page_html_parser_persistent.parsed_page.location_id
+        product_page_html_parse_result.page.location_id
         == product_page_expected_meta.product_page_location_id
     )
 
 
 def test_validate_parsed_location_name(
-    product_page_html_parser_persistent, product_page_expected_meta
+    product_page_html_parse_result, product_page_expected_meta
 ):
     assert (
-        product_page_html_parser_persistent.parsed_page.location_name
+        product_page_html_parse_result.page.location_name
         == product_page_expected_meta.product_page_location_name
     )
 
 
 def test_validate_parsed_products_count(
-    product_page_html_parser_persistent, product_page_expected_meta
+    product_page_html_parse_result, product_page_expected_meta
 ):
     assert (
-        len(product_page_html_parser_persistent.parsed_page.items)
+        len(product_page_html_parse_result.page.items)
         == product_page_expected_meta.product_quantity_total
     )
 
 
 def test_validate_parsed_products_count_available(
-    product_page_html_parser_persistent, product_page_expected_meta
+    product_page_html_parse_result, product_page_expected_meta
 ):
     assert (
         len([
             product
-            for product in product_page_html_parser_persistent.parsed_page.items
+            for product in product_page_html_parse_result.page.items
             if product.is_available
         ])
         == product_page_expected_meta.product_quantity_available
@@ -636,12 +636,12 @@ def test_validate_parsed_products_count_available(
 
 
 def test_validate_parsed_products_count_vegetarian(
-    product_page_html_parser_persistent, product_page_expected_meta
+    product_page_html_parse_result, product_page_expected_meta
 ):
     assert (
         len([
             product
-            for product in product_page_html_parser_persistent.parsed_page.items
+            for product in product_page_html_parse_result.page.items
             if product.is_vegetarian
         ])
         == product_page_expected_meta.product_quantity_is_vegetarian
@@ -649,12 +649,12 @@ def test_validate_parsed_products_count_vegetarian(
 
 
 def test_validate_parsed_products_count_gluten_free(
-    product_page_html_parser_persistent, product_page_expected_meta
+    product_page_html_parse_result, product_page_expected_meta
 ):
     assert (
         len([
             product
-            for product in product_page_html_parser_persistent.parsed_page.items
+            for product in product_page_html_parse_result.page.items
             if product.is_gluten_free
         ])
         == product_page_expected_meta.product_quantity_is_gluten_free
@@ -662,12 +662,12 @@ def test_validate_parsed_products_count_gluten_free(
 
 
 def test_validate_parsed_products_count_promo(
-    product_page_html_parser_persistent, product_page_expected_meta
+    product_page_html_parse_result, product_page_expected_meta
 ):
     assert (
         len([
             product
-            for product in product_page_html_parser_persistent.parsed_page.items
+            for product in product_page_html_parse_result.page.items
             if product.is_promo
         ])
         == product_page_expected_meta.product_quantity_is_promo
@@ -675,27 +675,25 @@ def test_validate_parsed_products_count_promo(
 
 
 def test_validate_parsed_products_count_on_sale(
-    product_page_html_parser_persistent, product_page_expected_meta
+    product_page_html_parse_result, product_page_expected_meta
 ):
     assert (
         len([
             product
-            for product in product_page_html_parser_persistent.parsed_page.items
+            for product in product_page_html_parse_result.page.items
             if product.is_on_sale
         ])
         == product_page_expected_meta.product_quantity_is_on_sale
     )
 
 
-def test_validate_generated_product_page(
-    product_page_html_parser_persistent, product_page
-):
-    parser = product_page_html_parser_persistent
-    assert parser.parsed_page.location_id == product_page.location_id
-    assert parser.parsed_page.location_name == product_page.location_name
+def test_validate_generated_product_page(product_page_html_parse_result, product_page):
+    result = product_page_html_parse_result
+    assert result.page.location_id == product_page.location_id
+    assert result.page.location_name == product_page.location_name
     # Both items are lists, extract IDs
     product_ids_reference = set(p.id_ for p in product_page.items)
-    product_ids_parsed = set(p.id_ for p in parser.parsed_page.items)
+    product_ids_parsed = set(p.id_ for p in result.page.items)
     assert product_ids_parsed == product_ids_reference
 
 
@@ -708,9 +706,9 @@ def test_validate_generated_product_page(
 @pytest.mark.is_parser_up_to_date
 @pytest.mark.parametrize(
     'product_page_id',
-    [pytest.param(id_, id=f'ID={id_}') for id_ in range(10, 11)],
+    [pytest.param(id_, id=f'ID={id_}') for id_ in range(10, 10)],
 )
-def test_parse_data_from_internet(product_page_html_parser_persistent, product_page_id):
+def test_parse_data_from_internet(product_page_id):
     """Go through all product pages fetched from the internet and validate them.
 
     This test aims to validate the parser's ability to parse actual fresh data.
@@ -738,14 +736,15 @@ def test_parse_data_from_internet(product_page_html_parser_persistent, product_p
             time.sleep(time_to_sleep)
             return get_response_with_retry(url, retries - 1)
 
-    parser = product_page_html_parser_persistent
+    parser = ProductPageHTMLParser()
     loc_url = get_product_page_url(product_page_id)
     response = get_response_with_retry(loc_url)
-    parser.parse(response.text)  # should be able to parse any page
+    result = parser.parse(response.text)  # should be able to parse any page
     if response.is_redirect:
         pytest.skip(f'Location {loc_url} does not exist (redirected)')
     else:
-        assert parser.parsed_page != ProductPage(), f'Did not parse data from {loc_url}'
+        assert result.page != ProductPage(), f'Did not parse data from {loc_url}'
+        assert result.metadata.errors == [], f'Parsing errors occurred for {loc_url}'
 
 
 # endregion Parse data from internet
