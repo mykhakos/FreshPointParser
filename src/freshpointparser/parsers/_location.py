@@ -1,62 +1,46 @@
 import json
 import re
-from typing import (
-    Dict,
-    List,
-    Optional,
-    Union,
-)
+from typing import Any, Dict, List, Union
 
-from freshpointparser._utils import validate_id
-
-from ..exceptions import FreshPointParserTypeError, FreshPointParserValueError
+from ..exceptions import FreshPointParserValueError
 from ..models import Location, LocationPage
-from ._base import BasePageHTMLParser
+from ._base import BasePageHTMLParser, ParseResult
 
 
 class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
-    """Parses HTML content of a FreshPoint location webpage ``my.freshpoint.cz``.
-    Allows accessing the parsed webpage data and searching for locations by name
-    or ID.
-    """
+    """Parses HTML content of a FreshPoint location webpage ``my.freshpoint.cz``."""
 
     _RE_SEARCH_PATTERN_STR = re.compile(r'devices\s*=\s*("\[.*\]");')
     """Regex pattern to search for the location data in the HTML string."""
     _RE_SEARCH_PATTERN_BYTES = re.compile(rb'devices\s*=\s*("\[.*\]");')
     """Regex pattern to search for the location data in the HTML bytes."""
 
-    def __init__(self) -> None:
-        """Initialize a LocationPageHTMLParser instance with an empty state."""
-        super().__init__()
-        self._page = LocationPage()
-
-    def _load_json(self, page_html: Union[str, bytes]) -> List[Dict]:
-        r"""Extract and parse the JSON location data embedded in the HTML.
+    def _load_json(self, page_content: Union[str, bytes]) -> List[Dict]:
+        r"""Extract the JSON location data embedded in the HTML.
 
         The location data is stored in the page HTML as a JavaScript string
         variable: ``devices = "[{\"prop\":{...}}]";``
 
-        This method uses regex to find this variable assignment and extract
-        the JSON string. A double JSON parsing approach is used because the data
-        is essentially double-quoted in the source
-        (a JSON string within a JavaScript string).
+        Regex is used to find this variable assignment and extract the JSON string.
+        A double JSON parsing approach is used because the data is essentially
+        double-quoted in the source (a JSON string within a JavaScript string).
 
         Args:
-            page_html (Union[str, bytes]): The HTML content of the
+            page_content (Union[str, bytes]): The HTML content of the
                 location page.
 
         Raises:
             FreshPointParserValueError: If the location data cannot be found or parsed.
 
         Returns:
-            List[Dict]: A list of location data dictionaries extracted from the
-                JavaScript variable in the HTML.
+            List[Dict]: Raw location data dictionaries extracted from
+                the JavaScript variable in the HTML content.
         """
         match_: Union[re.Match[str], re.Match[bytes], None]
-        if isinstance(page_html, str):
-            match_ = re.search(self._RE_SEARCH_PATTERN_STR, page_html)
+        if isinstance(page_content, str):
+            match_ = self._RE_SEARCH_PATTERN_STR.search(page_content)
         else:
-            match_ = re.search(self._RE_SEARCH_PATTERN_BYTES, page_html)
+            match_ = self._RE_SEARCH_PATTERN_BYTES.search(page_content)
         if not match_:
             raise FreshPointParserValueError(
                 'Unable to find the location data in the HTML '
@@ -66,199 +50,102 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             # double JSON parsing is required because of how the data is
             # embedded in the HTML (a JSON string inside a JavaScript string)
             data = json.loads(json.loads(match_.group(1)))
-        except IndexError as e:
+        except IndexError as err:
             raise FreshPointParserValueError(
                 'Unable to parse the location data in the HTML '
                 '(regex data group is missing).'
-            ) from e
-        except Exception as e:
+            ) from err
+        except Exception as exc:
             raise FreshPointParserValueError(
                 'Unable to parse the location data in the HTML '
                 '(Unexpected error during JSON parsing).'
-            ) from e
+            ) from exc
         if not isinstance(data, list):
             raise FreshPointParserValueError(
                 'Unable to parse the location data in the HTML (data is not a list).'
             )
         return data
 
-    def _parse_json(self, data: List[Dict]) -> LocationPage:
-        """Convert the extracted JSON data into a structured LocationPage model.
+    def _parse_location(self, location_data: Dict[str, Any]) -> Location:
+        """Parse a single location item from the raw location data.
 
-        This method transforms the raw JSON data extracted from the HTML into
-        a structured LocationPage model. Each location item in the raw data
-        contains both 'prop' and 'location' keys, but we only use the 'prop'
-        data as it contains all necessary information.
-
-        The method:
-        1. Extracts the 'prop' object from each item in the data list
-        2. Adds a timestamp for when the data was recorded
-        3. Creates a dictionary of locations keyed by their IDs
-        4. Constructs and validates a LocationPage model with the locations
+        The data is expected to contain both 'prop' and 'location' keys, but only
+        the 'prop' data is used for parsing as it contains all necessary information.
+        The 'recorded_at' timestamp is added to the data before validation.
 
         Args:
-            data (List[Dict]): The extracted location data from _load_json.
-                Expected format: [{'prop': {...}, 'location': {...}}, ...]
-
-        Returns:
-            LocationPage: The structured location page model containing all
-                parsed locations.
-        """
-        locations = {}
-        for item in data:
-            item['prop']['recordedAt'] = self._parse_datetime
-            locations[item['prop']['id']] = item['prop']
-        return LocationPage.model_validate({
-            'recordedAt': self._parse_datetime,
-            'items': locations,
-        })
-
-    def _parse_page_html(self, page_html: Union[str, bytes]) -> None:
-        """Parse HTML content of a location page.
-
-        This method is fully parses the HTML content to a structured
-        LocationPage model.
-
-        Args:
-            page_html (Union[str, bytes]): HTML content of
-                the location page to parse.
-        """
-        json_data = self._load_json(page_html)
-        self._page = self._parse_json(json_data)
-
-    def _construct_page(self) -> LocationPage:
-        """Get the location page data parsed from the HTML content.
-
-        The page is fully parsed during :meth:`parse`. A deep copy of the
-        cached model is returned to keep the internal state immutable. Every
-        access therefore yields a new :class:`LocationPage` instance.
-
-        Returns:
-            LocationPage: Parsed locations and metadata from the HTML content.
-        """
-        return self._page.model_copy(deep=True)
-
-    @property
-    def locations(self) -> List[Location]:
-        """All locations parsed from the page HTML content.
-
-        The returned ``Location`` instances are independent of the parser's
-        cached data. Changes made to them will not modify the parser state.
-        """
-        # page is fully parsed on ``parse`` call. Copy for cache immutability
-        return [loc.model_copy(deep=True) for loc in self._page.items.values()]
-
-    def find_location_by_id(self, id_: Union[int, str]) -> Optional[Location]:
-        """Find a single location based on the specified ID.
-
-        Args:
-            id_ (Union[int, str]): The ID of the location to search for.
-                The ID is expected to be a unique non-negative integer or
-                a string representation of a non-negative integer.
+            location_data (Dict[str, Any]): Raw location data dictionary.
 
         Raises:
-            FreshPointParserValueError: If the ID is an integer but is negative.
-            FreshPointParserTypeError: If the ID is not an integer and cannot be
-                converted to an integer.
+            FreshPointParserValueError: Raised when the 'prop' key is missing or
+                when other parsing errors occur.
 
         Returns:
-            Optional[Location]: Location with the specified ID or ``None`` if
-            the location is not found.  The returned instance is independent of
-            the parser's cached data.
+            Location: Parsed and validated Location model instance.
         """
+        parsed_data = self._new_base_record_data_from_context(self._context)
         try:
-            id_ = validate_id(id_)
-        except ValueError as exc:
-            raise FreshPointParserValueError(str(exc)) from exc
-        except TypeError as exc:
-            raise FreshPointParserTypeError(str(exc)) from exc
-        location = self._page.items.get(id_)
-        if location is None:
-            return None
-        return location.model_copy(deep=True)  # copy for cache immutability
+            parsed_data.update(location_data['prop'])
+            return Location.model_validate(parsed_data, context=self._context)
+        except KeyError as err:
+            raise FreshPointParserValueError(
+                f"Missing 'prop' key in location item: {location_data}"
+            ) from err
+        except Exception as exc:
+            raise FreshPointParserValueError(
+                f'Error parsing location item: {location_data}'
+            ) from exc
 
-    def find_location_by_name(
-        self, name: str, partial_match: bool = True
-    ) -> Optional[Location]:
-        """Find a single location based on the specified name.
-
-        Args:
-            name (str): The name of the location to search for. Note that
-                location names are normalized to lowercase ASCII characters.
-                The match is case-insensitive and ignores diacritics regardless
-                of the ``partial_match`` value.
-            partial_match (bool): If True, the name match can be partial
-                (case-insensitive). If False, the name match must be exact
-                (case-insensitive). Defaults to True.
-
-        Raises:
-            FreshPointParserTypeError: If the location name is not a string.
-
-        Returns:
-            Optional[Location]: Location matching the specified name or
-            ``None`` if no location is found.  The returned instance is
-            independent of the parser's cached data.  If multiple locations
-            match, the first one is returned.
-        """
-        if not isinstance(name, str):
-            raise FreshPointParserTypeError(
-                f'Expected a string for location name, got {type(name)}.'
-            )
-        # wrapper over ``LocationPage.find_item`` method
-        location = self._page.find_item(
-            lambda loc: self._match_strings(name, loc.name, partial_match)
-        )
-        if location is None:
-            return None
-        return location.model_copy(deep=True)  # copy for cache immutability
-
-    def find_locations_by_name(
-        self, name: str, partial_match: bool = True
-    ) -> List[Location]:
-        """Find all locations that match the specified name.
+    def _parse_locations(self, page_content: Union[str, bytes]) -> List[Location]:
+        """Parse multiple location items from the raw location data list.
 
         Args:
-            name (str): The name of the location to filter by. Note that location
-                names are normalized to lowercase ASCII characters. The match
-                is case-insensitive and ignores diacritics regardless of the
-                ``partial_match`` value.
-            partial_match (bool): If True, the name match can be partial
-                (case-insensitive). If False, the name match must be exact
-                (case-insensitive). Defaults to True.
-
-        Raises:
-            FreshPointParserTypeError: If the location name is not a string.
+            page_content (Union[str, bytes]): HTML content of
+                the location page to parse.
 
         Returns:
-            List[Location]: Locations matching the specified name. Each
-            location in the returned list is detached from the parser's internal
-            cache. If no locations are found, an empty list is returned.
+            List[Location]: Parsed and validated Location model instances.
         """
-        if not isinstance(name, str):
-            raise FreshPointParserTypeError(
-                f'Expected a string for location name, got {type(name)}.'
+        locations = []
+        for location_data in self._load_json(page_content):
+            location = self._safe_parse(
+                self._parse_location, location_data=location_data
             )
-        # wrapper over ``LocationPage.find_locations`` method
-        locations = self._page.find_items(
-            lambda loc: self._match_strings(name, loc.name, partial_match)
-        )
-        # return copies to keep cached data immutable
-        return [location.model_copy(deep=True) for location in locations]
+            if location is not None:
+                locations.append(location)
+        return locations
+
+    def _parse_page_content(self, page_content: Union[str, bytes]) -> LocationPage:
+        """Parse the HTML content of the location page to a Pydantic model.
+
+        This method fully parses the raw JSON data extracted from the HTML content to
+        a structured LocationPage model.
+
+        Args:
+            page_content (Union[str, bytes]): HTML content of
+                the location page to parse.
+
+        Returns:
+            LocationPage: The location page model containing all parsed locations.
+        """
+        parsed_data = self._new_base_record_data_from_context(self._context)
+
+        locations = self._safe_parse(self._parse_locations, page_content=page_content)
+        if locations is not None:
+            parsed_data['items'] = locations
+
+        return LocationPage.model_validate(parsed_data, context=self._context)
 
 
-def parse_location_page(page_html: Union[str, bytes]) -> LocationPage:
+def parse_location_page(page_content: Union[str, bytes]) -> ParseResult[LocationPage]:
     """Parse the HTML content of a FreshPoint location webpage
     ``my.freshpoint.cz`` to a structured LocationPage model.
 
     Args:
-        page_html (Union[str, bytes]): HTML content of the location page.
-
-    Raises:
-        FreshPointParserError: If the HTML does not match the expected structure.
+        page_content (Union[str, bytes]): HTML content of the location page.
 
     Returns:
-        LocationPage: Parsed and validated location page data.
+        ParseResult[LocationPage]: Parse result containing the page data and metadata.
+            Access the page via result.page, metadata via result.metadata.
     """
-    parser = LocationPageHTMLParser()
-    parser.parse(page_html)
-    return parser.page
+    return LocationPageHTMLParser().parse(page_content)

@@ -10,11 +10,8 @@ from freshpointparser.exceptions import (
     FreshPointParserTypeError,
     FreshPointParserValueError,
 )
-from freshpointparser.models import (
-    Product,
-    ProductPage,
-)
-from freshpointparser.models.annotations import (
+from freshpointparser.models import Product, ProductPage
+from freshpointparser.models.types import (
     DiffType,
     ProductPriceUpdateInfo,
     ProductQuantityUpdateInfo,
@@ -34,46 +31,46 @@ DEFAULT_PRODUCT_PIC_URL = (
         pytest.param(
             Product(),
             dict(
-                id_=0,
-                name='',
-                category='',
-                is_vegetarian=False,
-                is_gluten_free=False,
-                quantity=0,
-                price_full=0,
-                price_curr=0,
-                info='',
+                id_=None,
+                name=None,
+                category=None,
+                is_vegetarian=None,
+                is_gluten_free=None,
+                quantity=None,
+                price_full=None,
+                price_curr=None,
+                info=None,
                 pic_url=DEFAULT_PRODUCT_PIC_URL,
-                location_id=0,
+                location_id=None,
             ),
             id='default args',
         ),
         pytest.param(
             Product(
-                id_=1,
+                id_='1',
                 name='Product',
                 category='Category',
                 is_vegetarian=True,
                 is_gluten_free=True,
                 quantity=2,
-                price_full=3.0,
-                price_curr=4.0,
+                price_full=4.0,
+                price_curr=3.0,
                 info='Info',
                 pic_url='https://example.com/pic.jpg',
-                location_id=5,
+                location_id=5,  # type: ignore
             ),
             dict(
-                id_=1,
+                id_='1',
                 name='Product',
                 category='Category',
                 is_vegetarian=True,
                 is_gluten_free=True,
                 quantity=2,
-                price_full=3.0,
-                price_curr=4.0,
+                price_full=4.0,
+                price_curr=3.0,
                 info='Info',
                 pic_url='https://example.com/pic.jpg',
-                location_id=5,
+                location_id='5',
             ),
             id='custom args',
         ),
@@ -96,9 +93,9 @@ def test_product_init(product, expected_attrs):
 @pytest.mark.parametrize(
     'product, expected_price_full, expected_price_curr',
     [
-        pytest.param(Product(), 0.0, 0.0, id='no price args'),
-        pytest.param(Product(price_full=1.0), 1.0, 1.0, id='price_full'),
-        pytest.param(Product(price_curr=2.0), 2.0, 2.0, id='price_curr'),
+        pytest.param(Product(), None, None, id='no price args'),
+        pytest.param(Product(price_full=1.0), 1.0, None, id='price_full'),
+        pytest.param(Product(price_curr=2.0), None, 2.0, id='price_curr'),
         pytest.param(
             Product(price_full=0.0, price_curr=0.0),
             0.0,
@@ -112,9 +109,9 @@ def test_product_init(product, expected_attrs):
             id='both prices (same)',
         ),
         pytest.param(
-            Product(price_full=3.0, price_curr=4.0),
-            3.0,
+            Product(price_full=4.0, price_curr=3.0),
             4.0,
+            3.0,
             id='both prices (different)',
         ),
     ],
@@ -127,6 +124,7 @@ def test_product_init_price_resolve(product, expected_price_full, expected_price
 @pytest.mark.parametrize(
     'name, expected_name_lowercase_ascii',
     [
+        pytest.param(None, '', id='None name'),
         pytest.param('', '', id='empty name'),
         pytest.param(
             'BIO Zahradní limonáda bezový květ & meduňka',
@@ -143,6 +141,7 @@ def test_product_prop_name_lowercase_ascii(name, expected_name_lowercase_ascii):
 @pytest.mark.parametrize(
     'category, expected_category_lowercase_ascii',
     [
+        pytest.param(None, '', id='None category'),
         pytest.param('', '', id='empty category'),
         pytest.param(
             'Nápoje',
@@ -167,22 +166,16 @@ def test_product_prop_category_lowercase_ascii(
     'product, rate',
     [
         pytest.param(Product(price_full=0, price_curr=0), 0, id='both prices (zero)'),
-        pytest.param(Product(price_full=0, price_curr=10), 0, id='price_curr only'),
-        pytest.param(
-            Product(price_full=5, price_curr=10),
-            0,
-            id='price_full < price_curr',
-        ),
         pytest.param(Product(price_full=10, price_curr=0), 1, id='price_full only'),
         pytest.param(
             Product(price_full=10, price_curr=5),
             0.5,
-            id='price_full < price_curr',
+            id='price_full > price_curr',
         ),
         pytest.param(
             Product(price_full=10, price_curr=10 * 2 / 3),
             0.33,
-            id='price_full = 2/3 * price_full',
+            id='price_curr = 2/3 * price_full',
         ),
         pytest.param(
             Product(price_full=10, price_curr=10),
@@ -363,30 +356,16 @@ def test_is_newer_than_invalid_precision():
         p1.is_newer_than(p2, precision='q')  # type: ignore[reportArgumentType]
 
 
-def test_recorded_at_serialize_excluded():
-    product = Product()
-
-    data = product.model_dump(context={'__exclude_recorded_at__': True})
-    assert data['recorded_at'] is None
-
-    for data in (
-        product.model_dump(),
-        product.model_dump(mode='json'),
-        product.model_dump(context={'__exclude_recorded_at__': False}),
-    ):
-        assert data['recorded_at'] is not None
-
-
 @pytest.mark.parametrize(
     'product_this, product_other, diff',
     [
         pytest.param(
-            Product(id_=123, name='foo', quantity=0, price_full=5),
-            Product(id_=321, name='bar', quantity=5, price_full=10),
+            Product(id_='123', name='foo', quantity=0, price_full=5),
+            Product(id_='321', name='bar', quantity=5, price_full=10),
             {
                 'id_': {
                     'type': DiffType.UPDATED,
-                    'values': {'left': 123, 'right': 321},
+                    'values': {'left': '123', 'right': '321'},
                 },
                 'name': {
                     'type': DiffType.UPDATED,
@@ -400,16 +379,12 @@ def test_recorded_at_serialize_excluded():
                     'type': DiffType.UPDATED,
                     'values': {'left': 5, 'right': 10},
                 },
-                'price_curr': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 5, 'right': 10},
-                },
             },
             id='different products',
         ),
         pytest.param(
-            Product(category='foo'),
-            Product(category='bar'),
+            Product(id_='123', category='foo'),
+            Product(id_='123', category='bar'),
             {
                 'category': {
                     'type': DiffType.UPDATED,
@@ -419,14 +394,14 @@ def test_recorded_at_serialize_excluded():
             id='different category',
         ),
         pytest.param(
-            Product(id_=123, quantity=4, price_full=10),
-            Product(id_=123, quantity=4, price_full=10),
+            Product(id_='123', quantity=4, price_full=10),
+            Product(id_='123', quantity=4, price_full=10),
             {},
             id='same product',
         ),
         pytest.param(
-            Product(id_=123, quantity=4, price_full=10, price_curr=10),
-            Product(id_=123, quantity=4, price_full=10, price_curr=5),
+            Product(id_='123', quantity=4, price_full=10, price_curr=10),
+            Product(id_='123', quantity=4, price_full=10, price_curr=5),
             {
                 'price_curr': {
                     'type': DiffType.UPDATED,
@@ -436,8 +411,8 @@ def test_recorded_at_serialize_excluded():
             id='same product, different price_curr',
         ),
         pytest.param(
-            Product(id_=123, quantity=4, price_full=10, price_curr=5),
-            Product(id_=123, quantity=4, price_full=10, price_curr=10),
+            Product(id_='123', quantity=4, price_full=10, price_curr=5),
+            Product(id_='123', quantity=4, price_full=10, price_curr=10),
             {
                 'price_curr': {
                     'type': DiffType.UPDATED,
@@ -447,8 +422,8 @@ def test_recorded_at_serialize_excluded():
             id='same product, different price_curr (reversed)',
         ),
         pytest.param(
-            Product(id_=123, quantity=5, price_full=10, price_curr=10),
-            Product(id_=123, quantity=0, price_full=10, price_curr=10),
+            Product(id_='123', quantity=5, price_full=10, price_curr=10),
+            Product(id_='123', quantity=0, price_full=10, price_curr=10),
             {
                 'quantity': {
                     'type': DiffType.UPDATED,
@@ -460,16 +435,16 @@ def test_recorded_at_serialize_excluded():
     ],
 )
 def test_product_diff(product_this, product_other, diff):
-    assert product_this.diff(product_other) == diff
-    assert product_this.diff(product_other, exclude={'recorded_at'}) == diff
+    product_diff = product_this.diff(product_other)
+    assert product_diff == diff
 
 
 @pytest.mark.parametrize(
     'product_this, product_other, kwargs, expected_diff_true, expected_diff_false',
     [
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
             {},
             {},
             {
@@ -484,8 +459,8 @@ def test_product_diff(product_this, product_other, diff):
             id='only recorded_at differs',
         ),
         pytest.param(
-            Product(name='Apple', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(name='Banana', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
+            Product(id_='0', name='Apple', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
+            Product(id_='0', name='Banana', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
             {},
             {
                 'name': {
@@ -509,8 +484,8 @@ def test_product_diff(product_this, product_other, diff):
             id='recorded_at and name differ',
         ),
         pytest.param(
-            Product(name='Apple', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(name='Banana', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
+            Product(id_='0', name='Apple', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
+            Product(id_='0', name='Banana', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
             {'exclude': {'name'}},
             {},
             {
@@ -525,8 +500,8 @@ def test_product_diff(product_this, product_other, diff):
             id='exclude name, only recorded_at diff',
         ),
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Apple'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Apple'),
             {'include': {'recorded_at'}},
             {},
             {
@@ -541,8 +516,8 @@ def test_product_diff(product_this, product_other, diff):
             id='include only recorded_at',
         ),
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
             {'include': {'recorded_at', 'name'}},
             {
                 'name': {
@@ -566,8 +541,8 @@ def test_product_diff(product_this, product_other, diff):
             id='include recorded_at and name',
         ),
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
             {'by_alias': True},
             {},
             {
@@ -582,8 +557,8 @@ def test_product_diff(product_this, product_other, diff):
             id='by_alias kwarg',
         ),
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
             {'exclude': {'recorded_at'}},
             {
                 'name': {
@@ -600,8 +575,8 @@ def test_product_diff(product_this, product_other, diff):
             id='exclude kwarg includes recorded_at',
         ),
         pytest.param(
-            Product(recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
+            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
             {'exclude': {'recorded_at'}},
             {
                 'name': {
@@ -623,15 +598,11 @@ def test_product_diff_exclude_recorded_at_with_kwargs(
     product_this, product_other, kwargs, expected_diff_true, expected_diff_false
 ):
     # exclude_recorded_at=True
-    assert (
-        product_this.diff(product_other, exclude_recorded_at=True, **kwargs)
-        == expected_diff_true
-    )
+    product_diff = product_this.diff(product_other, exclude_recorded_at=True, **kwargs)
+    assert product_diff == expected_diff_true
     # exclude_recorded_at=False
-    assert (
-        product_this.diff(product_other, exclude_recorded_at=False, **kwargs)
-        == expected_diff_false
-    )
+    product_diff = product_this.diff(product_other, exclude_recorded_at=False, **kwargs)
+    assert product_diff == expected_diff_false
 
 
 @pytest.mark.parametrize(
@@ -973,25 +944,29 @@ def test_compare_price(product_this, product_other, info):
         pytest.param(
             ProductPage(),
             {
-                'items': {},
-                'location_id': 0,
-                'location_name': '',
+                'items': [],
+                'location_id': None,
+                'location_name': None,
             },
             id='empty page',
         ),
         pytest.param(
             ProductPage(
-                items={
-                    1: Product(id_=1, location_id=296, recorded_at=datetime(2025, 1, 1))
-                },
-                location_id=296,
+                items=[
+                    Product(
+                        id_='1', location_id='296', recorded_at=datetime(2025, 1, 1)
+                    )
+                ],
+                location_id=296,  # type: ignore[reportGeneralTypeIssues]
                 location_name='foo',
             ),
             {
-                'items': {
-                    1: Product(id_=1, location_id=296, recorded_at=datetime(2025, 1, 1))
-                },
-                'location_id': 296,
+                'items': [
+                    Product(
+                        id_='1', location_id='296', recorded_at=datetime(2025, 1, 1)
+                    )
+                ],
+                'location_id': '296',
                 'location_name': 'foo',
             },
             id='regular page',
@@ -1018,6 +993,7 @@ def test_product_page_prop_url(location_id, expected_url):
 @pytest.mark.parametrize(
     'location_name, expected_location_name_lowercase_ascii',
     [
+        pytest.param(None, '', id='None location name'),
         pytest.param('', '', id='empty location name'),
         pytest.param('foo', 'foo', id='location name with ascii charactersonly'),
         pytest.param(
@@ -1038,7 +1014,7 @@ def test_product_page_prop_location_name_lowercase_ascii(
 def products():
     return [
         Product(
-            id_=0,
+            id_='0',
             name='orange',
             category='fruit',
             quantity=1,
@@ -1047,15 +1023,15 @@ def products():
             info='very good',
         ),
         Product(
-            id_=1,
+            id_='1',
             name='cheesecake',
             category='dessert',
             quantity=5,
-            price_full=1.5,
-            price_curr=2.2,
+            price_full=3.2,
+            price_curr=2.5,
         ),
         Product(
-            id_=2,
+            id_='2',
             name='apple',
             category='fruit',
             quantity=10,
@@ -1063,7 +1039,7 @@ def products():
             price_curr=1.2,
         ),
         Product(
-            id_=3,
+            id_='3',
             name='banana',
             category='fruit',
             quantity=0,
@@ -1073,15 +1049,16 @@ def products():
             is_gluten_free=True,
         ),
         Product(
-            id_=4,
+            id_='4',
             name='carrot',
             category='vegetable',
             quantity=15,
+            price_curr=2.0,
             price_full=2.0,
             is_gluten_free=True,
         ),
         Product(
-            id_=5,
+            id_='5',
             name='doughnut',
             category='pastry',
             quantity=5,
@@ -1090,7 +1067,7 @@ def products():
             info='try it',
         ),
         Product(
-            id_=6,
+            id_='6',
             name='eggs',
             category='dairy',
             quantity=12,
@@ -1098,7 +1075,7 @@ def products():
             price_curr=2.5,
         ),
         Product(
-            id_=7,
+            id_='7',
             name='fish',
             category='seafood',
             quantity=8,
@@ -1107,7 +1084,7 @@ def products():
             pic_url='https://example.com',
         ),
         Product(
-            id_=8,
+            id_='8',
             name='grapes',
             category='fruit',
             quantity=20,
@@ -1116,7 +1093,7 @@ def products():
             is_vegetarian=True,
         ),
         Product(
-            id_=9,
+            id_='9',
             name='honey',
             category='sweetener',
             quantity=0,
@@ -1124,7 +1101,7 @@ def products():
             price_curr=3.5,
         ),
         Product(
-            id_=10,
+            id_='10',
             name='ice cream',
             category='dessert',
             quantity=10,
@@ -1132,7 +1109,7 @@ def products():
             price_curr=2.0,
         ),
         Product(
-            id_=11,
+            id_='11',
             name='jam',
             category='spread',
             quantity=7,
@@ -1145,13 +1122,11 @@ def products():
 
 @pytest.fixture(scope='module')
 def product_page(products):
-    return ProductPage(items={p.id_: p for p in products})
+    return ProductPage(items=products)
 
 
 def test_page_item_helpers(product_page):
     assert product_page.item_count == len(product_page.items)
-    assert set(product_page.item_ids) == set(product_page.items)
-    assert product_page.item_list == list(product_page.items.values())
 
 
 @pytest.mark.parametrize(
@@ -1159,69 +1134,69 @@ def test_page_item_helpers(product_page):
     [
         pytest.param(
             {},
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'],
             id='dict constraint: empty',
         ),
-        pytest.param({'name': 'orange'}, [0], id='dict constraint: name'),
-        pytest.param({'id_': 4}, [4], id='dict constraint: id'),
+        pytest.param({'name': 'orange'}, ['0'], id='dict constraint: name'),
+        pytest.param({'id_': '4'}, ['4'], id='dict constraint: id'),
         pytest.param(
-            {'id_': 4, 'name': 'carrot'},
-            [4],
+            {'id_': '4', 'name': 'carrot'},
+            ['4'],
             id='dict constraint: id with other constraint',
         ),
         pytest.param(
             {'name': 'jam', 'category': 'spread'},
-            [11],
+            ['11'],
             id='dict constraint: two constraints',
         ),
         pytest.param(
             {'name': 'honey', 'category': 'sweetener', 'quantity': 0},
-            [9],
+            ['9'],
             id='dict constraint: multiple constraints',
         ),
         pytest.param(
             {'name_lowercase_ascii': 'orange'},
-            [0],
+            ['0'],
             id='dict constraint: property constraint',
         ),
         pytest.param(
             MappingProxyType({'name': 'orange'}),
-            [0],
+            ['0'],
             id='MappingProxyType constraint: name',
         ),
         pytest.param(
             lambda p: p,
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'],
             id='lambda constraint: any product',
         ),
         pytest.param(
             lambda p: 'ice' in p.name,
-            [10],
+            ['10'],
             id='lambda constraint: partial name match',
         ),
         pytest.param(
             lambda p: p.price_full > 3.0,
-            [7, 9],
+            ['1', '7', '9'],
             id='lambda constraint: full price gt',
         ),
         pytest.param(
             lambda p: 1.0 <= p.price_curr <= 2.0,
-            [0, 2, 4, 8, 10],
+            ['0', '2', '4', '8', '10'],
             id='lambda constraint: curr price range',
         ),
         pytest.param(
             lambda p: 5 <= p.quantity <= 10,
-            [1, 2, 5, 7, 10, 11],
+            ['1', '2', '5', '7', '10', '11'],
             id='lambda constraint: quantity range',
         ),
         pytest.param(
             lambda p: p.is_vegetarian and p.is_gluten_free,
-            [3],
+            ['3'],
             id='lambda constraint: vegetarian and gluten free',
         ),
         pytest.param(
             lambda p: p.price_curr < 2.0 and p.quantity > 8,
-            [2, 8],
+            ['2', '8'],
             id='lambda constraint: multiple parameters',
         ),
     ],
@@ -1351,21 +1326,21 @@ def test_product_page_find_items_invalid_lambda_attribute(product_page, constrai
 
 def test_item_diff_created_updated_deleted():
     p_old = ProductPage(
-        items={
-            1: Product(id_=1, name='Banana'),
-            2: Product(id_=2, name='Apple', quantity=2),
-        }
+        items=[
+            Product(id_='1', name='Banana'),
+            Product(id_='2', name='Apple', quantity=2),
+        ]
     )
     p_new = ProductPage(
-        items={
-            2: Product(id_=2, name='Apple', quantity=1),
-            3: Product(id_=3, name='Orange'),
-        }
+        items=[
+            Product(id_='2', name='Apple', quantity=1),
+            Product(id_='3', name='Orange'),
+        ]
     )
     diff = p_old.item_diff(p_new)
-    assert diff[1]['type'] is DiffType.DELETED
-    assert diff[2]['type'] is DiffType.UPDATED
-    assert diff[3]['type'] is DiffType.CREATED
+    assert diff['1']['type'] is DiffType.DELETED
+    assert diff['2']['type'] is DiffType.UPDATED
+    assert diff['3']['type'] is DiffType.CREATED
 
 
 def test_iter_item_attr_defaults_and_uniqueness():
@@ -1373,12 +1348,12 @@ def test_iter_item_attr_defaults_and_uniqueness():
         context: Dict[str, str] = Field(default_factory=dict)
 
     page = ProductPage(
-        items={
-            1: Product(id_=1, category='c1'),
-            2: Product(id_=2, category='c2'),
-            3: Product(id_=3, category='c2'),
-            4: Product(id_=4, category='c3'),
-        }
+        items=[
+            Product(id_='1', category='c1'),
+            Product(id_='2', category='c2'),
+            Product(id_='3', category='c2'),
+            Product(id_='4', category='c3'),
+        ]
     )
     # missing attr without default -> raises
     with pytest.raises(AttributeError):
@@ -1400,7 +1375,7 @@ def test_iter_item_attr_defaults_and_uniqueness():
     ]
 
     # unique with unhashable values
-    page.items[5] = SubProduct(id_=5, context={'key': 'value'})
+    page.items.append(SubProduct(id_='5', context={'key': 'value'}))
     assert list(page.iter_item_attr('context', default={}, unhashable=True)) == [
         {},
         {},

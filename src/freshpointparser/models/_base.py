@@ -13,6 +13,7 @@ from typing import (
     Iterator,
     List,
     Literal,
+    MutableMapping,
     Optional,
     Protocol,
     Set,
@@ -22,18 +23,28 @@ from typing import (
     overload,
 )
 
-from pydantic import BaseModel, ConfigDict, Field, SerializationInfo, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ModelWrapValidatorHandler,
+    ValidationError,
+    ValidationInfo,
+    model_validator,
+)
 from pydantic.alias_generators import to_camel
 
 from ..exceptions import FreshPointParserTypeError, FreshPointParserValueError
 
 if sys.version_info >= (3, 11):
-    from typing import TypeAlias
+    from typing import Self, TypeAlias
 else:
-    from typing_extensions import TypeAlias
+    from typing_extensions import Self, TypeAlias
+
 
 logger = logging.getLogger('freshpointparser.models')
-"""Logger of the ``freshpointparser.models`` package."""
+"""Logger for the ``freshpointparser.models`` package."""
+
 
 _NoDefaultType = Enum('_NoDefaultType', 'NO_DEFAULT')
 _NO_DEFAULT = _NoDefaultType.NO_DEFAULT
@@ -41,7 +52,6 @@ _NO_DEFAULT = _NoDefaultType.NO_DEFAULT
 
 
 T = TypeVar('T')
-"""Type variable to annotate arbitrary generic types."""
 
 
 class ToCamel:
@@ -54,15 +64,10 @@ class ToCamel:
         return to_camel(string)
 
 
-class DynamicFieldsModel(BaseModel):
-    """Wraps arbitrary fields in a model to capture unknown or unstructured data."""
+class EmptyModel(BaseModel):
+    """An empty Pydantic model with no fields."""
 
-    model_config = ConfigDict(
-        alias_generator=ToCamel(),
-        populate_by_name=True,
-        extra='allow',
-        arbitrary_types_allowed=True,
-    )
+    model_config = ConfigDict(frozen=True)
 
 
 # region Diff
@@ -118,11 +123,15 @@ class ModelDiff(TypedDict):
     """Mapping of field names to their differences."""
 
 
-ModelDiffMapping: TypeAlias = Dict[int, ModelDiff]
+ModelDiffMapping: TypeAlias = Dict[str, ModelDiff]
 """Mapping of item IDs to their differences."""
 
 
-def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMapping:
+def model_diff(
+    left: BaseModel,
+    right: BaseModel,
+    model_dump_kwargs: Dict[str, Any],
+) -> FieldDiffMapping:
     """Compare the left model with the right model to identify which model
     fields have different values.
 
@@ -138,17 +147,17 @@ def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMap
     Args:
         left (model): The model to compare.
         right (model): The model to compare with.
-        **kwargs: Additional keyword arguments to pass to the ``model_dump``
-            calls to control the serialization process, such as ``exclude``,
-            ``include``, ``by_alias``, and others.
+        model_dump_kwargs (Dict[str, Any]): Additional keyword arguments to pass to
+            the ``model_dump`` calls to control the serialization process.
 
     Returns:
         FieldDiffMapping: A dictionary mapping field names to their differences,
         each containing the diff type and a pair of left/right values.
     """
-    left_asdict = left.model_dump(**kwargs)
-    right_asdict = right.model_dump(**kwargs)
+    left_asdict = left.model_dump(**model_dump_kwargs)
+    right_asdict = right.model_dump(**model_dump_kwargs)
     diff = {}
+
     # compare left to right
     for field, value_left in left_asdict.items():
         if field in right_asdict:
@@ -162,6 +171,7 @@ def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMap
                 type=diff_type,
                 values=DiffValues(left=value_left, right=value_right),
             )
+
     # compare right to left
     if right_asdict.keys() != left_asdict.keys():
         for field, value_right in right_asdict.items():
@@ -172,23 +182,100 @@ def model_diff(left: BaseModel, right: BaseModel, **kwargs: Any) -> FieldDiffMap
                     type=diff_type,
                     values=DiffValues(left=value_left, right=value_right),
                 )
+
     return diff
 
 
 # endregion Diff
 
+# region BestEffortModel
+
+
+class ValidationContext(Protocol):
+    """Protocol for the validation context expected by ``BestEffortModel``
+    and its subclasses.
+    """
+
+    def register_error(self, error: Exception) -> None:
+        """Register a validation error in the context.
+
+        Args:
+            error (Exception): The validation error to register.
+        """
+        pass
+
+
+class BestEffortModel(BaseModel):
+    """Model that attempts to validate input data, and on validation errors,
+    falls back to using default values for the fields that failed validation.
+    """
+
+    @model_validator(mode='wrap')
+    @classmethod
+    def _safe_validate(
+        cls, data: Any, handler: ModelWrapValidatorHandler[Self], info: ValidationInfo
+    ) -> Self:
+        """A wrapper around the standard model validation process that catches
+        validation errors and falls back to using default values for the fields
+        that failed validation.
+
+        NOTE: A model-level 'wrap' validator in the parent class
+        is expected to be called first for any subclasses.
+
+        Args:
+            data (Any): Input data to validate (injected by Pydantic).
+            handler (ModelWrapValidatorHandler[Self]): The validation handler
+                to process the data (injected by Pydantic).
+            info (ValidationInfo): Additional validation information
+                (injected by Pydantic).
+
+        Raises:
+            ValidationError: Raised when validation fails, and the fallback
+                mechanism cannot be applied.
+
+        Returns:
+            Self: The validated model instance.
+        """
+        try:
+            return handler(data)
+        except ValidationError as validation_err:
+            if not isinstance(data, Mapping):
+                logger.warning('Cannot fallback on non-mapping data')
+                raise validation_err
+
+            if info.config and info.config.get('strict'):
+                logger.warning('Cannot fallback on validation error in strict mode.')
+                raise validation_err
+
+            logger.info(
+                "Validation error in model '%s':\n%s", cls.__name__, validation_err
+            )
+            try:
+                context: Optional[ValidationContext] = info.context
+                context.register_error(validation_err)  # type: ignore[arg-type]
+            except Exception as ctx_err:
+                logger.warning(
+                    'Failed to record validation error to the context (%s)',
+                    ctx_err,
+                )
+
+            failed_fields = set()
+            for err in validation_err.errors():
+                err_loc = err.get('loc')
+                if not err_loc:  # usually means a model validator failed
+                    return handler({})
+                failed_fields.add(err_loc[0])
+
+            cleaned_data = {
+                key: value for key, value in data.items() if key not in failed_fields
+            }
+            return handler(cleaned_data)
+
 
 # region BaseRecord
 
 
-class HasRecordedAt(Protocol):
-    """Protocol for classes that have the ``recorded_at`` datetime attribute."""
-
-    recorded_at: datetime
-    """Datetime when the data has been recorded."""
-
-
-class BaseRecord(BaseModel):
+class BaseRecord(BestEffortModel):
     """Base model of a FreshPoint record."""
 
     model_config = ConfigDict(alias_generator=ToCamel(), populate_by_name=True)
@@ -202,7 +289,7 @@ class BaseRecord(BaseModel):
 
     def is_newer_than(
         self,
-        other: HasRecordedAt,
+        other: BaseRecord,
         precision: Optional[Literal['s', 'm', 'h', 'd']] = None,
     ) -> Optional[bool]:
         """Check if this record is newer than another one by comparing
@@ -212,8 +299,7 @@ class BaseRecord(BaseModel):
         level (e.g., cutting off seconds, minutes, etc.), not rounding it.
 
         Args:
-            other (HasRecordedAt): The record to compare against. Must contain
-                the ``recorded_at`` datetime attribute.
+            other (BaseRecord): The record to compare against.
             precision (Optional[Literal['s', 'm', 'h', 'd']]): The level of
                 precision for the comparison. Supported values:
 
@@ -262,6 +348,24 @@ class BaseRecord(BaseModel):
         return recorded_at_self > recorded_at_other
 
 
+def remove_recorded_at_from_mapping(
+    mapping: MutableMapping[str, Any],
+) -> MutableMapping[str, Any]:
+    """Remove the ``recorded_at`` field or its CamelCase alias from the given mapping
+    if present.
+
+    Args:
+        mapping (MutableMapping[str, Any]): The mapping to modify.
+
+    Returns:
+        MutableMapping[str, Any]: The modified mapping.
+    """
+    field_name = 'recorded_at'
+    mapping.pop(field_name, None)
+    mapping.pop(to_camel(field_name), None)
+    return mapping
+
+
 # endregion BaseRecord
 
 # region BaseItem
@@ -270,36 +374,15 @@ class BaseRecord(BaseModel):
 class BaseItem(BaseRecord):
     """Base model of a FreshPoint item."""
 
-    id_: int = Field(
-        default=0,
+    id_: Optional[str] = Field(
+        default=None,
         serialization_alias='id',  # not using 'alias' to bypass
         validation_alias='id',  # Pyright / Pylance limitations
+        coerce_numbers_to_str=True,
         title='ID',
-        description='Unique numeric identifier.',
+        description='Unique item identifier (numeric unless undefined).',
     )
-    """Unique numeric identifier."""
-
-    @field_serializer('recorded_at')
-    def _serialize_recorded_at(  # noqa: PLR6301
-        self, value: datetime, info: SerializationInfo
-    ) -> Optional[datetime]:
-        """Exclude the ``recorded_at`` field from serialization if the context indicates
-        that it should not be recorded.
-        """
-        # This method could be a part of the BaseRecord class, but at the moment
-        # there are no use cases to exclude the ``recorded_at`` field there.
-        if not info.context:
-            return value
-        try:
-            if info.context.get('__exclude_recorded_at__'):
-                return None
-        except AttributeError:
-            logger.debug(
-                "Could not determine if 'recorded_at' should be excluded "
-                'from serialization. Returning the value as is.'
-            )
-            return value
-        return value
+    """Unique item identifier (numeric unless undefined)."""
 
     def diff(
         self,
@@ -317,17 +400,16 @@ class BaseItem(BaseRecord):
         is considered to be *Deleted*. If the field is not present in any of
         the items, its value is considered to be ``None``.
 
-        By default, the ``recorded_at`` field is excluded from comparison with
-        the ``exclude_recorded_at`` argument set to ``True``. This argument acts
-        similar to the standard ``exclude_xx`` Pydantic serialization flags.
-
         The data is serialized according to the item models' configurations
-        using ``model_dump``.
+        using ``model_dump``. The ``metadata`` field is ignored in the comparison.
 
         Args:
             other (BaseItem): The item to compare against.
             exclude_recorded_at (bool): If True, the ``recorded_at`` field is
-                excluded from the comparison. Defaults to True.
+                excluded from comparison. This argument is a shortcut for
+                ``exclude={'recorded_at': ...}``. It takes precedence over any
+                standard exclusion and inclusion parameters passed via ``kwargs``.
+                Defaults to True.
             **kwargs: Additional keyword arguments passed to each item model's
                 ``model_dump`` call, such as ``exclude``, ``include``,
                 ``by_alias``, and others.
@@ -366,11 +448,17 @@ class BaseItem(BaseRecord):
             ... }
 
         """
+        if self is other:
+            return {}
+        diff = model_diff(self, other, kwargs)
         if exclude_recorded_at:
-            context = dict(kwargs.get('context', {}))
-            context['__exclude_recorded_at__'] = True
-            kwargs['context'] = context
-        return model_diff(self, other, **kwargs)
+            remove_recorded_at_from_mapping(diff)
+        return diff
+
+
+# endregion BaseItem
+
+# region BasePage
 
 
 # default values for the type variables are only available in pydantic>=2.11,
@@ -382,33 +470,17 @@ TItem = TypeVar(
 )
 """Type variable to annotate item models."""
 
-# endregion BaseItem
-
-# region BasePage
-
 
 class BasePage(BaseRecord, Generic[TItem]):
     """Base data model of a FreshPoint page."""
 
-    items: Dict[int, TItem] = Field(
-        default_factory=dict,
+    items: List[TItem] = Field(
+        default_factory=list,
         repr=False,
         title='Items',
-        description=(
-            'Dictionary of item IDs as keys and data models on the page as values.'
-        ),
+        description='Data models on the page.',
     )
-    """Dictionary of item IDs as keys and data models on the page as values."""
-
-    @property
-    def item_list(self) -> List[TItem]:
-        """Items listed on the page."""
-        return list(self.items.values())
-
-    @property
-    def item_ids(self) -> List[int]:
-        """IDs of the items listed on the page."""
-        return list(self.items.keys())
+    """Data models on the page."""
 
     @property
     def item_count(self) -> int:
@@ -417,7 +489,7 @@ class BasePage(BaseRecord, Generic[TItem]):
 
     def item_diff(
         self,
-        other: BasePage,
+        other: BasePage[TItem],
         *,
         exclude_recorded_at: bool = True,
         **kwargs: Any,
@@ -441,7 +513,9 @@ class BasePage(BaseRecord, Generic[TItem]):
         Args:
             other (BasePage): The page to compare against.
             exclude_recorded_at (bool): If True, the ``recorded_at`` field is
-                excluded from the comparison. Defaults to True.
+                excluded from comparison. This argument is a shortcut for
+                ``exclude={'recorded_at': ...}``. It takes precedence over any
+                standard exclusion and inclusion parameters passed via ``kwargs``.
             **kwargs: Additional keyword arguments passed to each item model's
                 ``model_dump`` call, such as ``exclude``, ``include``,
                 ``by_alias``, and others.
@@ -463,7 +537,7 @@ class BasePage(BaseRecord, Generic[TItem]):
 
             >>> from freshpointparser.models.annotations import DiffType
             >>> {
-            ...     1001: {
+            ...     '1001': {
             ...         'type': DiffType.UPDATED,
             ...         'diff': {
             ...             'field_common': {
@@ -472,7 +546,7 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...             },
             ...         },
             ...     },
-            ...     1002: {
+            ...     '1002': {
             ...         'type': DiffType.DELETED,
             ...         'diff': {
             ...             'field_only_in_this': {
@@ -481,7 +555,7 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...             },
             ...         },
             ...     },
-            ...     1003: {
+            ...     '1003': {
             ...         'type': DiffType.CREATED,
             ...         'diff': {
             ...             'field_only_in_other': {
@@ -492,35 +566,45 @@ class BasePage(BaseRecord, Generic[TItem]):
             ...     },
             ... }
         """
-        if exclude_recorded_at:
-            context = dict(kwargs.get('context', {}))
-            context['__exclude_recorded_at__'] = True
-            kwargs['context'] = context
-        item_missing = DynamicFieldsModel()
+        items_as_dict_self = {
+            item.id_: item for item in self.items if item.id_ is not None
+        }
+        items_as_dict_other = {
+            item.id_: item for item in other.items if item.id_ is not None
+        }
+        item_missing = EmptyModel()
         diff = {}
+
         # compare self to other
-        for item_id, item_self in self.items.items():
-            item_other = other.items.get(item_id, None)
+        for item_id, item_self in items_as_dict_self.items():
+            item_other = items_as_dict_other.get(item_id, None)
+
             if item_other is None:
-                diff[item_id] = ModelDiff(
-                    type=DiffType.DELETED,
-                    diff=model_diff(item_self, item_missing, **kwargs),
-                )
+                item_diff_type = DiffType.DELETED
+                item_diff = model_diff(item_self, item_missing, kwargs)
             else:
-                item_diff = model_diff(item_self, item_other, **kwargs)
-                if item_diff:
-                    diff[item_id] = ModelDiff(
-                        type=DiffType.UPDATED,
-                        diff=item_diff,
-                    )
+                item_diff_type = DiffType.UPDATED
+                item_diff = model_diff(item_self, item_other, kwargs)
+
+            if exclude_recorded_at:
+                remove_recorded_at_from_mapping(item_diff)
+
+            if item_diff:
+                diff[item_id] = ModelDiff(type=item_diff_type, diff=item_diff)
+
         # compare other to self
-        if other.items.keys() != self.items.keys():
-            for item_id, item_other in other.items.items():
-                if item_id not in self.items:
-                    diff[item_id] = ModelDiff(
-                        type=DiffType.CREATED,
-                        diff=model_diff(item_missing, item_other, **kwargs),
-                    )
+        if items_as_dict_other.keys() != items_as_dict_self.keys():
+            for item_id, item_other in items_as_dict_other.items():
+                if item_id not in items_as_dict_self:
+                    item_diff_type = DiffType.CREATED
+                    item_diff = model_diff(item_missing, item_other, kwargs)
+
+                    if exclude_recorded_at:
+                        remove_recorded_at_from_mapping(item_diff)
+
+                    if item_diff:
+                        diff[item_id] = ModelDiff(type=item_diff_type, diff=item_diff)
+
         return diff
 
     @overload
@@ -577,11 +661,11 @@ class BasePage(BaseRecord, Generic[TItem]):
             Iterator[Union[Any, T]]: Attribute values collected from each item
             on the page.
         """
-        items = self.items.values()
         if default is _NO_DEFAULT:
-            values = (getattr(item, attr) for item in items)
+            values = (getattr(item, attr) for item in self.items)
         else:
-            values = (getattr(item, attr, default) for item in items)
+            values = (getattr(item, attr, default) for item in self.items)
+
         if unique:
             if unhashable:
                 seen_unhashable: List[Any] = []
@@ -692,7 +776,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         if callable(constraint):
 
             def _filter_callable() -> Iterator[TItem]:
-                for item in self.items.values():
+                for item in self.items:
                     try:
                         if constraint(item):
                             yield item
@@ -706,7 +790,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         if isinstance(constraint, Mapping):
 
             def _filter_mapping() -> Iterator[TItem]:
-                for item in self.items.values():
+                for item in self.items:
                     try:
                         if all(
                             getattr(item, attr, _NO_DEFAULT) == value
