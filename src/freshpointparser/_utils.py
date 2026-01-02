@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 import logging
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from unidecode import unidecode
 
@@ -36,18 +35,3 @@ def normalize_text(text: Any) -> str:
         return unidecode(str(text).strip()).casefold()
     except Exception as exc:
         raise FreshPointParserValueError(f'Failed to normalize text "{text}".') from exc
-
-
-def hash_sha1(content: Union[str, bytes]) -> bytes:
-    """Hash the given text using the SHA-1 algorithm and return the
-    hexadecimal representation of the hash.
-
-    Args:
-        content (Union[str, bytes]): The text to be hashed.
-
-    Returns:
-        bytes: The SHA-1 hash of the text.
-    """
-    if isinstance(content, str):
-        content = content.encode('utf-8')
-    return hashlib.sha1(content).digest()  # noqa: S324
