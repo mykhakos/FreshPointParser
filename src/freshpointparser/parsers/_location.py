@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 
 from ..exceptions import FreshPointParserValueError
 from ..models import Location, LocationPage
-from ._base import BasePageHTMLParser, ParseContext
+from ._base import BasePageHTMLParser, ParseContext, ParseResult
 
 
 class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
@@ -162,7 +162,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         return LocationPage.model_validate(parsed_data, context=context)
 
 
-def parse_location_page(page_content: Union[str, bytes]) -> LocationPage:
+def parse_location_page(page_content: Union[str, bytes]) -> ParseResult[LocationPage]:
     """Parse the HTML content of a FreshPoint location webpage
     ``my.freshpoint.cz`` to a structured LocationPage model.
 
@@ -170,6 +170,7 @@ def parse_location_page(page_content: Union[str, bytes]) -> LocationPage:
         page_content (Union[str, bytes]): HTML content of the location page.
 
     Returns:
-        LocationPage: Parsed and validated location page data.
+        ParseResult[LocationPage]: Parse result containing the page data and metadata.
+            Access the page via result.page, metadata via result.metadata.
     """
     return LocationPageHTMLParser().parse(page_content)

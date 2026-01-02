@@ -7,7 +7,7 @@ import bs4
 from .._utils import normalize_text
 from ..exceptions import FreshPointParserKeyError, FreshPointParserValueError
 from ..models import Product, ProductPage
-from ._base import BasePageHTMLParser, ParseContext, logger
+from ._base import BasePageHTMLParser, ParseContext, ParseResult, logger
 
 T = TypeVar('T')
 
@@ -387,7 +387,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             raise FreshPointParserValueError('Unable to parse location name.') from e
 
 
-def parse_product_page(page_content: Union[str, bytes]) -> ProductPage:
+def parse_product_page(page_content: Union[str, bytes]) -> ParseResult[ProductPage]:
     """Parse the HTML content of a FreshPoint product webpage
     ``my.freshpoint.cz/device/product-list/<pageId>`` to a structured
     ProductPage model.
@@ -396,6 +396,7 @@ def parse_product_page(page_content: Union[str, bytes]) -> ProductPage:
         page_content (Union[str, bytes]): HTML content of the product page.
 
     Returns:
-        ProductPage: Parsed and validated product page data.
+        ParseResult[ProductPage]: Parse result containing the page data and metadata.
+            Access the page via result.page, metadata via result.metadata.
     """
     return ProductPageHTMLParser().parse(page_content)
