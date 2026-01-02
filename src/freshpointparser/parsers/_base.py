@@ -9,6 +9,7 @@ from ..exceptions import FreshPointParserError
 from ..models._base import BasePage
 
 logger = logging.getLogger('freshpointparser.parsers')
+"""Logger for the ``freshpointparser.parsers`` package."""
 
 TPage = TypeVar('TPage', bound=BasePage)
 
