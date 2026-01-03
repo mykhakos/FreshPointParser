@@ -170,16 +170,6 @@ class Product(BaseItem):
         description='URL of the illustrative product image.',
     )
     """URL of the illustrative product image."""
-    location_id: Optional[str] = Field(
-        default=None,
-        coerce_numbers_to_str=True,
-        title='Location ID',
-        description=(
-            'Unique identifier or the product location (also known as '
-            'the page ID or the device ID).'
-        ),
-    )
-    """Unique identifier or the product location (also known as the page ID or the device ID)."""
 
     @model_validator(mode='after')
     def _validate_price(self) -> Self:
