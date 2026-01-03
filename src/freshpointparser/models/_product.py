@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from typing import Optional, Union
 
-from pydantic import Field, NonNegativeFloat, NonNegativeInt, model_validator
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
+from pydantic import (
+    Field,
+    NonNegativeFloat,
+    NonNegativeInt,
+    ValidationInfo,
+    field_validator,
+)
 
 from freshpointparser.exceptions import FreshPointParserValueError
 
@@ -171,17 +171,17 @@ class Product(BaseItem):
     )
     """URL of the illustrative product image."""
 
-    @model_validator(mode='after')
-    def _validate_price(self) -> Self:
-        """Ensure that both full price and current price are set."""
-        if self.price_full is None or self.price_curr is None:
-            return self
-        if self.price_full < self.price_curr:
+    @field_validator('price_curr', mode='after')
+    @classmethod
+    def _validate_price_curr(cls, price_curr: float, info: ValidationInfo) -> float:
+        """Validate that the current selling price is not higher than the full price."""
+        price_full = info.data.get('price_full')
+        if price_full is not None and price_full < price_curr:
             raise FreshPointParserValueError(
-                f'Full price ({self.price_full}) cannot be lower than '
-                f'current price ({self.price_curr}).'
+                f'Full price ({price_full}) cannot be lower than '
+                f'current price ({price_curr}).'
             )
-        return self
+        return price_curr
 
     @property
     def name_lowercase_ascii(self) -> str:
@@ -200,40 +200,69 @@ class Product(BaseItem):
         return normalize_text(self.category)
 
     @property
-    def discount_rate(self) -> float:
-        """Discount rate (<0; 1>) of the product, calculated based on
-        the difference between the full price and the current selling price.
+    def price(self) -> Optional[float]:
+        """Effective price of the product.
 
-        Precision is up to two decimal places (whole percentage points).
+        If the product has a current selling price, it is considered the effective
+        price. If the product only has a full price, then the full price is considered
+        the effective price. If neither price is set, the effective price is None.
         """
-        if not self.price_full or self.price_curr is None:
-            return 0
-        return round((self.price_full - self.price_curr) / self.price_full, 2)
+        if self.price_curr is not None:
+            return self.price_curr
+        if self.price_full is not None:
+            return self.price_full
+        return None
+
+    @property
+    def discount_rate(self) -> Optional[float]:
+        """Discount rate (<0; 1>) of the product, calculated based on the difference
+        between the full price and the current selling price. Precision is up to
+        two decimal places.
+
+        If either the full price or the current selling price is not set,
+        the discount rate is None.
+        """
+        if self.price_full is None or self.price_curr is None:
+            return None
+        try:
+            return round((self.price_full - self.price_curr) / self.price_full, 2)
+        except ZeroDivisionError:
+            return 0.0
 
     @property
     def is_on_sale(self) -> bool:
         """A product is considered on sale if
         its current selling price is lower than its full price.
+
+        If either the full price or the current selling price is not set,
+        the product is not considered on sale.
         """
-        if not self.price_full or self.price_curr is None:
+        if self.price_full is None or self.price_curr is None:
             return False
         return self.price_curr < self.price_full
 
     @property
     def is_available(self) -> bool:
-        """A product is considered available if
-        its quantity is greater than zero.
+        """A product is considered available if its quantity is greater than zero.
+
+        If the quantity is not set, the product is not considered available.
         """
         return self.quantity is not None and self.quantity != 0
 
     @property
     def is_sold_out(self) -> bool:
-        """A product is considered sold out if its quantity equals zero."""
+        """A product is considered sold out if its quantity equals zero.
+
+        If the quantity is not set, the product is not considered sold out.
+        """
         return self.quantity is not None and self.quantity == 0
 
     @property
     def is_last_piece(self) -> bool:
-        """A product is considered the last piece if its quantity is one."""
+        """A product is considered the last piece if its quantity is one.
+
+        If the quantity is not set, the product is not considered the last piece.
+        """
         return self.quantity is not None and self.quantity == 1
 
     def compare_quantity(self, new: Product) -> ProductQuantityUpdateInfo:
@@ -243,6 +272,9 @@ class Product(BaseItem):
         This comparison is meaningful primarily when the ``new`` argument
         represents the same product at a different state or time, such as
         after a stock update.
+
+        If either product does not have quantity information, the comparison
+        will indicate no changes in quantity.
 
         Args:
             new (Product): The instance of the product to compare against. It
@@ -254,30 +286,37 @@ class Product(BaseItem):
                 the provided product, such as decreases, increases, depletion,
                 or restocking.
         """
-        self_quantity = self.quantity or 0
-        new_quantity = new.quantity or 0
-
-        if self_quantity > new_quantity:
-            decrease = self_quantity - new_quantity
-            increase = 0
-            last_piece = new.quantity == 1 and self_quantity > 1
-            depleted = new.quantity == 0
-            restocked = False
-        elif self_quantity < new_quantity:
-            decrease = 0
-            increase = new_quantity - self_quantity
-            last_piece = False
-            depleted = False
-            restocked = self_quantity == 0
+        if self.quantity is None or new.quantity is None:
+            quantity_decrease = 0
+            quantity_increase = 0
+            is_last_piece = False
+            is_depleted = False
+            is_restocked = False
+        elif self.quantity > new.quantity:
+            quantity_decrease = self.quantity - new.quantity
+            quantity_increase = 0
+            is_last_piece = new.quantity == 1 and self.quantity > 1
+            is_depleted = new.quantity == 0
+            is_restocked = False
+        elif self.quantity < new.quantity:
+            quantity_decrease = 0
+            quantity_increase = new.quantity - self.quantity
+            is_last_piece = False
+            is_depleted = False
+            is_restocked = self.quantity == 0
         else:
-            decrease = 0
-            increase = 0
-            last_piece = False
-            depleted = False
-            restocked = False
+            quantity_decrease = 0
+            quantity_increase = 0
+            is_last_piece = False
+            is_depleted = False
+            is_restocked = False
 
         return ProductQuantityUpdateInfo(
-            decrease, increase, last_piece, depleted, restocked
+            quantity_decrease,
+            quantity_increase,
+            is_last_piece,
+            is_depleted,
+            is_restocked,
         )
 
     def compare_price(self, new: Product) -> ProductPriceUpdateInfo:
@@ -287,6 +326,10 @@ class Product(BaseItem):
         This comparison is meaningful primarily when the ``new`` argument
         represents the same product but in a different pricing state, such as
         after a price adjustment.
+
+        If either product does not specify full or current prices, the comparison
+        will indicate no changes in those prices and related metrics such as
+        discount rates or sale status.
 
         Args:
             new (Product): The instance of the product to compare against. It
@@ -298,37 +341,41 @@ class Product(BaseItem):
                 product, such as changes in full price, current price, discount
                 rates, and flags indicating the start or end of a sale.
         """
-        self_price_full = self.price_full or 0.0
-        new_price_full = new.price_full or 0.0
-        self_price_curr = self.price_curr or 0.0
-        new_price_curr = new.price_curr or 0.0
-        self_discount_rate = self.discount_rate or 0.0
-        new_discount_rate = new.discount_rate or 0.0
-
-        # Compare full prices
-        if self_price_full > new_price_full:
-            price_full_decrease = self_price_full - new_price_full
-            price_full_increase = 0.0
-        elif self_price_full < new_price_full:
+        # compare full prices
+        if self.price_full is None or new.price_full is None:
             price_full_decrease = 0.0
-            price_full_increase = new_price_full - self_price_full
+            price_full_increase = 0.0
+        elif self.price_full > new.price_full:
+            price_full_decrease = self.price_full - new.price_full
+            price_full_increase = 0.0
+        elif self.price_full < new.price_full:
+            price_full_decrease = 0.0
+            price_full_increase = new.price_full - self.price_full
         else:
             price_full_decrease = 0.0
             price_full_increase = 0.0
 
         # compare current prices
-        if self_price_curr > new_price_curr:
-            price_curr_decrease = self_price_curr - new_price_curr
-            price_curr_increase = 0.0
-        elif self_price_curr < new_price_curr:
+        if self.price_curr is None or new.price_curr is None:
             price_curr_decrease = 0.0
-            price_curr_increase = new_price_curr - self_price_curr
+            price_curr_increase = 0.0
+        elif self.price_curr > new.price_curr:
+            price_curr_decrease = self.price_curr - new.price_curr
+            price_curr_increase = 0.0
+        elif self.price_curr < new.price_curr:
+            price_curr_decrease = 0.0
+            price_curr_increase = new.price_curr - self.price_curr
         else:
             price_curr_decrease = 0.0
             price_curr_increase = 0.0
 
         # compare discount rates
-        if self_discount_rate > new_discount_rate:
+        self_discount_rate = self.discount_rate
+        new_discount_rate = new.discount_rate
+        if self_discount_rate is None or new_discount_rate is None:
+            discount_rate_decrease = 0.0
+            discount_rate_increase = 0.0
+        elif self_discount_rate > new_discount_rate:
             discount_rate_decrease = self_discount_rate - new_discount_rate
             discount_rate_increase = 0.0
         elif self_discount_rate < new_discount_rate:

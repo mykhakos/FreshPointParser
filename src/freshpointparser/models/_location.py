@@ -6,7 +6,6 @@ from typing import Optional
 from pydantic import AliasChoices, Field
 
 from .._utils import normalize_text
-from ..exceptions import FreshPointParserValueError
 from ._base import BaseItem, BasePage
 
 if sys.version_info >= (3, 11):
@@ -96,12 +95,13 @@ class Location(BaseItem):
         return normalize_text(self.address)
 
     @property
-    def coordinates(self) -> LocationCoordinates:
-        """Coordinates of the location as tuple (latitude, longitude)."""
+    def coordinates(self) -> Optional[LocationCoordinates]:
+        """Coordinates of the location as tuple (latitude, longitude).
+
+        If either latitude or longitude is not set, None is returned.
+        """
         if self.latitude is None or self.longitude is None:
-            raise FreshPointParserValueError(
-                'Both latitude and longitude must be set to get coordinates.'
-            )
+            return None
         return LocationCoordinates(self.latitude, self.longitude)
 
 

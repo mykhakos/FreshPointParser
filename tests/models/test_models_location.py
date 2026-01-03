@@ -3,9 +3,6 @@ from types import MappingProxyType
 import pytest
 
 from freshpointparser import get_location_page_url
-from freshpointparser.exceptions import (
-    FreshPointParserValueError,
-)
 from freshpointparser.models import Location, LocationPage
 
 # region Location
@@ -107,24 +104,10 @@ def test_location_prop_coordinates(latitude, longitude, expected_coordinates):
 
 
 def test_location_prop_coordinates_with_none_values():
-    """Test that coordinates raises error when latitude or longitude is None."""
-    location = Location()
-    with pytest.raises(
-        FreshPointParserValueError, match='Both latitude and longitude must be set'
-    ):
-        _ = location.coordinates
-
-    location = Location(latitude=1.23)
-    with pytest.raises(
-        FreshPointParserValueError, match='Both latitude and longitude must be set'
-    ):
-        _ = location.coordinates
-
-    location = Location(longitude=4.56)
-    with pytest.raises(
-        FreshPointParserValueError, match='Both latitude and longitude must be set'
-    ):
-        _ = location.coordinates
+    """Test that coordinates returns None when latitude or longitude is None."""
+    assert Location().coordinates is None
+    assert Location(latitude=1.23).coordinates is None
+    assert Location(longitude=4.56).coordinates is None
 
 
 # endregion Location
