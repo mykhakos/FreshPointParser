@@ -117,6 +117,26 @@ def test_product_init_price_resolve(product, expected_price_full, expected_price
 
 
 @pytest.mark.parametrize(
+    'price_full, price_curr',
+    [
+        pytest.param(5.0, 10.0, id='price_curr > price_full'),
+        pytest.param(0.0, 5.0, id='price_curr > price_full (zero price_full)'),
+        pytest.param(3.5, 3.6, id='price_curr slightly higher than price_full'),
+    ],
+)
+def test_product_init_price_validation_error(price_full, price_curr):
+    """Test that creating a Product with price_curr > price_full triggers validation.
+    
+    Due to BestEffortModel behavior, the Product is created with price_curr set to None
+    instead of raising an exception.
+    """
+    product = Product(price_full=price_full, price_curr=price_curr)
+    # Validation should fail and price_curr should be set to None (default)
+    assert product.price_full == price_full
+    assert product.price_curr is None
+
+
+@pytest.mark.parametrize(
     'name, expected_name_lowercase_ascii',
     [
         pytest.param(None, '', id='None name'),
