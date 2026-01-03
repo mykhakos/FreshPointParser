@@ -553,10 +553,9 @@ class BasePage(BestEffortModel, Generic[TItem]):
             if unhashable:
                 seen_unhashable: List[Any] = []
                 for value in values:
-                    if any(value == seen_value for seen_value in seen_unhashable):
-                        continue
-                    seen_unhashable.append(value)
-                    yield value
+                    if value not in seen_unhashable:
+                        seen_unhashable.append(value)
+                        yield value
             else:
                 try:
                     seen_hashable: Set[Any] = set()
@@ -564,12 +563,12 @@ class BasePage(BestEffortModel, Generic[TItem]):
                         if value not in seen_hashable:
                             seen_hashable.add(value)
                             yield value
-                except TypeError as e:
+                except TypeError as err:
                     raise FreshPointParserTypeError(
                         f"Cannot yield unique values for attribute '{attr}': "
                         f'the values are not hashable. '
                         f"Set 'unhashable=True' to compare the values directly."
-                    ) from e
+                    ) from err
         else:
             yield from values
 
