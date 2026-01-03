@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union
+from typing import Any, Callable, Generic, List, Optional, TypeVar, Union
 
 from ..exceptions import FreshPointParserError
 from ..models._base import BasePage
@@ -110,18 +110,6 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         if isinstance(content, str):
             content = content.encode('utf-8')
         return hashlib.sha1(content).digest()  # noqa: S324
-
-    @staticmethod
-    def _new_base_record_data_from_context(context: ParseContext) -> Dict[str, Any]:
-        """Create a new base record data dictionary from the parsing context.
-
-        Args:
-            context (ParseContext): The parsing context containing metadata.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing base record data.
-        """
-        return {'recorded_at': context.parsed_at}
 
     def _reset_context(self) -> None:
         """Reset the internal parsing context to a new, empty state."""

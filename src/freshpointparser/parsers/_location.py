@@ -83,10 +83,8 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         Returns:
             Location: Parsed and validated Location model instance.
         """
-        parsed_data = self._new_base_record_data_from_context(self._context)
         try:
-            parsed_data.update(location_data['prop'])
-            return Location.model_validate(parsed_data, context=self._context)
+            return Location.model_validate(location_data['prop'], context=self._context)
         except KeyError as err:
             raise FreshPointParserValueError(
                 f"Missing 'prop' key in location item: {location_data}"
@@ -128,7 +126,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         Returns:
             LocationPage: The location page model containing all parsed locations.
         """
-        parsed_data = self._new_base_record_data_from_context(self._context)
+        parsed_data = {'recorded_at': self._context.parsed_at}
 
         locations = self._safe_parse(self._parse_locations, page_content=page_content)
         if locations is not None:

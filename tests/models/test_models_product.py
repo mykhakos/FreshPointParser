@@ -41,7 +41,6 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_curr=None,
                 info=None,
                 pic_url=DEFAULT_PRODUCT_PIC_URL,
-                location_id=None,
             ),
             id='default args',
         ),
@@ -57,7 +56,6 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_curr=3.0,
                 info='Info',
                 pic_url='https://example.com/pic.jpg',
-                location_id=5,  # type: ignore
             ),
             dict(
                 id_='1',
@@ -70,7 +68,6 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_curr=3.0,
                 info='Info',
                 pic_url='https://example.com/pic.jpg',
-                location_id='5',
             ),
             id='custom args',
         ),
@@ -87,7 +84,6 @@ def test_product_init(product, expected_attrs):
     assert product.price_curr == expected_attrs['price_curr']
     assert product.info == expected_attrs['info']
     assert product.pic_url == expected_attrs['pic_url']
-    assert product.location_id == expected_attrs['location_id']
 
 
 @pytest.mark.parametrize(
@@ -210,153 +206,6 @@ def test_product_prop_availability():
 
 
 @pytest.mark.parametrize(
-    'p1, p2, precision, is_p1_newer_than_p2',
-    [
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 15)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 15)),
-            None,
-            None,
-            id='same timestamp - full precision',
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 16)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 15)),
-            None,
-            True,
-            id='first is newer by a second - full precision',
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 15)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 15)),
-            's',
-            None,
-            id="same timestamp - precision 's'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 15, 999999)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 15, 1)),
-            's',
-            None,
-            id="same second - precision 's'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 16, 0)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 15, 999999)),
-            's',
-            True,
-            id="first is newer by a second - precision 's'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 14, 999999)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 15, 0)),
-            's',
-            False,
-            id="first is older by a second - precision 's'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 59)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 0)),
-            'm',
-            None,
-            id="same minute - precision 'm'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 12, 31, 0)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 59)),
-            'm',
-            True,
-            id="first is newer by a minute - precision 'm'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 12, 29, 59)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 30, 0)),
-            'm',
-            False,
-            id="first is older by a minute - precision 'm'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 12, 59, 59)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 0, 0)),
-            'h',
-            None,
-            id="same hour - precision 'h'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 13, 0, 0)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 59, 59)),
-            'h',
-            True,
-            id="first is newer by an hour - precision 'h'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 11, 59, 59)),
-            Product(recorded_at=datetime(2025, 3, 28, 12, 0, 0)),
-            'h',
-            False,
-            id="first is older by an hour - precision 'h'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 28, 23, 59, 59)),
-            Product(recorded_at=datetime(2025, 3, 28, 0, 0, 0)),
-            'd',
-            None,
-            id="same day - precision 'd'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 29, 0, 0, 0)),
-            Product(recorded_at=datetime(2025, 3, 28, 23, 59, 59)),
-            'd',
-            True,
-            id="first is newer by a day - precision 'd'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 27, 23, 59, 59)),
-            Product(recorded_at=datetime(2025, 3, 28, 0, 0, 0)),
-            'd',
-            False,
-            id="first is older by a day - precision 'd'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 31, 23, 59, 59)),
-            Product(recorded_at=datetime(2025, 3, 1, 0, 0, 0)),
-            'd',
-            True,
-            id="first is newer by a month - precision 'd'",
-        ),
-        pytest.param(
-            Product(recorded_at=datetime(2025, 3, 1, 0, 0, 0)),
-            Product(recorded_at=datetime(2025, 3, 31, 23, 59, 59)),
-            'd',
-            False,
-            id="first is older by a month - precision 'd'",
-        ),
-    ],
-)
-def test_product_is_newer_than(p1, p2, precision, is_p1_newer_than_p2):
-    # direct test
-    assert p1.is_newer_than(p2, precision=precision) is is_p1_newer_than_p2
-
-    # reverse test
-    if is_p1_newer_than_p2 is None:
-        is_p2_newer_than_p1 = None
-    else:
-        is_p2_newer_than_p1 = not is_p1_newer_than_p2
-    assert p2.is_newer_than(p1, precision=precision) is is_p2_newer_than_p1
-
-    # test with the product compared to itself
-    assert p1.is_newer_than(p1, precision=precision) is None
-    assert p2.is_newer_than(p2, precision=precision) is None
-
-
-def test_is_newer_than_invalid_precision():
-    p1 = Product(recorded_at=datetime(2024, 1, 1))
-    p2 = Product(recorded_at=datetime(2024, 1, 2))
-    with pytest.raises(FreshPointParserValueError):
-        p1.is_newer_than(p2, precision='q')  # type: ignore[reportArgumentType]
-
-
-@pytest.mark.parametrize(
     'product_this, product_other, diff',
     [
         pytest.param(
@@ -437,172 +286,6 @@ def test_is_newer_than_invalid_precision():
 def test_product_diff(product_this, product_other, diff):
     product_diff = product_this.diff(product_other)
     assert product_diff == diff
-
-
-@pytest.mark.parametrize(
-    'product_this, product_other, kwargs, expected_diff_true, expected_diff_false',
-    [
-        pytest.param(
-            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
-            {},
-            {},
-            {
-                'recorded_at': {
-                    'type': DiffType.UPDATED,
-                    'values': {
-                        'left': datetime(2024, 1, 1, 12, 0, 0),
-                        'right': datetime(2024, 1, 2, 12, 0, 0),
-                    },
-                }
-            },
-            id='only recorded_at differs',
-        ),
-        pytest.param(
-            Product(id_='0', name='Apple', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(id_='0', name='Banana', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
-            {},
-            {
-                'name': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 'Apple', 'right': 'Banana'},
-                }
-            },
-            {
-                'name': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 'Apple', 'right': 'Banana'},
-                },
-                'recorded_at': {
-                    'type': DiffType.UPDATED,
-                    'values': {
-                        'left': datetime(2024, 1, 1, 12, 0, 0),
-                        'right': datetime(2024, 1, 2, 12, 0, 0),
-                    },
-                },
-            },
-            id='recorded_at and name differ',
-        ),
-        pytest.param(
-            Product(id_='0', name='Apple', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(id_='0', name='Banana', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
-            {'exclude': {'name'}},
-            {},
-            {
-                'recorded_at': {
-                    'type': DiffType.UPDATED,
-                    'values': {
-                        'left': datetime(2024, 1, 1, 12, 0, 0),
-                        'right': datetime(2024, 1, 2, 12, 0, 0),
-                    },
-                }
-            },
-            id='exclude name, only recorded_at diff',
-        ),
-        pytest.param(
-            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Apple'),
-            {'include': {'recorded_at'}},
-            {},
-            {
-                'recorded_at': {
-                    'type': DiffType.UPDATED,
-                    'values': {
-                        'left': datetime(2024, 1, 1, 12, 0, 0),
-                        'right': datetime(2024, 1, 2, 12, 0, 0),
-                    },
-                }
-            },
-            id='include only recorded_at',
-        ),
-        pytest.param(
-            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
-            {'include': {'recorded_at', 'name'}},
-            {
-                'name': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 'Apple', 'right': 'Banana'},
-                }
-            },
-            {
-                'name': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 'Apple', 'right': 'Banana'},
-                },
-                'recorded_at': {
-                    'type': DiffType.UPDATED,
-                    'values': {
-                        'left': datetime(2024, 1, 1, 12, 0, 0),
-                        'right': datetime(2024, 1, 2, 12, 0, 0),
-                    },
-                },
-            },
-            id='include recorded_at and name',
-        ),
-        pytest.param(
-            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0)),
-            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0)),
-            {'by_alias': True},
-            {},
-            {
-                'recordedAt': {
-                    'type': DiffType.UPDATED,
-                    'values': {
-                        'left': datetime(2024, 1, 1, 12, 0, 0),
-                        'right': datetime(2024, 1, 2, 12, 0, 0),
-                    },
-                }
-            },
-            id='by_alias kwarg',
-        ),
-        pytest.param(
-            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
-            {'exclude': {'recorded_at'}},
-            {
-                'name': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 'Apple', 'right': 'Banana'},
-                }
-            },
-            {
-                'name': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 'Apple', 'right': 'Banana'},
-                }
-            },
-            id='exclude kwarg includes recorded_at',
-        ),
-        pytest.param(
-            Product(id_='0', recorded_at=datetime(2024, 1, 1, 12, 0, 0), name='Apple'),
-            Product(id_='0', recorded_at=datetime(2024, 1, 2, 12, 0, 0), name='Banana'),
-            {'exclude': {'recorded_at'}},
-            {
-                'name': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 'Apple', 'right': 'Banana'},
-                }
-            },
-            {
-                'name': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 'Apple', 'right': 'Banana'},
-                }
-            },
-            id='exclude kwarg includes recorded_at',
-        ),
-    ],
-)
-def test_product_diff_exclude_recorded_at_with_kwargs(
-    product_this, product_other, kwargs, expected_diff_true, expected_diff_false
-):
-    # exclude_recorded_at=True
-    product_diff = product_this.diff(product_other, exclude_recorded_at=True, **kwargs)
-    assert product_diff == expected_diff_true
-    # exclude_recorded_at=False
-    product_diff = product_this.diff(product_other, exclude_recorded_at=False, **kwargs)
-    assert product_diff == expected_diff_false
 
 
 @pytest.mark.parametrize(
@@ -952,20 +635,12 @@ def test_compare_price(product_this, product_other, info):
         ),
         pytest.param(
             ProductPage(
-                items=[
-                    Product(
-                        id_='1', location_id='296', recorded_at=datetime(2025, 1, 1)
-                    )
-                ],
+                items=[Product(id_='1')],
                 location_id=296,  # type: ignore[reportGeneralTypeIssues]
                 location_name='foo',
             ),
             {
-                'items': [
-                    Product(
-                        id_='1', location_id='296', recorded_at=datetime(2025, 1, 1)
-                    )
-                ],
+                'items': [Product(id_='1')],
                 'location_id': '296',
                 'location_name': 'foo',
             },
@@ -1387,6 +1062,153 @@ def test_iter_item_attr_defaults_and_uniqueness():
     # TypeError on unhashable unique without flag
     with pytest.raises(AttributeError):
         list(page.iter_item_attr('context', unique=True))
+
+
+@pytest.mark.parametrize(
+    'p1, p2, precision, is_p1_newer_than_p2',
+    [
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 15)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 15)),
+            None,
+            None,
+            id='same timestamp - full precision',
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 16)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 15)),
+            None,
+            True,
+            id='first is newer by a second - full precision',
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 15)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 15)),
+            's',
+            None,
+            id="same timestamp - precision 's'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 15, 999999)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 15, 1)),
+            's',
+            None,
+            id="same second - precision 's'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 16, 0)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 15, 999999)),
+            's',
+            True,
+            id="first is newer by a second - precision 's'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 14, 999999)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 15, 0)),
+            's',
+            False,
+            id="first is older by a second - precision 's'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 59)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 0)),
+            'm',
+            None,
+            id="same minute - precision 'm'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 31, 0)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 59)),
+            'm',
+            True,
+            id="first is newer by a minute - precision 'm'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 29, 59)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 30, 0)),
+            'm',
+            False,
+            id="first is older by a minute - precision 'm'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 59, 59)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 0, 0)),
+            'h',
+            None,
+            id="same hour - precision 'h'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 13, 0, 0)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 59, 59)),
+            'h',
+            True,
+            id="first is newer by an hour - precision 'h'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 11, 59, 59)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 12, 0, 0)),
+            'h',
+            False,
+            id="first is older by an hour - precision 'h'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 28, 23, 59, 59)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 0, 0, 0)),
+            'd',
+            None,
+            id="same day - precision 'd'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 29, 0, 0, 0)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 23, 59, 59)),
+            'd',
+            True,
+            id="first is newer by a day - precision 'd'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 27, 23, 59, 59)),
+            ProductPage(recorded_at=datetime(2025, 3, 28, 0, 0, 0)),
+            'd',
+            False,
+            id="first is older by a day - precision 'd'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 31, 23, 59, 59)),
+            ProductPage(recorded_at=datetime(2025, 3, 1, 0, 0, 0)),
+            'd',
+            True,
+            id="first is newer by a month - precision 'd'",
+        ),
+        pytest.param(
+            ProductPage(recorded_at=datetime(2025, 3, 1, 0, 0, 0)),
+            ProductPage(recorded_at=datetime(2025, 3, 31, 23, 59, 59)),
+            'd',
+            False,
+            id="first is older by a month - precision 'd'",
+        ),
+    ],
+)
+def test_product_page_is_newer_than(p1, p2, precision, is_p1_newer_than_p2):
+    # direct test
+    assert p1.is_newer_than(p2, precision=precision) is is_p1_newer_than_p2
+
+    # reverse test
+    if is_p1_newer_than_p2 is None:
+        is_p2_newer_than_p1 = None
+    else:
+        is_p2_newer_than_p1 = not is_p1_newer_than_p2
+    assert p2.is_newer_than(p1, precision=precision) is is_p2_newer_than_p1
+
+    # test with the product compared to itself
+    assert p1.is_newer_than(p1, precision=precision) is None
+    assert p2.is_newer_than(p2, precision=precision) is None
+
+
+def test_is_newer_than_invalid_precision():
+    p1 = ProductPage(recorded_at=datetime(2024, 1, 1))
+    p2 = ProductPage(recorded_at=datetime(2024, 1, 2))
+    with pytest.raises(FreshPointParserValueError):
+        p1.is_newer_than(p2, precision='q')  # type: ignore[reportArgumentType]
 
 
 # endregion ProductPage

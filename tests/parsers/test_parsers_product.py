@@ -388,7 +388,7 @@ def test_parse_product_success():
     """
     tag = bs4.BeautifulSoup(html, 'lxml').find('div', class_='product')
     assert tag is not None
-    product = parser._parse_product(tag, location_id='10')
+    product = parser._parse_product(tag)
 
     assert isinstance(product, Product)
     assert product.id_ == '1'
@@ -396,7 +396,6 @@ def test_parse_product_success():
     assert product.is_vegetarian is True
     assert product.price_full == 50.0
     assert product.quantity == 2
-    assert product.location_id == '10'
 
 
 def test_parse_product_minimal_data():
@@ -406,12 +405,11 @@ def test_parse_product_minimal_data():
     html = '<div class="product" data-id="1" data-name="Test"></div>'
     tag = bs4.BeautifulSoup(html, 'lxml').find('div', class_='product')
     assert tag is not None
-    product = parser._parse_product(tag, location_id=None)
+    product = parser._parse_product(tag)
 
     assert isinstance(product, Product)
     assert product.id_ == '1'
     assert product.name == 'Test'
-    assert product.location_id is None
 
 
 def test_parse_products_multiple():
@@ -426,7 +424,7 @@ def test_parse_products_multiple():
     """
     bs4_parser = bs4.BeautifulSoup(html, 'lxml')
 
-    products = parser._parse_products(bs4_parser, location_id=None)
+    products = parser._parse_products(bs4_parser)
     assert len(products) == 3
     assert products[0].id_ == '1'
     assert products[1].id_ == '2'
@@ -439,7 +437,7 @@ def test_parse_products_empty():
     html = '<html><body></body></html>'
     bs4_parser = bs4.BeautifulSoup(html, 'lxml')
 
-    products = parser._parse_products(bs4_parser, location_id=None)
+    products = parser._parse_products(bs4_parser)
     assert len(products) == 0
 
 
@@ -455,7 +453,7 @@ def test_parse_products_partial_failure():
     """
     bs4_parser = bs4.BeautifulSoup(html, 'lxml')
 
-    products = parser._parse_products(bs4_parser, location_id=None)
+    products = parser._parse_products(bs4_parser)
     # All 3 products should be created - missing optional fields get defaults
     assert len(products) == 3
     assert products[0].id_ == '1'

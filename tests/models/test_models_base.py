@@ -1,13 +1,12 @@
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import List, Optional
 
 from pydantic import ValidationError
 
-from freshpointparser.models._base import BaseRecord
+from freshpointparser.models._base import BestEffortModel
 
 
-class DummyRecord(BaseRecord):
+class DummyRecord(BestEffortModel):
     """A dummy model for testing purposes with optional fields."""
 
     field1: Optional[str] = None
@@ -141,20 +140,15 @@ def test_log_failed_validation_mixed_valid_invalid():
 def test_log_failed_validation_preserves_recorded_at():
     """Test that recorded_at field is preserved even when other fields fail validation."""
     context = MockContext()
-    test_datetime = datetime(2025, 12, 27, 10, 30, 0)
 
     record = DummyRecord.model_validate(
         {
             'field1': 'valid',
             'field2': 'invalid',
             'field3': [1.0],
-            'recorded_at': test_datetime,
         },
         context=context,
     )
-
-    # recorded_at should be preserved
-    assert record.recorded_at == test_datetime
 
     # Other fields behave as expected
     assert record.field1 == 'valid'

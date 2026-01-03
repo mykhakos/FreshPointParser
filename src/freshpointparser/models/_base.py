@@ -13,7 +13,6 @@ from typing import (
     Iterator,
     List,
     Literal,
-    MutableMapping,
     Optional,
     Protocol,
     Set,
@@ -154,6 +153,9 @@ def model_diff(
         FieldDiffMapping: A dictionary mapping field names to their differences,
         each containing the diff type and a pair of left/right values.
     """
+    if left is right:
+        return {}
+
     left_asdict = left.model_dump(**model_dump_kwargs)
     right_asdict = right.model_dump(**model_dump_kwargs)
     diff = {}
@@ -272,107 +274,15 @@ class BestEffortModel(BaseModel):
             return handler(cleaned_data)
 
 
-# region BaseRecord
-
-
-class BaseRecord(BestEffortModel):
-    """Base model of a FreshPoint record."""
-
-    model_config = ConfigDict(alias_generator=ToCamel(), populate_by_name=True)
-
-    recorded_at: datetime = Field(
-        default_factory=datetime.now,
-        title='Recorded At',
-        description='Datetime when the data has been recorded.',
-    )
-    """Datetime when the data has been recorded."""
-
-    def is_newer_than(
-        self,
-        other: BaseRecord,
-        precision: Optional[Literal['s', 'm', 'h', 'd']] = None,
-    ) -> Optional[bool]:
-        """Check if this record is newer than another one by comparing
-        their ``recorded_at`` fields at the specified precision.
-
-        Note that precision here means truncating the datetime to the desired
-        level (e.g., cutting off seconds, minutes, etc.), not rounding it.
-
-        Args:
-            other (BaseRecord): The record to compare against.
-            precision (Optional[Literal['s', 'm', 'h', 'd']]): The level of
-                precision for the comparison. Supported values:
-
-                - ``None``: full precision (microsecond) (default)
-                - ``s``: second precision
-                - ``m``: minute precision
-                - ``h``: hour precision
-                - ``d``: date precision
-
-        Raises:
-            FreshPointParserValueError: If the precision is not one of the supported values.
-
-        Returns:
-            Optional[bool]: With the specified precision taken into account,
-                - True if this model's record datetime is newer than the other's
-                - False if this model's record datetime is older than the other's
-                - None if the record datetimes are the same
-        """
-        recorded_at_self: Union[datetime, date]
-        recorded_at_other: Union[datetime, date]
-        if precision is None:
-            recorded_at_self = self.recorded_at
-            recorded_at_other = other.recorded_at
-        elif precision == 's':
-            recorded_at_self = self.recorded_at.replace(microsecond=0)
-            recorded_at_other = other.recorded_at.replace(microsecond=0)
-        elif precision == 'm':
-            recorded_at_self = self.recorded_at.replace(second=0, microsecond=0)
-            recorded_at_other = other.recorded_at.replace(second=0, microsecond=0)
-        elif precision == 'h':
-            recorded_at_self = self.recorded_at.replace(
-                minute=0, second=0, microsecond=0
-            )
-            recorded_at_other = other.recorded_at.replace(
-                minute=0, second=0, microsecond=0
-            )
-        elif precision == 'd':
-            recorded_at_self = self.recorded_at.date()
-            recorded_at_other = other.recorded_at.date()
-        else:
-            raise FreshPointParserValueError(
-                f"Invalid precision '{precision}'. Expected one of: 's', 'm', 'h', 'd'."
-            )
-        if recorded_at_self == recorded_at_other:
-            return None
-        return recorded_at_self > recorded_at_other
-
-
-def remove_recorded_at_from_mapping(
-    mapping: MutableMapping[str, Any],
-) -> MutableMapping[str, Any]:
-    """Remove the ``recorded_at`` field or its CamelCase alias from the given mapping
-    if present.
-
-    Args:
-        mapping (MutableMapping[str, Any]): The mapping to modify.
-
-    Returns:
-        MutableMapping[str, Any]: The modified mapping.
-    """
-    field_name = 'recorded_at'
-    mapping.pop(field_name, None)
-    mapping.pop(to_camel(field_name), None)
-    return mapping
-
-
-# endregion BaseRecord
+# endregion BestEffortModel
 
 # region BaseItem
 
 
-class BaseItem(BaseRecord):
+class BaseItem(BestEffortModel):
     """Base model of a FreshPoint item."""
+
+    model_config = ConfigDict(alias_generator=ToCamel(), populate_by_name=True)
 
     id_: Optional[str] = Field(
         default=None,
@@ -384,13 +294,7 @@ class BaseItem(BaseRecord):
     )
     """Unique item identifier (numeric unless undefined)."""
 
-    def diff(
-        self,
-        other: BaseItem,
-        *,
-        exclude_recorded_at: bool = True,
-        **kwargs: Any,
-    ) -> FieldDiffMapping:
+    def diff(self, other: BaseItem, **kwargs: Any) -> FieldDiffMapping:
         """Compare this item with another one to identify which item fields
         have different values.
 
@@ -401,15 +305,10 @@ class BaseItem(BaseRecord):
         the items, its value is considered to be ``None``.
 
         The data is serialized according to the item models' configurations
-        using ``model_dump``. The ``metadata`` field is ignored in the comparison.
+        using ``model_dump``.
 
         Args:
             other (BaseItem): The item to compare against.
-            exclude_recorded_at (bool): If True, the ``recorded_at`` field is
-                excluded from comparison. This argument is a shortcut for
-                ``exclude={'recorded_at': ...}``. It takes precedence over any
-                standard exclusion and inclusion parameters passed via ``kwargs``.
-                Defaults to True.
             **kwargs: Additional keyword arguments passed to each item model's
                 ``model_dump`` call, such as ``exclude``, ``include``,
                 ``by_alias``, and others.
@@ -448,12 +347,7 @@ class BaseItem(BaseRecord):
             ... }
 
         """
-        if self is other:
-            return {}
-        diff = model_diff(self, other, kwargs)
-        if exclude_recorded_at:
-            remove_recorded_at_from_mapping(diff)
-        return diff
+        return model_diff(self, other, kwargs)
 
 
 # endregion BaseItem
@@ -471,8 +365,17 @@ TItem = TypeVar(
 """Type variable to annotate item models."""
 
 
-class BasePage(BaseRecord, Generic[TItem]):
+class BasePage(BestEffortModel, Generic[TItem]):
     """Base data model of a FreshPoint page."""
+
+    model_config = ConfigDict(alias_generator=ToCamel(), populate_by_name=True)
+
+    recorded_at: datetime = Field(
+        default_factory=datetime.now,
+        title='Recorded At',
+        description='Datetime when the data has been recorded.',
+    )
+    """Datetime when the data has been recorded."""
 
     items: List[TItem] = Field(
         default_factory=list,
@@ -487,13 +390,7 @@ class BasePage(BaseRecord, Generic[TItem]):
         """Total number of items on the page."""
         return len(self.items)
 
-    def item_diff(
-        self,
-        other: BasePage[TItem],
-        *,
-        exclude_recorded_at: bool = True,
-        **kwargs: Any,
-    ) -> ModelDiffMapping:
+    def item_diff(self, other: BasePage[TItem], **kwargs: Any) -> ModelDiffMapping:
         """Compare items between this page and another one to identify which
         items differ. Items are matched by their ID.
 
@@ -503,19 +400,11 @@ class BasePage(BaseRecord, Generic[TItem]):
         is considered to be *Deleted*. If the item is not present in any of
         the pages, its fields are considered to be ``None``.
 
-        By default, the ``recorded_at`` field is excluded from comparison with
-        the ``exclude_recorded_at`` argument set to ``True``. This argument acts
-        similar to the standard ``exclude_xx`` Pydantic serialization flags.
-
         The data is serialized according to the item models' configurations
         using ``model_dump``.
 
         Args:
             other (BasePage): The page to compare against.
-            exclude_recorded_at (bool): If True, the ``recorded_at`` field is
-                excluded from comparison. This argument is a shortcut for
-                ``exclude={'recorded_at': ...}``. It takes precedence over any
-                standard exclusion and inclusion parameters passed via ``kwargs``.
             **kwargs: Additional keyword arguments passed to each item model's
                 ``model_dump`` call, such as ``exclude``, ``include``,
                 ``by_alias``, and others.
@@ -586,9 +475,6 @@ class BasePage(BaseRecord, Generic[TItem]):
                 item_diff_type = DiffType.UPDATED
                 item_diff = model_diff(item_self, item_other, kwargs)
 
-            if exclude_recorded_at:
-                remove_recorded_at_from_mapping(item_diff)
-
             if item_diff:
                 diff[item_id] = ModelDiff(type=item_diff_type, diff=item_diff)
 
@@ -598,9 +484,6 @@ class BasePage(BaseRecord, Generic[TItem]):
                 if item_id not in items_as_dict_self:
                     item_diff_type = DiffType.CREATED
                     item_diff = model_diff(item_missing, item_other, kwargs)
-
-                    if exclude_recorded_at:
-                        remove_recorded_at_from_mapping(item_diff)
 
                     if item_diff:
                         diff[item_id] = ModelDiff(type=item_diff_type, diff=item_diff)
@@ -808,6 +691,67 @@ class BasePage(BaseRecord, Generic[TItem]):
             f'Constraint must be either a Mapping or a Callable. '
             f"Got type '{type(constraint)}' instead."
         )
+
+    def is_newer_than(
+        self,
+        other: BasePage,
+        precision: Optional[Literal['s', 'm', 'h', 'd']] = None,
+    ) -> Optional[bool]:
+        """Check if this page is newer than another one by comparing
+        their ``recorded_at`` fields at the specified precision.
+
+        Note that precision here means truncating the datetime to the desired
+        level (e.g., cutting off seconds, minutes, etc.), not rounding it.
+
+        Args:
+            other (BasePage): The page to compare against.
+            precision (Optional[Literal['s', 'm', 'h', 'd']]): The level of
+                precision for the comparison. Supported values:
+
+                - ``None``: full precision (microsecond) (default)
+                - ``s``: second precision
+                - ``m``: minute precision
+                - ``h``: hour precision
+                - ``d``: date precision
+
+        Raises:
+            FreshPointParserValueError: If the precision is not one of
+                the supported values.
+
+        Returns:
+            Optional[bool]: With the specified precision taken into account,
+                - True if this model's record datetime is newer than the other's
+                - False if this model's record datetime is older than the other's
+                - None if the record datetimes are the same
+        """
+        recorded_at_self: Union[datetime, date]
+        recorded_at_other: Union[datetime, date]
+        if precision is None:
+            recorded_at_self = self.recorded_at
+            recorded_at_other = other.recorded_at
+        elif precision == 's':
+            recorded_at_self = self.recorded_at.replace(microsecond=0)
+            recorded_at_other = other.recorded_at.replace(microsecond=0)
+        elif precision == 'm':
+            recorded_at_self = self.recorded_at.replace(second=0, microsecond=0)
+            recorded_at_other = other.recorded_at.replace(second=0, microsecond=0)
+        elif precision == 'h':
+            recorded_at_self = self.recorded_at.replace(
+                minute=0, second=0, microsecond=0
+            )
+            recorded_at_other = other.recorded_at.replace(
+                minute=0, second=0, microsecond=0
+            )
+        elif precision == 'd':
+            recorded_at_self = self.recorded_at.date()
+            recorded_at_other = other.recorded_at.date()
+        else:
+            raise FreshPointParserValueError(
+                f"Invalid precision '{precision}'. Expected one of: 's', 'm', 'h', 'd'."
+            )
+        if recorded_at_self == recorded_at_other:
+            return None
+        return recorded_at_self > recorded_at_other
 
 
 # endregion BasePage

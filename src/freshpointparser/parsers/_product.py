@@ -1,6 +1,6 @@
 import html
 import re
-from typing import Callable, List, Optional, Tuple, TypeVar, Union
+from typing import Callable, List, Tuple, TypeVar, Union
 
 import bs4
 
@@ -298,23 +298,17 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         except Exception as exc:
             raise FreshPointParserValueError('Unable to parse location name.') from exc
 
-    def _parse_product(
-        self, product_data: bs4.Tag, location_id: Optional[str]
-    ) -> Product:
+    def _parse_product(self, product_data: bs4.Tag) -> Product:
         """Parse the a single product item to a Product model.
 
         Args:
             product_data (bs4.Tag): The Tag containing the product data.
-            location_id (Optional[str]): The ID of the location
-                the product belongs to.
+
 
         Returns:
             Product: Parsed and validated Product model instance.
         """
-        parsed_data = self._new_base_record_data_from_context(self._context)
-
-        if location_id is not None:
-            parsed_data['location_id'] = location_id
+        parsed_data = {}
 
         for field, parser_func in (
             ('id_', ProductHTMLParser.find_id),
@@ -340,25 +334,19 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
 
         return Product.model_validate(parsed_data, context=self._context)
 
-    def _parse_products(
-        self, bs4_parser: bs4.BeautifulSoup, location_id: Optional[str]
-    ) -> List[Product]:
+    def _parse_products(self, bs4_parser: bs4.BeautifulSoup) -> List[Product]:
         """Parse all products from the page HTML content.
 
         Args:
             bs4_parser (bs4.BeautifulSoup): The BeautifulSoup parser
                 initialized with the page HTML content.
-            location_id (Optional[str]): The ID of the location
-                the products belong to.
 
         Returns:
             List[Product]: Parsed and validated Product model instances.
         """
         products = []
         for product_data in bs4_parser.find_all('div', class_='product'):
-            product = self._safe_parse(
-                self._parse_product, product_data=product_data, location_id=location_id
-            )
+            product = self._safe_parse(self._parse_product, product_data=product_data)
             if product is not None:
                 products.append(product)
         return products
@@ -372,7 +360,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             page_content (Union[str, bytes]): HTML content of
                 the product page to parse.
         """
-        parsed_data = self._new_base_record_data_from_context(self._context)
+        parsed_data = {'recorded_at': self._context.parsed_at}
 
         bs4_parser = bs4.BeautifulSoup(page_content, 'lxml')
 
@@ -386,9 +374,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         if location_name is not None:
             parsed_data['location_name'] = location_name
 
-        products = self._safe_parse(
-            self._parse_products, bs4_parser=bs4_parser, location_id=location_id
-        )
+        products = self._safe_parse(self._parse_products, bs4_parser=bs4_parser)
         if products is not None:
             parsed_data['items'] = products
 
