@@ -125,13 +125,9 @@ def test_product_init_price_resolve(product, expected_price_full, expected_price
     ],
 )
 def test_product_init_price_validation_error(price_full, price_curr):
-    """Test that creating a Product with price_curr > price_full triggers validation.
-    
-    Due to BestEffortModel behavior, the Product is created with price_curr set to None
-    instead of raising an exception.
-    """
     product = Product(price_full=price_full, price_curr=price_curr)
     # Validation should fail and price_curr should be set to None (default)
+    # instead of raising an exception due to the nature of BestEffortModel
     assert product.price_full == price_full
     assert product.price_curr is None
 
