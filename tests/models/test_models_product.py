@@ -158,6 +158,20 @@ def test_product_prop_category_lowercase_ascii(
 
 
 @pytest.mark.parametrize(
+    'price_curr, price_full, expected_price',
+    [
+        pytest.param(None, None, None, id='neither price set'),
+        pytest.param(2.5, None, 2.5, id='only price_curr set'),
+        pytest.param(None, 3.0, 3.0, id='only price_full set'),
+        pytest.param(2.5, 3.0, 2.5, id='both prices set'),
+    ],
+)
+def test_product_prop_price(price_curr, price_full, expected_price):
+    product = Product(price_curr=price_curr, price_full=price_full)
+    assert product.price == expected_price
+
+
+@pytest.mark.parametrize(
     'product, rate',
     [
         pytest.param(Product(price_full=0, price_curr=0), 0, id='both prices (zero)'),

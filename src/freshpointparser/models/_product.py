@@ -176,7 +176,7 @@ class Product(BaseItem):
     def _validate_price_curr(cls, price_curr: float, info: ValidationInfo) -> float:
         """Validate that the current selling price is not higher than the full price."""
         price_full = info.data.get('price_full')
-        if price_full is not None and price_full < price_curr:
+        if price_curr is not None and price_full is not None and price_full < price_curr:
             raise FreshPointParserValueError(
                 f'Full price ({price_full}) cannot be lower than '
                 f'current price ({price_curr}).'
