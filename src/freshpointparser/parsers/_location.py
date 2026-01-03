@@ -10,9 +10,15 @@ from ._base import BasePageHTMLParser, ParseResult
 class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
     """Parses HTML content of a FreshPoint location webpage ``my.freshpoint.cz``."""
 
-    _RE_SEARCH_PATTERN_STR = re.compile(r'devices\s*=\s*("\[.*\]");')
+    _RE_SEARCH_PATTERN_STR = re.compile(
+        r'\bdevices\b\s*=\s*("\[(?:\\.|[^"\\])*\]")\s*;',
+        re.DOTALL,
+    )
     """Regex pattern to search for the location data in the HTML string."""
-    _RE_SEARCH_PATTERN_BYTES = re.compile(rb'devices\s*=\s*("\[.*\]");')
+    _RE_SEARCH_PATTERN_BYTES = re.compile(
+        rb'\bdevices\b\s*=\s*("\[(?:\\.|[^"\\])*\]")\s*;',
+        re.DOTALL,
+    )
     """Regex pattern to search for the location data in the HTML bytes."""
 
     def _load_json(self, page_content: Union[str, bytes]) -> List[Dict]:
