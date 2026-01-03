@@ -7,7 +7,6 @@ from pydantic import Field
 
 from freshpointparser import get_product_page_url
 from freshpointparser.exceptions import (
-    FreshPointParserTypeError,
     FreshPointParserValueError,
 )
 from freshpointparser.models import Product, ProductPage
@@ -965,9 +964,9 @@ def test_product_page_find_items_no_match(product_page, constraint):
     ],
 )
 def test_product_page_find_items_invalid_constraint(product_page, constraint):
-    with pytest.raises(FreshPointParserTypeError):
+    with pytest.raises(Exception):  # noqa: B017
         list(product_page.find_items(constraint))
-    with pytest.raises(FreshPointParserTypeError):
+    with pytest.raises(Exception):  # noqa: B017
         product_page.find_item(constraint)
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import sys
-from collections.abc import Mapping
 from datetime import date, datetime
 from enum import Enum
 from typing import (
@@ -13,6 +12,7 @@ from typing import (
     Iterator,
     List,
     Literal,
+    Mapping,
     Optional,
     Protocol,
     Set,
@@ -47,7 +47,7 @@ logger = logging.getLogger('freshpointparser.models')
 
 _NoDefaultType = Enum('_NoDefaultType', 'NO_DEFAULT')
 _NO_DEFAULT = _NoDefaultType.NO_DEFAULT
-"""Sentinel value for the ``default`` argument of ``getattr()``."""
+"""Placeholder for a default parameter value."""
 
 
 T = TypeVar('T')
@@ -462,7 +462,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
             item.id_: item for item in other.items if item.id_ is not None
         }
         item_missing = EmptyModel()
-        diff = {}
+        diff: ModelDiffMapping = {}
 
         # compare self to other
         for item_id, item_self in items_as_dict_self.items():
@@ -635,7 +635,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 is the expected value. If a key is not present in the item, this
                 item is skipped.
 
-                Example: ``{'name': ``'foo'``}`` will match items where
+                Example: ``{'name': 'foo'}`` will match items where
                 the ``name`` attribute of the item is equal to ``'foo'``.
 
                 - Callable that receives an item instance and returns a boolean.
@@ -644,53 +644,29 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 argument, which is an instance of the item model, and return
                 a boolean value indicating whether the item meets the constraint.
 
-                Example: ``lambda item: ``'foo'`` in item.name`` will match items
-                where the ``name`` attribute of the item contains the string
-                ``'foo'``.
-
-        Raises:
-            FreshPointParserTypeError: If the constraint is invalid, i.e., not a
-                Mapping or a Callable.
+                Example: ``lambda item: 'foo' in item.name`` will match items
+                where the ``name`` attribute of the item contains ``'foo'``.
 
         Returns:
             Iterator[TBaseItem]: A lazy iterator over all items on the page that
             match the given constraint.
         """
         if callable(constraint):
-
-            def _filter_callable() -> Iterator[TItem]:
-                for item in self.items:
-                    try:
-                        if constraint(item):
-                            yield item
-                    except TypeError as exc:  # invalid callable signature
-                        if type(exc) is TypeError:
-                            raise FreshPointParserTypeError(str(exc)) from exc
-                        raise
-
-            return _filter_callable()
-
-        if isinstance(constraint, Mapping):
-
-            def _filter_mapping() -> Iterator[TItem]:
-                for item in self.items:
-                    try:
-                        if all(
-                            getattr(item, attr, _NO_DEFAULT) == value
-                            for attr, value in constraint.items()
-                        ):
-                            yield item
-                    except TypeError as exc:  # invalid attribute type
-                        if type(exc) is TypeError:
-                            raise FreshPointParserTypeError(str(exc)) from exc
-                        raise
-
-            return _filter_mapping()
-
-        raise FreshPointParserTypeError(
-            f'Constraint must be either a Mapping or a Callable. '
-            f"Got type '{type(constraint)}' instead."
-        )
+            for item in self.items:
+                if constraint(item):
+                    yield item
+        elif isinstance(constraint, Mapping):
+            for item in self.items:
+                if all(
+                    getattr(item, attr, _NO_DEFAULT) == value
+                    for attr, value in constraint.items()
+                ):
+                    yield item
+        else:
+            raise FreshPointParserTypeError(
+                f'Constraint must be either a Mapping or a Callable. '
+                f"Got type '{type(constraint).__name__}' instead."
+            )
 
     def is_newer_than(
         self,

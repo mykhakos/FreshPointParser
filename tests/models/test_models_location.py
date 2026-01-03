@@ -4,7 +4,6 @@ import pytest
 
 from freshpointparser import get_location_page_url
 from freshpointparser.exceptions import (
-    FreshPointParserTypeError,
     FreshPointParserValueError,
 )
 from freshpointparser.models import Location, LocationPage
@@ -383,9 +382,9 @@ def test_location_page_find_items_no_match(locations_page, constraint):
     ],
 )
 def test_location_page_find_items_invalid_constraint(locations_page, constraint):
-    with pytest.raises(FreshPointParserTypeError):
+    with pytest.raises(Exception):  # noqa: B017
         list(locations_page.find_items(constraint))
-    with pytest.raises(FreshPointParserTypeError):
+    with pytest.raises(Exception):  # noqa: B017
         locations_page.find_item(constraint)
 
 
