@@ -1,4 +1,3 @@
-from datetime import datetime
 from types import MappingProxyType
 
 import pytest
@@ -143,10 +142,8 @@ def test_location_prop_coordinates_with_none_values():
             id='empty page',
         ),
         pytest.param(
-            LocationPage(
-                items=[Location(id_='1', recorded_at=datetime(2025, 6, 1))],
-            ),
-            {'items': [Location(id_='1', recorded_at=datetime(2025, 6, 1))]},
+            LocationPage(items=[Location(id_='1')]),
+            {'items': [Location(id_='1')]},
             id='regular page',
         ),
     ],

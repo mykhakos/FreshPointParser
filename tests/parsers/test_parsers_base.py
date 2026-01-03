@@ -7,12 +7,12 @@ from freshpointparser.exceptions import (
     FreshPointParserValueError,
 )
 from freshpointparser.models._base import BasePage
-from freshpointparser.parsers._base import BasePageHTMLParser, ParseContext
+from freshpointparser.parsers._base import BasePageHTMLParser
 
 
 class DummyPageHTMLParser(BasePageHTMLParser[BasePage]):
     def _parse_page_content(self, page_content: Union[str, bytes]) -> BasePage:
-        data = self._new_base_record_data_from_context(self._context)
+        data = {'recorded_at': self._context.parsed_at}
         return BasePage.model_validate(data, context=self._context)
 
 
@@ -26,7 +26,7 @@ class DummyPageHTMLParserWithErrors(BasePageHTMLParser[BasePage]):
             self._context.register_error(
                 FreshPointParserValueError('Simulated parsing error')
             )
-        data = self._new_base_record_data_from_context(self._context)
+        data = {'recorded_at': datetime.now()}
         return BasePage.model_validate(data, context=self._context)
 
 
@@ -257,13 +257,3 @@ def test_parse_alternating_content():
     # Parse A again (cache miss, content changed back)
     result = parser.parse(content_a)
     assert result.metadata.from_cache is False
-
-
-def test_new_base_record_data_from_context():
-    """Test the _new_base_record_data_from_context static method."""
-    context = ParseContext()
-    data = DummyPageHTMLParser._new_base_record_data_from_context(context)
-
-    assert 'recorded_at' in data
-    assert isinstance(data['recorded_at'], datetime)
-    assert data['recorded_at'] == context.parsed_at

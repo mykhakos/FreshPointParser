@@ -167,7 +167,6 @@ def test_parse_location_success():
     assert location.discount_rate == 0.2
     assert location.is_active is True
     assert location.is_suspended is False
-    assert location.recorded_at == parser._context.parsed_at
 
 
 def test_parse_location_minimal_data():
@@ -179,7 +178,6 @@ def test_parse_location_minimal_data():
     }
     location = parser._parse_location(location_data)
     assert isinstance(location, Location)
-    assert location.recorded_at == parser._context.parsed_at
 
 
 def test_parse_location_missing_prop_key():
