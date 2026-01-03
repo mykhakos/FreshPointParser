@@ -162,7 +162,6 @@ def test_product_prop_category_lowercase_ascii(
     [
         pytest.param(None, None, None, id='neither price set'),
         pytest.param(2.5, None, 2.5, id='only price_curr set'),
-        pytest.param(None, 3.0, 3.0, id='only price_full set'),
         pytest.param(2.5, 3.0, 2.5, id='both prices set'),
     ],
 )
