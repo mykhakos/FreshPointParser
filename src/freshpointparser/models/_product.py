@@ -341,7 +341,7 @@ class Product(BaseItem):
                 product, such as changes in full price, current price, discount
                 rates, and flags indicating the start or end of a sale.
         """
-        # Compare full prices
+        # compare full prices
         if self.price_full is None or new.price_full is None:
             price_full_decrease = 0.0
             price_full_increase = 0.0
