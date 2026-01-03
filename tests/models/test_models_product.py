@@ -332,6 +332,18 @@ def test_product_quantity_update_info(
     'product_this, product_other, info',
     [
         pytest.param(
+            Product(),
+            Product(),
+            ProductQuantityUpdateInfo(
+                quantity_decrease=0,
+                quantity_increase=0,
+                is_last_piece=False,
+                is_depleted=False,
+                is_restocked=False,
+            ),
+            id='missing quantity',
+        ),
+        pytest.param(
             Product(quantity=0),
             Product(quantity=0),
             ProductQuantityUpdateInfo(
