@@ -49,7 +49,6 @@ _NoDefaultType = Enum('_NoDefaultType', 'NO_DEFAULT')
 _NO_DEFAULT = _NoDefaultType.NO_DEFAULT
 """Placeholder for a default parameter value."""
 
-
 T = TypeVar('T')
 
 
@@ -67,6 +66,10 @@ class EmptyModel(BaseModel):
     """An empty Pydantic model with no fields."""
 
     model_config = ConfigDict(frozen=True)
+
+
+_EMPTY_MODEL = EmptyModel()
+"""Singleton instance of an empty model."""
 
 
 # region Diff
@@ -461,7 +464,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
         items_as_dict_other = {
             item.id_: item for item in other.items if item.id_ is not None
         }
-        item_missing = EmptyModel()
+        item_missing = _EMPTY_MODEL
         diff: ModelDiffMapping = {}
 
         # compare self to other
