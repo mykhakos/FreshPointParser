@@ -11,7 +11,6 @@ from freshpointparser.exceptions import (
 )
 from freshpointparser.models import Product, ProductPage
 from freshpointparser.models.types import (
-    DiffType,
     ProductPriceUpdateInfo,
     ProductQuantityUpdateInfo,
 )
@@ -240,22 +239,10 @@ def test_product_prop_availability():
             Product(id_='123', name='foo', quantity=0, price_full=5),
             Product(id_='321', name='bar', quantity=5, price_full=10),
             {
-                'id_': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': '123', 'right': '321'},
-                },
-                'name': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 'foo', 'right': 'bar'},
-                },
-                'quantity': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 0, 'right': 5},
-                },
-                'price_full': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 5, 'right': 10},
-                },
+                'id_': {'left': '123', 'right': '321'},
+                'name': {'left': 'foo', 'right': 'bar'},
+                'quantity': {'left': 0, 'right': 5},
+                'price_full': {'left': 5, 'right': 10},
             },
             id='different products',
         ),
@@ -263,10 +250,7 @@ def test_product_prop_availability():
             Product(id_='123', category='foo'),
             Product(id_='123', category='bar'),
             {
-                'category': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 'foo', 'right': 'bar'},
-                }
+                'category': {'left': 'foo', 'right': 'bar'},
             },
             id='different category',
         ),
@@ -280,10 +264,7 @@ def test_product_prop_availability():
             Product(id_='123', quantity=4, price_full=10, price_curr=10),
             Product(id_='123', quantity=4, price_full=10, price_curr=5),
             {
-                'price_curr': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 10, 'right': 5},
-                }
+                'price_curr': {'left': 10, 'right': 5},
             },
             id='same product, different price_curr',
         ),
@@ -291,10 +272,7 @@ def test_product_prop_availability():
             Product(id_='123', quantity=4, price_full=10, price_curr=5),
             Product(id_='123', quantity=4, price_full=10, price_curr=10),
             {
-                'price_curr': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 5, 'right': 10},
-                }
+                'price_curr': {'left': 5, 'right': 10},
             },
             id='same product, different price_curr (reversed)',
         ),
@@ -302,17 +280,14 @@ def test_product_prop_availability():
             Product(id_='123', quantity=5, price_full=10, price_curr=10),
             Product(id_='123', quantity=0, price_full=10, price_curr=10),
             {
-                'quantity': {
-                    'type': DiffType.UPDATED,
-                    'values': {'left': 5, 'right': 0},
-                }
+                'quantity': {'left': 5, 'right': 0},
             },
             id='same product, different quantity',
         ),
     ],
 )
 def test_product_diff(product_this, product_other, diff):
-    product_diff = product_this.diff(product_other)
+    product_diff = product_this.model_diff(product_other)
     assert product_diff == diff
 
 
@@ -1053,9 +1028,169 @@ def test_item_diff_created_updated_deleted():
         ]
     )
     diff = p_old.item_diff(p_new)
-    assert diff['1']['type'] is DiffType.DELETED
-    assert diff['2']['type'] is DiffType.UPDATED
-    assert diff['3']['type'] is DiffType.CREATED
+    # Item '1' exists in old but not in new (deleted)
+    assert '1' in diff
+    assert diff['1']['name'] == {'left': 'Banana', 'right': None}
+    # Item '2' exists in both but has different quantity (updated)
+    assert '2' in diff
+    assert diff['2']['quantity'] == {'left': 2, 'right': 1}
+    # Item '3' exists in new but not in old (created)
+    assert '3' in diff
+    assert diff['3']['name'] == {'left': None, 'right': 'Orange'}
+
+
+def test_item_diff_exclude_missing():
+    """Test item_diff with exclude_missing parameter.
+
+    When exclude_missing=False (default), all item differences are included:
+    - Items only in left page (deleted)
+    - Items in both pages with different fields (updated)
+    - Items only in right page (created)
+
+    When exclude_missing=True, only items that exist in both pages are included.
+    Items that exist in only one page are excluded from the result.
+    """
+    p_left = ProductPage(
+        items=[
+            Product(id_='1', name='Apple', quantity=10, price_full=5),
+            Product(id_='2', name='Banana', quantity=5, price_full=3),
+            Product(id_='3', name='Cherry', quantity=8, price_full=7),
+        ]
+    )
+    p_right = ProductPage(
+        items=[
+            Product(id_='2', name='Banana', quantity=3, price_full=3),  # updated
+            Product(id_='3', name='Cherry', quantity=8, price_full=7),  # unchanged
+            Product(id_='4', name='Date', quantity=15, price_full=10),  # created
+        ]
+    )
+
+    # Test with exclude_missing=False (default) - includes all differences
+    diff_include = p_left.item_diff(p_right, exclude_missing=False)
+
+    assert '1' in diff_include  # Item only in left (deleted)
+    assert diff_include['1']['name'] == {'left': 'Apple', 'right': None}
+    assert diff_include['1']['quantity'] == {'left': 10, 'right': None}
+
+    assert '2' in diff_include  # Item in both with differences (updated)
+    assert diff_include['2']['quantity'] == {'left': 5, 'right': 3}
+    assert 'name' not in diff_include['2']  # name is the same
+
+    assert '3' not in diff_include  # Item in both but identical (no diff)
+
+    assert '4' in diff_include  # Item only in right (created)
+    assert diff_include['4']['name'] == {'left': None, 'right': 'Date'}
+    assert diff_include['4']['quantity'] == {'left': None, 'right': 15}
+
+    # Test with exclude_missing=True - excludes items only in one page
+    diff_exclude = p_left.item_diff(p_right, exclude_missing=True)
+
+    assert '1' not in diff_exclude  # Item only in left - excluded
+    assert '2' in diff_exclude  # Item in both with differences - included
+    assert diff_exclude['2']['quantity'] == {'left': 5, 'right': 3}
+    assert '3' not in diff_exclude  # Item in both but identical - no diff
+    assert '4' not in diff_exclude  # Item only in right - excluded
+
+
+def test_item_diff_exclude_missing_edge_cases():
+    """Test edge cases for exclude_missing parameter."""
+
+    # Test: All items only in left page
+    p_only_left = ProductPage(
+        items=[
+            Product(id_='1', name='Apple', quantity=10),
+            Product(id_='2', name='Banana', quantity=5),
+        ]
+    )
+    p_empty = ProductPage(items=[])
+
+    diff_include = p_only_left.item_diff(p_empty, exclude_missing=False)
+    assert '1' in diff_include
+    assert '2' in diff_include
+
+    diff_exclude = p_only_left.item_diff(p_empty, exclude_missing=True)
+    assert diff_exclude == {}  # All items excluded
+
+    # Test: All items only in right page
+    diff_include = p_empty.item_diff(p_only_left, exclude_missing=False)
+    assert '1' in diff_include
+    assert '2' in diff_include
+
+    diff_exclude = p_empty.item_diff(p_only_left, exclude_missing=True)
+    assert diff_exclude == {}  # All items excluded
+
+    # Test: All items exist in both pages with no differences
+    p_same_1 = ProductPage(
+        items=[
+            Product(id_='1', name='Apple', quantity=10),
+            Product(id_='2', name='Banana', quantity=5),
+        ]
+    )
+    p_same_2 = ProductPage(
+        items=[
+            Product(id_='1', name='Apple', quantity=10),
+            Product(id_='2', name='Banana', quantity=5),
+        ]
+    )
+
+    diff_include = p_same_1.item_diff(p_same_2, exclude_missing=False)
+    assert diff_include == {}
+
+    diff_exclude = p_same_1.item_diff(p_same_2, exclude_missing=True)
+    assert diff_exclude == {}
+
+    # Test: All items exist in both pages with differences
+    p_all_diff_1 = ProductPage(
+        items=[
+            Product(id_='1', name='Apple', quantity=10),
+            Product(id_='2', name='Banana', quantity=5),
+        ]
+    )
+    p_all_diff_2 = ProductPage(
+        items=[
+            Product(id_='1', name='Apple', quantity=15),
+            Product(id_='2', name='Banana', quantity=3),
+        ]
+    )
+
+    diff_include = p_all_diff_1.item_diff(p_all_diff_2, exclude_missing=False)
+    assert '1' in diff_include
+    assert '2' in diff_include
+
+    diff_exclude = p_all_diff_1.item_diff(p_all_diff_2, exclude_missing=True)
+    assert '1' in diff_exclude  # Exists in both
+    assert '2' in diff_exclude  # Exists in both
+    assert diff_exclude == diff_include  # Should be the same
+
+
+def test_item_diff_exclude_missing_with_kwargs():
+    """Test that exclude_missing works correctly with other kwargs like exclude."""
+    p1 = ProductPage(
+        items=[
+            Product(id_='1', name='Apple', category='Fruit', quantity=10),
+            Product(id_='2', name='Banana', category='Fruit', quantity=5),
+        ]
+    )
+    p2 = ProductPage(
+        items=[
+            Product(id_='2', name='Banana', category='Vegetable', quantity=3),
+            Product(id_='3', name='Carrot', category='Vegetable', quantity=7),
+        ]
+    )
+
+    # Exclude 'category' field from comparison
+    diff = p1.item_diff(p2, exclude_missing=True, exclude={'category'})
+
+    # Item '1' only in p1 - excluded due to exclude_missing
+    assert '1' not in diff
+
+    # Item '2' in both - included, but category difference should not appear
+    assert '2' in diff
+    assert 'category' not in diff['2']  # Excluded from comparison
+    assert diff['2']['quantity'] == {'left': 5, 'right': 3}
+
+    # Item '3' only in p2 - excluded due to exclude_missing
+    assert '3' not in diff
 
 
 def test_iter_item_attr_defaults_and_uniqueness():
