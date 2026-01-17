@@ -1,5 +1,5 @@
 """Pydantic models and other data containers of the ``freshpointparser`` library.
-The ``annotations`` submodule is available for additional data types.
+The ``types`` submodule is available for additional data types.
 """
 
 from . import types
