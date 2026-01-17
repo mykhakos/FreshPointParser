@@ -4,7 +4,6 @@ import logging
 import sys
 from datetime import date, datetime
 from enum import Enum
-from re import A
 from typing import (
     Any,
     Callable,
@@ -62,88 +61,6 @@ class ToCamel:
     def __call__(self, string: str) -> str:
         return to_camel(string)
 
-
-class EmptyModel(BaseModel):
-    """An empty Pydantic model with no fields."""
-
-    model_config = ConfigDict(frozen=True)
-
-
-_EMPTY_MODEL = EmptyModel()
-"""Singleton instance of an empty model."""
-
-
-# region Diff
-
-
-class FieldDiff(TypedDict):
-    """Typed dictionary to represent the left and the right value in
-    a difference comparison.
-    """
-
-    left: Any
-    """The left value in the pair."""
-    right: Any
-    """The right value in the pair."""
-
-
-FieldDiffMapping: TypeAlias = Dict[str, FieldDiff]
-"""Mapping of field names to their differences."""
-
-
-ModelDiffMapping: TypeAlias = Dict[str, FieldDiffMapping]
-"""Mapping of item IDs to their differences."""
-
-
-def model_diff(
-    left: BaseModel, right: BaseModel, model_dump_kwargs: Dict[str, Any]
-) -> FieldDiffMapping:
-    """Compare the left model with the right model to identify which model
-    fields have different values.
-
-    If a field exists in both items but its values differ, it is
-    marked as *Updated*. If the field is missing in this item, it is
-    considered to be *Created*, and if it is missing in the other item, it
-    is considered to be *Deleted*. If the field is not present in any of
-    the items, its value is considered to be ``None``.
-
-    The data is serialized according to the item models' configurations
-    using ``model_dump``.
-
-    Args:
-        left (model): The model to compare.
-        right (model): The model to compare with.
-        model_dump_kwargs (Dict[str, Any]): Additional keyword arguments to pass to
-            the ``model_dump`` calls to control the serialization process.
-
-    Returns:
-        FieldDiffMapping: A dictionary mapping field names to their differences,
-        each containing the diff type and a pair of left/right values.
-    """
-    if left is right:
-        return {}
-
-    left_asdict = left.model_dump(**model_dump_kwargs)
-    right_asdict = right.model_dump(**model_dump_kwargs)
-    diff = {}
-
-    # compare left to right
-    for field, value_left in left_asdict.items():
-        value_right = right_asdict.get(field, None)
-        if value_left != value_right:
-            diff[field] = FieldDiff(left=value_left, right=value_right)
-
-    # compare right to left
-    if right_asdict.keys() != left_asdict.keys():
-        for field, value_right in right_asdict.items():
-            value_left = left_asdict.get(field, None)
-            if value_left is None and value_right is not None:
-                diff[field] = FieldDiff(left=value_left, right=value_right)
-
-    return diff
-
-
-# endregion Diff
 
 # region BestEffortModel
 
@@ -234,6 +151,19 @@ class BestEffortModel(BaseModel):
 # region BaseItem
 
 
+class FieldDiff(TypedDict):
+    """Represents the difference for a single field between two models."""
+
+    left: Any
+    """The value from the left model."""
+    right: Any
+    """The value from the right model."""
+
+
+FieldDiffMapping: TypeAlias = Dict[str, FieldDiff]
+"""Mapping of field names to their difference pairs."""
+
+
 class BaseItem(BestEffortModel):
     """Base model of a FreshPoint item."""
 
@@ -249,15 +179,12 @@ class BaseItem(BestEffortModel):
     )
     """Unique item identifier (numeric unless undefined)."""
 
-    def diff(self, other: BaseItem, **kwargs: Any) -> FieldDiffMapping:
+    def model_diff(self, other: BaseItem, **kwargs: Any) -> FieldDiffMapping:
         """Compare this item with another one to identify which item fields
         have different values.
 
-        If a field exists in both items but its values differ, it is
-        marked as *Updated*. If the field is missing in this item, it is
-        considered to be *Created*, and if it is missing in the other item, it
-        is considered to be *Deleted*. If the field is not present in any of
-        the items, its value is considered to be ``None``.
+        If a field is not present in any of the models, its value is considered
+        to be ``None``.
 
         The data is serialized according to the item models' configurations
         using ``model_dump``.
@@ -270,39 +197,45 @@ class BaseItem(BestEffortModel):
 
         Returns:
             FieldDiffMapping: A dictionary mapping field names to their
-            corresponding differences.
+            corresponding difference pairs.
 
-            Each field difference is a dictionary
-            (:class:`~freshpointparser.models.annotations.FieldDiff`) containing
-            the ``type`` and ``values`` keys.
-
-            - ``type`` (:class:`~freshpointparser.models.annotations.DiffType`): \
-            An enumeration value indicating the type of the difference.
-
-            - ``values`` (:class:`~freshpointparser.models.annotations.DiffValues`): \
-            A pair of values - `left` from this model and `right` from the other \
-            model. If a field is missing in one model, its value will be ``None``.
+            Each field difference is a
+            (:class:`~freshpointparser.models.annotations.FieldDiff`) dictionary
+            containing the ``left`` and ``right`` values from this model and the other
+            model, respectively. If a field is missing in any of the models, its value
+            is considered to be ``None`` in this model.
 
             FieldDiffMapping structure example:
 
-            >>> from freshpointparser.models.annotations import DiffType
-            >>> {
-            ...     'field_common': {
-            ...         'type': DiffType.UPDATED,
-            ...         'values': {'left': 12.5, 'right': 15.0},
-            ...     },
-            ...     'field_only_in_this': {
-            ...         'type': DiffType.CREATED,
-            ...         'values': {'left': ``'foo'``, 'right': None},
-            ...     },
-            ...     'field_only_in_other': {
-            ...         'type': DiffType.DELETED,
-            ...         'values': {'left': None, 'right': ``'bar'``},
-            ...     },
-            ... }
-
+            ```python
+            {
+                'field_common': {'left': 12.5, 'right': 15.0},
+                'field_missing_in_other': {'left': 'foo', 'right': None},
+                'field_missing_in_self: {'left': None, 'right': 'bar'}
+            }
+            ```
         """
-        return model_diff(self, other, kwargs)
+        if self is other:
+            return {}
+
+        as_dict_self = self.model_dump(**kwargs)
+        as_dict_other = other.model_dump(**kwargs)
+        diff: FieldDiffMapping = {}
+
+        # compare self to other
+        for field, value_self in as_dict_self.items():
+            value_other = as_dict_other.get(field, None)
+            if value_self != value_other:
+                diff[field] = FieldDiff(left=value_self, right=value_other)
+
+        # compare other to self
+        if as_dict_other.keys() != as_dict_self.keys():
+            for field, value_other in as_dict_other.items():
+                value_self = as_dict_self.get(field, None)
+                if value_self is None and value_other is not None:
+                    diff[field] = FieldDiff(left=value_self, right=value_other)
+
+        return diff
 
 
 # endregion BaseItem
@@ -318,6 +251,10 @@ TItem = TypeVar(
     # default=BaseItem,
 )
 """Type variable to annotate item models."""
+
+
+ModelDiffMapping: TypeAlias = Dict[str, FieldDiffMapping]
+"""Mapping of item IDs to their differences."""
 
 
 class BasePage(BestEffortModel, Generic[TItem]):
@@ -349,11 +286,9 @@ class BasePage(BestEffortModel, Generic[TItem]):
         """Compare items between this page and another one to identify which
         items differ. Items are matched by their ID.
 
-        If an item exists in both pages but its field values differ, it is
-        marked as *Updated*. If the item is missing in this page, it is
-        considered to be *Created*, and if it is missing in the other page, it
-        is considered to be *Deleted*. If the item is not present in any of
-        the pages, its fields are considered to be ``None``.
+        If a field of any item is not present in any of the models, the value of
+        that field is considered to be ``None``. If an item is missing in either
+        page, all fields of that item are considered to be ``None``.
 
         The data is serialized according to the item models' configurations
         using ``model_dump``.
@@ -368,64 +303,47 @@ class BasePage(BestEffortModel, Generic[TItem]):
             ModelDiffMapping: A dictionary mapping numeric item IDs to their
             corresponding differences.
 
-            Each dictionary value is a dictionary (ModelDiff) containing
-            the ``type`` and `diff` keys.
+            Each item difference is a
+            (:class:`~freshpointparser.models.annotations.FieldDiffMapping`) dictionary
+            that maps fields to the corresponding field differences.
 
-            - ``type`` (DiffType): An enumeration value indicating the type of \
-            the difference (`Created`, `Updated`, or `Deleted`).
+            Each field difference is a
+            (:class:`~freshpointparser.models.annotations.FieldDiff`) dictionary
+            containing the ``left`` and ``right`` values from this model and the other
+            model, respectively. If a field is missing in any of the models, its value
+            is considered to be ``None`` in this model.
 
-            - `diff` (FieldDiffMapping): A dictionary mapping field names to \
-            `FieldDiff` entries, as described in `BaseItem.diff()`.
+            ModelDiffMapping structure example:
 
-            ModelDiff structure example:
-
-            >>> from freshpointparser.models.annotations import DiffType
-            >>> {
-            ...     '1001': {
-            ...         'type': DiffType.UPDATED,
-            ...         'diff': {
-            ...             'field_common': {
-            ...                 'type': DiffType.UPDATED,
-            ...                 'values': {'left': 12.5, 'right': 15.0},
-            ...             },
-            ...         },
-            ...     },
-            ...     '1002': {
-            ...         'type': DiffType.DELETED,
-            ...         'diff': {
-            ...             'field_only_in_this': {
-            ...                 'type': DiffType.DELETED,
-            ...                 'values': {'left': ``'foo'``, 'right': None},
-            ...             },
-            ...         },
-            ...     },
-            ...     '1003': {
-            ...         'type': DiffType.CREATED,
-            ...         'diff': {
-            ...             'field_only_in_other': {
-            ...                 'type': DiffType.CREATED,
-            ...                 'values': {'left': None, 'right': ``'bar'``},
-            ...             },
-            ...         },
-            ...     },
-            ... }
+            ```python
+            {
+                '1001': {
+                    'field_common': {'left': 12.5, 'right': 15.0},
+                    'field_missing_in_other': {'left': 'foo', 'right': None},
+                },
+                '1002': {
+                    'field_common': {'left': 10.0, 'right': 12.0},
+                    'field_missing_in_self': {'left': None, 'right': 'qux'},
+                },
+            }
+            ```
         """
+        if self is other:
+            return {}
+
         items_as_dict_self = {
             item.id_: item for item in self.items if item.id_ is not None
         }
         items_as_dict_other = {
             item.id_: item for item in other.items if item.id_ is not None
         }
-        item_missing = _EMPTY_MODEL
+        item_missing = BaseItem()
         diff: ModelDiffMapping = {}
 
         # compare self to other
         for item_id, item_self in items_as_dict_self.items():
-            item_other = items_as_dict_other.get(item_id, None)
-            if item_other is None:
-                item_diff = model_diff(item_self, item_missing, kwargs)
-            else:
-                item_diff = model_diff(item_self, item_other, kwargs)
+            item_other = items_as_dict_other.get(item_id, item_missing)
+            item_diff = item_self.model_diff(item_other, **kwargs)
             if item_diff:
                 diff[item_id] = item_diff
 
@@ -433,7 +351,8 @@ class BasePage(BestEffortModel, Generic[TItem]):
         if items_as_dict_other.keys() != items_as_dict_self.keys():
             for item_id, item_other in items_as_dict_other.items():
                 if item_id not in items_as_dict_self:
-                    item_diff = model_diff(item_missing, item_other, kwargs)
+                    # item_id not found => item_self is item_missing
+                    item_diff = item_missing.model_diff(item_other, **kwargs)
                     if item_diff:
                         diff[item_id] = item_diff
 
