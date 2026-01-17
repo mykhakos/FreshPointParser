@@ -564,7 +564,7 @@ def test_validate_parsed_products(product_page_html_parse_result, product_page):
     for product in page.items:
         assert product.id_ in reference_items
         product_reference = reference_items[product.id_]
-        assert not product.diff(product_reference, exclude='recorded_at')
+        assert not product.model_diff(product_reference, exclude={'recorded_at'})
         product_ids.add(product.id_)
     # assert each product in the reference is in the parser
     assert product_ids == set(reference_items.keys())
