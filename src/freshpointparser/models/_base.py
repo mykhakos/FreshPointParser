@@ -211,7 +211,7 @@ class BaseItem(BestEffortModel):
             {
                 'field_common': {'left': 12.5, 'right': 15.0},
                 'field_missing_in_other': {'left': 'foo', 'right': None},
-                'field_missing_in_self': {'left': None, 'right': 'bar'}
+                'field_missing_in_self': {'left': None, 'right': 'bar'},
             }
             ```
         """
@@ -228,12 +228,12 @@ class BaseItem(BestEffortModel):
             if value_self != value_other:
                 diff[field] = FieldDiff(left=value_self, right=value_other)
 
-        # compare other to self
-        if as_dict_other.keys() != as_dict_self.keys():
-            for field, value_other in as_dict_other.items():
-                value_self = as_dict_self.get(field, None)
-                if value_self is None and value_other is not None:
-                    diff[field] = FieldDiff(left=value_self, right=value_other)
+        # compare other to self (only missing fields)
+        fields_missing_in_self = as_dict_other.keys() - as_dict_self.keys()
+        for field in fields_missing_in_self:
+            value_other = as_dict_other[field]
+            if value_other is not None:
+                diff[field] = FieldDiff(left=None, right=value_other)
 
         return diff
 
@@ -354,16 +354,15 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 diff[item_id] = item_diff
 
         # compare other to self (only items that are missing in self)
-        if (
-            items_as_dict_other.keys() != items_as_dict_self.keys()
-            and not exclude_missing
-        ):
-            for item_id, item_other in items_as_dict_other.items():
-                if item_id not in items_as_dict_self:
-                    # item_id not found => item_self is item_missing
-                    item_diff = item_missing.model_diff(item_other, **kwargs)
-                    if item_diff:
-                        diff[item_id] = item_diff
+        if not exclude_missing:
+            item_ids_missing_in_self = (
+                items_as_dict_other.keys() - items_as_dict_self.keys()
+            )
+            for item_id in item_ids_missing_in_self:
+                item_other = items_as_dict_other[item_id]
+                item_diff = item_missing.model_diff(item_other, **kwargs)
+                if item_diff:
+                    diff[item_id] = item_diff
 
         return diff
 
