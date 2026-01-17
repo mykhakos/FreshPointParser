@@ -4,6 +4,7 @@ from ._base import (
     FieldDiff,
     FieldDiffMapping,
     ModelDiffMapping,
+    ValidationContext,
 )
 from ._location import (
     LocationCoordinates,
@@ -20,4 +21,5 @@ __all__ = [
     'ModelDiffMapping',
     'ProductPriceUpdateInfo',
     'ProductQuantityUpdateInfo',
+    'ValidationContext',
 ]
