@@ -353,7 +353,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
             if item_diff:
                 diff[item_id] = item_diff
 
-        # compare other to self (only fields that are missing is self)
+        # compare other to self (only items that are missing in self)
         if (
             items_as_dict_other.keys() != items_as_dict_self.keys()
             and not exclude_missing
