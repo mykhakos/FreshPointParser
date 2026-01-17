@@ -211,7 +211,7 @@ class BaseItem(BestEffortModel):
             {
                 'field_common': {'left': 12.5, 'right': 15.0},
                 'field_missing_in_other': {'left': 'foo', 'right': None},
-                'field_missing_in_self: {'left': None, 'right': 'bar'}
+                'field_missing_in_self': {'left': None, 'right': 'bar'}
             }
             ```
         """
