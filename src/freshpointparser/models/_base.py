@@ -282,7 +282,9 @@ class BasePage(BestEffortModel, Generic[TItem]):
         """Total number of items on the page."""
         return len(self.items)
 
-    def item_diff(self, other: BasePage[TItem], **kwargs: Any) -> ModelDiffMapping:
+    def item_diff(
+        self, other: BasePage[TItem], *, exclude_missing: bool = False, **kwargs: Any
+    ) -> ModelDiffMapping:
         """Compare items between this page and another one to identify which
         items differ. Items are matched by their ID.
 
@@ -295,6 +297,8 @@ class BasePage(BestEffortModel, Generic[TItem]):
 
         Args:
             other (BasePage): The page to compare against.
+            exclude_missing (bool): Whether to exclude items that are missing in
+                either page from the result.
             **kwargs: Additional keyword arguments passed to each item model's
                 ``model_dump`` call, such as ``exclude``, ``include``,
                 ``by_alias``, and others.
@@ -343,12 +347,17 @@ class BasePage(BestEffortModel, Generic[TItem]):
         # compare self to other
         for item_id, item_self in items_as_dict_self.items():
             item_other = items_as_dict_other.get(item_id, item_missing)
+            if item_other is item_missing and exclude_missing:
+                continue
             item_diff = item_self.model_diff(item_other, **kwargs)
             if item_diff:
                 diff[item_id] = item_diff
 
-        # compare other to self
-        if items_as_dict_other.keys() != items_as_dict_self.keys():
+        # compare other to self (only fields that are missing is self)
+        if (
+            items_as_dict_other.keys() != items_as_dict_self.keys()
+            and not exclude_missing
+        ):
             for item_id, item_other in items_as_dict_other.items():
                 if item_id not in items_as_dict_self:
                     # item_id not found => item_self is item_missing
