@@ -4,6 +4,7 @@ import logging
 import sys
 from datetime import date, datetime
 from enum import Enum
+from re import A
 from typing import (
     Any,
     Callable,
@@ -75,20 +76,7 @@ _EMPTY_MODEL = EmptyModel()
 # region Diff
 
 
-class DiffType(str, Enum):
-    """String enumeration of the types of differences between two items."""
-
-    CREATED = 'Created'
-    """The left item is missing"""
-
-    UPDATED = 'Updated'
-    """The right item is different from the left item."""
-
-    DELETED = 'Deleted'
-    """The right item is missing."""
-
-
-class DiffValues(TypedDict):
+class FieldDiff(TypedDict):
     """Typed dictionary to represent the left and the right value in
     a difference comparison.
     """
@@ -99,40 +87,16 @@ class DiffValues(TypedDict):
     """The right value in the pair."""
 
 
-class FieldDiff(TypedDict):
-    """Typed dictionary to represent the difference between two fields
-    in a model comparison.
-    """
-
-    type: DiffType
-    """The type of the difference."""
-    values: DiffValues
-    """The left and the right values in the difference comparison."""
-
-
 FieldDiffMapping: TypeAlias = Dict[str, FieldDiff]
 """Mapping of field names to their differences."""
 
 
-class ModelDiff(TypedDict):
-    """Typed dictionary to represent the difference between two models
-    in a model comparison.
-    """
-
-    type: DiffType
-    """The type of the difference."""
-    diff: FieldDiffMapping
-    """Mapping of field names to their differences."""
-
-
-ModelDiffMapping: TypeAlias = Dict[str, ModelDiff]
+ModelDiffMapping: TypeAlias = Dict[str, FieldDiffMapping]
 """Mapping of item IDs to their differences."""
 
 
 def model_diff(
-    left: BaseModel,
-    right: BaseModel,
-    model_dump_kwargs: Dict[str, Any],
+    left: BaseModel, right: BaseModel, model_dump_kwargs: Dict[str, Any]
 ) -> FieldDiffMapping:
     """Compare the left model with the right model to identify which model
     fields have different values.
@@ -165,28 +129,16 @@ def model_diff(
 
     # compare left to right
     for field, value_left in left_asdict.items():
-        if field in right_asdict:
-            diff_type = DiffType.UPDATED
-            value_right = right_asdict[field]
-        else:
-            diff_type = DiffType.DELETED
-            value_right = None
+        value_right = right_asdict.get(field, None)
         if value_left != value_right:
-            diff[field] = FieldDiff(
-                type=diff_type,
-                values=DiffValues(left=value_left, right=value_right),
-            )
+            diff[field] = FieldDiff(left=value_left, right=value_right)
 
     # compare right to left
     if right_asdict.keys() != left_asdict.keys():
         for field, value_right in right_asdict.items():
-            if field not in left_asdict:
-                diff_type = DiffType.CREATED
-                value_left = None
-                diff[field] = FieldDiff(
-                    type=diff_type,
-                    values=DiffValues(left=value_left, right=value_right),
-                )
+            value_left = left_asdict.get(field, None)
+            if value_left is None and value_right is not None:
+                diff[field] = FieldDiff(left=value_left, right=value_right)
 
     return diff
 
@@ -470,26 +422,20 @@ class BasePage(BestEffortModel, Generic[TItem]):
         # compare self to other
         for item_id, item_self in items_as_dict_self.items():
             item_other = items_as_dict_other.get(item_id, None)
-
             if item_other is None:
-                item_diff_type = DiffType.DELETED
                 item_diff = model_diff(item_self, item_missing, kwargs)
             else:
-                item_diff_type = DiffType.UPDATED
                 item_diff = model_diff(item_self, item_other, kwargs)
-
             if item_diff:
-                diff[item_id] = ModelDiff(type=item_diff_type, diff=item_diff)
+                diff[item_id] = item_diff
 
         # compare other to self
         if items_as_dict_other.keys() != items_as_dict_self.keys():
             for item_id, item_other in items_as_dict_other.items():
                 if item_id not in items_as_dict_self:
-                    item_diff_type = DiffType.CREATED
                     item_diff = model_diff(item_missing, item_other, kwargs)
-
                     if item_diff:
-                        diff[item_id] = ModelDiff(type=item_diff_type, diff=item_diff)
+                        diff[item_id] = item_diff
 
         return diff
 
