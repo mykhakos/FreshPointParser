@@ -1094,7 +1094,6 @@ def test_item_diff_exclude_missing():
 
 def test_item_diff_exclude_missing_edge_cases():
     """Test edge cases for exclude_missing parameter."""
-
     # Test: All items only in left page
     p_only_left = ProductPage(
         items=[
@@ -1226,17 +1225,16 @@ def test_iter_item_attr_defaults_and_uniqueness():
 
     # unique with unhashable values
     page.items.append(SubProduct(id_='5', context={'key': 'value'}))
-    assert list(page.iter_item_attr('context', default={}, unhashable=True)) == [
-        {},
-        {},
-        {},
+    assert list(
+        page.iter_item_attr('context', default={}, unique=True, hashable=False)
+    ) == [
         {},
         {'key': 'value'},
     ]
 
-    # TypeError on unhashable unique without flag
-    with pytest.raises(AttributeError):
-        list(page.iter_item_attr('context', unique=True))
+    # TypeError on unhashable unique without hashable=False
+    with pytest.raises(TypeError):
+        list(page.iter_item_attr('context', default={}, unique=True))
 
 
 @pytest.mark.parametrize(

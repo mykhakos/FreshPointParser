@@ -372,7 +372,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
         attr: str,
         *,
         unique: bool = ...,
-        unhashable: bool = ...,
+        hashable: bool = ...,
     ) -> Iterator[Any]: ...
 
     @overload
@@ -382,7 +382,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
         default: T,
         *,
         unique: bool = ...,
-        unhashable: bool = ...,
+        hashable: bool = ...,
     ) -> Iterator[Union[Any, T]]: ...
 
     def iter_item_attr(
@@ -391,7 +391,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
         default: Union[T, _NoDefaultType] = _NO_DEFAULT,
         *,
         unique: bool = False,
-        unhashable: bool = False,
+        hashable: bool = True,
     ) -> Iterator[Union[Any, T]]:
         """Iterate over values of a specific attribute of the page's items,
         with optional default fallback and optional uniqueness filtering.
@@ -406,15 +406,15 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 If not provided, missing attributes will raise AttributeError.
             unique (bool, optional): If True, only distinct values will be
                 yielded. Defaults to False.
-            unhashable (bool, optional): If True, uniqueness is checked
+            hashable (bool, optional): If False, uniqueness is checked
                 by comparing values directly, which is useful for unhashable
-                types like lists or dictionaries, but is slower. Defaults to False.
+                types like lists or dictionaries, but is slower. Defaults to True.
 
         Raises:
-            AttributeError: If the attribute is not present in an item
-                and `default` is not provided.
-            FreshPointParserTypeError: If the attribute values are not hashable and
-                `unhashable` is set to False.
+            AttributeError: If the attribute is not present in an item and
+                ``default`` is not provided.
+            TypeError: If the attribute values are not hashable and
+                ``hashable`` is set to True.
 
         Yields:
             Iterator[Union[Any, T]]: Attribute values collected from each item
@@ -426,25 +426,18 @@ class BasePage(BestEffortModel, Generic[TItem]):
             values = (getattr(item, attr, default) for item in self.items)
 
         if unique:
-            if unhashable:
+            if hashable:
+                seen_hashable: Set[Any] = set()
+                for value in values:
+                    if value not in seen_hashable:
+                        seen_hashable.add(value)
+                        yield value
+            else:
                 seen_unhashable: List[Any] = []
                 for value in values:
                     if value not in seen_unhashable:
                         seen_unhashable.append(value)
                         yield value
-            else:
-                try:
-                    seen_hashable: Set[Any] = set()
-                    for value in values:
-                        if value not in seen_hashable:
-                            seen_hashable.add(value)
-                            yield value
-                except TypeError as err:
-                    raise FreshPointParserTypeError(
-                        f"Cannot yield unique values for attribute '{attr}': "
-                        f'the values are not hashable. '
-                        f"Set 'unhashable=True' to compare the values directly."
-                    ) from err
         else:
             yield from values
 
