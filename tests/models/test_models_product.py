@@ -6,9 +6,6 @@ import pytest
 from pydantic import Field
 
 from freshpointparser import get_product_page_url
-from freshpointparser.exceptions import (
-    FreshPointParserValueError,
-)
 from freshpointparser.models import Product, ProductPage
 from freshpointparser.models.types import (
     ProductPriceUpdateInfo,
@@ -1380,7 +1377,7 @@ def test_product_page_is_newer_than(p1, p2, precision, is_p1_newer_than_p2):
 def test_is_newer_than_invalid_precision():
     p1 = ProductPage(recorded_at=datetime(2024, 1, 1))
     p2 = ProductPage(recorded_at=datetime(2024, 1, 2))
-    with pytest.raises(FreshPointParserValueError):
+    with pytest.raises(ValueError):
         p1.is_newer_than(p2, precision='q')  # type: ignore[reportArgumentType]
 
 

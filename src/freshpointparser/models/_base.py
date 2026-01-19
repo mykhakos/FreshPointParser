@@ -33,8 +33,6 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
-from ..exceptions import FreshPointParserValueError
-
 if sys.version_info >= (3, 11):
     from typing import Self, TypeAlias
 else:
@@ -552,17 +550,11 @@ class BasePage(BestEffortModel, Generic[TItem]):
         Args:
             other (BasePage): The page to compare against.
             precision (Optional[Literal['s', 'm', 'h', 'd']]): The level of
-                precision for the comparison. Supported values:
-
-                - ``None``: full precision (microsecond) (default)
-                - ``s``: second precision
-                - ``m``: minute precision
-                - ``h``: hour precision
-                - ``d``: date precision
+                precision for the comparison (`None` for full precision (default),
+                's' for seconds, 'm' for minutes, 'h' for hours, and 'd' for days).
 
         Raises:
-            FreshPointParserValueError: If the precision is not one of
-                the supported values.
+            ValueError: If the precision is not one of the supported values.
 
         Returns:
             Optional[bool]: With the specified precision taken into account,
@@ -592,8 +584,9 @@ class BasePage(BestEffortModel, Generic[TItem]):
             recorded_at_self = self.recorded_at.date()
             recorded_at_other = other.recorded_at.date()
         else:
-            raise FreshPointParserValueError(
-                f"Invalid precision '{precision}'. Expected one of: 's', 'm', 'h', 'd'."
+            raise ValueError(
+                f"Invalid precision '{precision!r}'. "
+                f"Expected one of: None, 's', 'm', 'h', 'd'."
             )
         if recorded_at_self == recorded_at_other:
             return None
