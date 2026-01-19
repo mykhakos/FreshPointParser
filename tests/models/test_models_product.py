@@ -668,6 +668,7 @@ def test_product_page_init(page, expected_attrs):
 @pytest.mark.parametrize(
     'location_id, expected_url',
     [
+        pytest.param(None, None, id='location_id=None'),
         pytest.param(0, get_product_page_url(location_id=0), id='location_id=0'),
         pytest.param(296, get_product_page_url(location_id=296), id='location_id=296'),
     ],

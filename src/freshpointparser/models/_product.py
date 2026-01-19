@@ -443,12 +443,13 @@ class ProductPage(BasePage[Product]):
     """Name of the product location."""
 
     @property
-    def url(self) -> str:
-        """URL of the product page."""
+    def url(self) -> Optional[str]:
+        """URL of the product page.
+
+        Returns None if the location ID is not set.
+        """
         if self.location_id is None:
-            raise FreshPointParserValueError(
-                'Cannot generate product page URL: location ID is not set.'
-            )
+            return None
         return get_product_page_url(self.location_id)
 
     @property
