@@ -177,7 +177,7 @@ class Product(BaseItem):
         """Validate that the current selling price is not higher than the full price."""
         price_full = info.data.get('price_full')
         if price_full is not None and price_full < price_curr:
-            raise FreshPointParserValueError(
+            raise ValueError(
                 f'Full price ({price_full}) cannot be lower than '
                 f'current price ({price_curr}).'
             )
