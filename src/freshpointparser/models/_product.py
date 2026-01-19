@@ -409,14 +409,14 @@ def get_product_page_url(location_id: Union[int, str]) -> str:
             the ID is 296.
 
     Raises:
-        FreshPointParserValueError: If the object does not represent a non-negative
-            integer (e.g., a negative integer, a float, or a non-numeric string).
+        ValueError: If the object does not represent a non-negative integer
+            (e.g., a negative integer, a float, or a non-numeric string).
 
     Returns:
         str: The full page URL for the given location ID.
     """
     if not str(location_id).isdigit():
-        raise FreshPointParserValueError(
+        raise ValueError(
             f'Location ID must respresent a non-negative integer, got: {location_id!r}'
         )
     return f'https://my.freshpoint.cz/device/product-list/{location_id}'
