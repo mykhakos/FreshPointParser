@@ -980,9 +980,9 @@ def test_product_page_find_items_no_match(product_page, constraint):
     ],
 )
 def test_product_page_find_items_invalid_constraint(product_page, constraint):
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(TypeError):
         list(product_page.find_items(constraint))
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(TypeError):
         product_page.find_item(constraint)
 
 

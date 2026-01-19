@@ -33,7 +33,7 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
-from ..exceptions import FreshPointParserTypeError, FreshPointParserValueError
+from ..exceptions import FreshPointParserValueError
 
 if sys.version_info >= (3, 11):
     from typing import Self, TypeAlias
@@ -475,8 +475,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 ``'foo'``.
 
         Raises:
-            FreshPointParserTypeError: If the constraint is invalid, i.e., not a
-                Mapping or a Callable.
+            TypeError: If the constraint is not a Mapping or Callable.
 
         Returns:
             Optional[TBaseItem]: The first item on the page that matches
@@ -515,6 +514,9 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 Example: ``lambda item: 'foo' in item.name`` will match items
                 where the ``name`` attribute of the item contains ``'foo'``.
 
+        Raises:
+            TypeError: If the constraint is not a Mapping or Callable.
+
         Returns:
             Iterator[TBaseItem]: A lazy iterator over all items on the page that
             match the given constraint.
@@ -531,7 +533,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 ):
                     yield item
         else:
-            raise FreshPointParserTypeError(
+            raise TypeError(
                 f'Constraint must be either a Mapping or a Callable. '
                 f"Got type '{type(constraint).__name__}' instead."
             )

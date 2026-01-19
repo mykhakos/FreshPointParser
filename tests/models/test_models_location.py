@@ -365,9 +365,9 @@ def test_location_page_find_items_no_match(locations_page, constraint):
     ],
 )
 def test_location_page_find_items_invalid_constraint(locations_page, constraint):
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(TypeError):
         list(locations_page.find_items(constraint))
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(TypeError):
         locations_page.find_item(constraint)
 
 
