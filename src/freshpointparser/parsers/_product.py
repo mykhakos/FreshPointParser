@@ -76,7 +76,7 @@ class ProductHTMLParser:
 
         Raises:
             ParseError: If the attribute is missing.
-            ParseError: If the attribute is not a string.
+            ParseError: If the attribute value cannot be converted to a string.
         """
         try:
             attr = tag[attr_name]
