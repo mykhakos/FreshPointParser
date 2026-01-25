@@ -7,10 +7,7 @@ from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from freshpointparser import parse_product_page
-from freshpointparser.exceptions import (
-    FreshPointParserKeyError,
-    FreshPointParserValueError,
-)
+from freshpointparser.exceptions import ParseError
 from freshpointparser.models import Product, ProductPage
 from freshpointparser.parsers import ProductPageHTMLParser
 from freshpointparser.parsers._product import ProductHTMLParser
@@ -100,7 +97,7 @@ def test_find_name_with_html_entities():
 def test_find_name_missing_attribute():
     """Test error when data-name attribute is missing."""
     tag = bs4.BeautifulSoup('<div></div>', 'lxml').div
-    with pytest.raises(FreshPointParserKeyError) as exc_info:
+    with pytest.raises(ParseError) as exc_info:
         ProductHTMLParser.find_name(tag)  # type: ignore
     assert 'data-name' in str(exc_info.value)
 
@@ -118,7 +115,7 @@ def test_find_id_missing_attribute():
     """Test error when data-id attribute is missing."""
     tag = bs4.BeautifulSoup('<div></div>', 'lxml').div
     assert tag is not None
-    with pytest.raises(FreshPointParserKeyError):
+    with pytest.raises(ParseError):
         ProductHTMLParser.find_id(tag)
 
 
@@ -206,7 +203,7 @@ def test_find_category_success():
 def test_find_category_missing_h2():
     """Test error when no preceding h2 tag exists."""
     tag = bs4.BeautifulSoup('<div data-id="1"></div>', 'lxml').div
-    with pytest.raises(FreshPointParserValueError) as exc_info:
+    with pytest.raises(ParseError) as exc_info:
         ProductHTMLParser.find_category(tag)  # type: ignore
     assert 'no preceding <h2/> tag' in str(exc_info.value)
 
@@ -215,7 +212,7 @@ def test_find_category_empty_h2():
     """Test error when preceding h2 tag is empty."""
     soup = bs4.BeautifulSoup('<h2>  </h2><div data-id="1"></div>', 'lxml')
     tag = soup.find('div')
-    with pytest.raises(FreshPointParserValueError) as exc_info:
+    with pytest.raises(ParseError) as exc_info:
         ProductHTMLParser.find_category(tag)  # type: ignore
     assert 'empty' in str(exc_info.value)
 
@@ -280,7 +277,7 @@ def test_find_price_invalid_order():
         '<div class="product" data-id="1"><span>50.00</span><span>100.00</span></div>',
         'lxml',
     ).div
-    with pytest.raises(FreshPointParserValueError) as exc_info:
+    with pytest.raises(ParseError) as exc_info:
         ProductHTMLParser.find_price(tag)  # type: ignore
     assert 'greater than' in str(exc_info.value)
 
@@ -291,7 +288,7 @@ def test_find_price_too_many():
         '<div class="product"><span>100.00</span><span>75.00</span><span>50.00</span></div>',
         'lxml',
     ).div
-    with pytest.raises(FreshPointParserValueError) as exc_info:
+    with pytest.raises(ParseError) as exc_info:
         ProductHTMLParser.find_price(tag)  # type: ignore
     assert 'expected 1 or 2' in str(exc_info.value)
 
@@ -315,7 +312,7 @@ def test_get_attr_value_with_whitespace():
 def test_get_attr_value_missing():
     """Test _get_attr_value raises error for missing attribute."""
     tag = bs4.BeautifulSoup('<div></div>', 'lxml').div
-    with pytest.raises(FreshPointParserKeyError):
+    with pytest.raises(ParseError):
         ProductHTMLParser._get_attr_value('missing-attr', tag)  # type: ignore
 
 
@@ -339,7 +336,7 @@ def test_parse_location_id_no_script():
     parser = ProductPageHTMLParser()
     html = '<html></html>'
     bs4_parser = bs4.BeautifulSoup(html, 'lxml')
-    with pytest.raises(FreshPointParserValueError) as exc_info:
+    with pytest.raises(ParseError) as exc_info:
         parser._parse_location_id(bs4_parser)
     assert 'script tag' in str(exc_info.value)
 
@@ -349,7 +346,7 @@ def test_parse_location_id_no_match():
     parser = ProductPageHTMLParser()
     html = '<script>var other = "123";</script>'
     bs4_parser = bs4.BeautifulSoup(html, 'lxml')
-    with pytest.raises(FreshPointParserValueError) as exc_info:
+    with pytest.raises(ParseError) as exc_info:
         parser._parse_location_id(bs4_parser)
     assert 'deviceId' in str(exc_info.value)
 
@@ -368,7 +365,7 @@ def test_parse_location_name_no_title():
     parser = ProductPageHTMLParser()
     html = '<html></html>'
     bs4_parser = bs4.BeautifulSoup(html, 'lxml')
-    with pytest.raises(FreshPointParserValueError) as exc_info:
+    with pytest.raises(ParseError) as exc_info:
         parser._parse_location_name(bs4_parser)
     assert 'title' in str(exc_info.value).lower()
 

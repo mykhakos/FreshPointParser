@@ -5,7 +5,7 @@ from typing import Callable, List, Tuple, TypeVar, Union
 import bs4
 
 from .._utils import normalize_text
-from ..exceptions import FreshPointParserKeyError, FreshPointParserValueError
+from ..exceptions import ParseError
 from ..models import Product, ProductPage
 from ._base import BasePageHTMLParser, ParseResult, logger
 
@@ -25,35 +25,6 @@ class ProductHTMLParser:
     """Regex pattern to find the quantity of a product in the HTML string."""
     _RE_PATTERN_FIND_PRICE = re.compile(r'^\d+\.\d+$')
     """Regex pattern to find the price of a product in the HTML string."""
-
-    @staticmethod
-    def _get_attr_value(attr_name: str, tag: bs4.Tag) -> str:
-        """Get the value of a specified attribute from a Tag.
-
-        Args:
-            attr_name (str): The name of the attribute to retrieve.
-            tag (bs4.Tag): The Tag to extract the attribute from.
-
-        Returns:
-            str: The value of the specified attribute.
-
-        Raises:
-            FreshPointParserKeyError: If the attribute is missing.
-            FreshPointParserValueError: If the attribute is not a string.
-        """
-        try:
-            attr = tag[attr_name]
-        except KeyError as err:
-            raise FreshPointParserKeyError(
-                f'Product attributes do not contain keyword "{attr_name}".'
-            ) from err
-        if not isinstance(attr, str):
-            raise FreshPointParserValueError(
-                f'Unexpected "{attr_name}" attribute parsing results: '
-                f'attribute value is expected to be a string '
-                f'(got type "{type(attr)}").'
-            )
-        return attr.strip()
 
     @classmethod
     def _find_id_safe(cls, product_data: bs4.Tag) -> str:
@@ -82,15 +53,39 @@ class ProductHTMLParser:
             T: The converted value.
 
         Raises:
-            FreshPointParserValueError: If an error occurs during the conversion process.
+            ParseError: If an error occurs during the conversion process.
         """
         try:
             return converter()
         except Exception as exc:
-            raise FreshPointParserValueError(
+            raise ParseError(
                 f'Unable to convert a parsed value for the product '
-                f'"id={cls._find_id_safe(product_data)}".'
+                f"with id='{cls._find_id_safe(product_data)}'."
             ) from exc
+
+    @classmethod
+    def _get_attr_value(cls, attr_name: str, tag: bs4.Tag) -> str:
+        """Get the value of a specified attribute from a Tag.
+
+        Args:
+            attr_name (str): The name of the attribute to retrieve.
+            tag (bs4.Tag): The Tag to extract the attribute from.
+
+        Returns:
+            str: The value of the specified attribute.
+
+        Raises:
+            ParseError: If the attribute is missing.
+            ParseError: If the attribute is not a string.
+        """
+        try:
+            attr = tag[attr_name]
+        except KeyError as err:
+            raise ParseError(
+                f"Data of product with id='{cls._find_id_safe(tag)}' "
+                f"does not contain keyword '{attr_name}'."
+            ) from err
+        return cls._run_converter(lambda: str(attr).strip(), tag)
 
     @classmethod
     def find_name(cls, product_data: bs4.Tag) -> str:
@@ -149,14 +144,14 @@ class ProductHTMLParser:
         """Extract the product category from the given product data."""
         category_tag = product_data.find_previous('h2')
         if category_tag is None:
-            raise FreshPointParserValueError(
+            raise ParseError(
                 f'Unable to extract product category name for product '
                 f'"id={cls._find_id_safe(product_data)}" from the provided '
                 f'html data (no preceding <h2/> tag found).'
             )
         category = category_tag.get_text(strip=True)
         if not category:
-            raise FreshPointParserValueError(
+            raise ParseError(
                 f'Unable to extract product category name for product '
                 f'"id={cls._find_id_safe(product_data)}" from the provided '
                 f'html data (the preceding <h2/> tag is empty).'
@@ -214,7 +209,7 @@ class ProductHTMLParser:
             )
             if price_curr > price_full:
                 id_ = cls._find_id_safe(product_data)
-                raise FreshPointParserValueError(
+                raise ParseError(
                     f'Unexpected product "id={id_}" parsing results: '
                     f'current price "{price_curr}" is greater than '
                     f'the regular full price "{price_full}".'
@@ -229,7 +224,7 @@ class ProductHTMLParser:
             #             f'but the "isPromo" flag is not set.'
             #             )
             return price_full, price_curr
-        raise FreshPointParserValueError(
+        raise ParseError(
             f'Unexpected number of elements in the ResultSet'
             f'(expected 1 or 2, got {len(prices)}).'
         )
@@ -252,27 +247,27 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
                 initialized with the page HTML content.
 
         Raises:
-            FreshPointParserValueError: If the page ID cannot be parsed.
+            ParseError: If the page ID cannot be parsed.
 
         Returns:
             str: The ID number of the location.
         """
         script = bs4_parser.find(string=self._RE_PATTERN_DEVICE_ID)
         if script is None:
-            raise FreshPointParserValueError(
+            raise ParseError(
                 'Unable to parse page ID '
                 '(script tag with "deviceId" text was not found).'
             )
         match = self._RE_PATTERN_DEVICE_ID.search(script)
         if not match:
-            raise FreshPointParserValueError(
+            raise ParseError(
                 'Unable to parse page ID '
                 '("deviceId" text within the script tag was not matched).'
             )
         try:
             return str(match.group(1))
         except Exception as exc:
-            raise FreshPointParserValueError('Unable to parse page ID.') from exc
+            raise ParseError('Unable to parse page ID.') from exc
 
     def _parse_location_name(self, bs4_parser: bs4.BeautifulSoup) -> str:  # noqa: PLR6301
         """Extract the name of the location (also known as the page title)
@@ -283,20 +278,20 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
                 initialized with the page HTML content.
 
         Raises:
-            FreshPointParserValueError: If the location name cannot be parsed.
+            ParseError: If the location name cannot be parsed.
 
         Returns:
             str: The name of the location.
         """
         title_tag = bs4_parser.find('title')
         if not title_tag:
-            raise FreshPointParserValueError(
+            raise ParseError(
                 'Unable to parse location name (<title/> tag  was not found).'
             )
         try:
             return title_tag.get_text().split('|')[0].strip()
         except Exception as exc:
-            raise FreshPointParserValueError('Unable to parse location name.') from exc
+            raise ParseError('Unable to parse location name.') from exc
 
     def _parse_product(self, product_data: bs4.Tag) -> Product:
         """Parse the a single product item to a Product model.

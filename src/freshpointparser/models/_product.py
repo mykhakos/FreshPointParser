@@ -11,8 +11,6 @@ from pydantic import (
     field_validator,
 )
 
-from freshpointparser.exceptions import FreshPointParserValueError
-
 from .._utils import normalize_text
 from ._base import BaseItem, BasePage
 
