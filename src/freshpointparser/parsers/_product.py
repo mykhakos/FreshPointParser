@@ -32,7 +32,7 @@ class ProductHTMLParser:
         is not found, catch the raised exception and return a placeholder.
         """
         try:
-            return str(cls.find_id(product_data))
+            return product_data['data-id']  # type: ignore[attr-type]
         except Exception as exc:
             logger.warning(
                 'Unable to extract product ID from the provided html data (%s).', exc
