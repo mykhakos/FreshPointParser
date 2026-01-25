@@ -415,7 +415,7 @@ def get_product_page_url(location_id: Union[int, str]) -> str:
     """
     if not str(location_id).isdigit():
         raise ValueError(
-            f'Location ID must respresent a non-negative integer, got: {location_id!r}'
+            f'Location ID must represent a non-negative integer, got: {location_id!r}'
         )
     return f'https://my.freshpoint.cz/device/product-list/{location_id}'
 
