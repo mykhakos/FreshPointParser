@@ -6,9 +6,6 @@ import pytest
 from pydantic import Field
 
 from freshpointparser import get_product_page_url
-from freshpointparser.exceptions import (
-    FreshPointParserValueError,
-)
 from freshpointparser.models import Product, ProductPage
 from freshpointparser.models.types import (
     ProductPriceUpdateInfo,
@@ -671,6 +668,7 @@ def test_product_page_init(page, expected_attrs):
 @pytest.mark.parametrize(
     'location_id, expected_url',
     [
+        pytest.param(None, None, id='location_id=None'),
         pytest.param(0, get_product_page_url(location_id=0), id='location_id=0'),
         pytest.param(296, get_product_page_url(location_id=296), id='location_id=296'),
     ],
@@ -980,9 +978,9 @@ def test_product_page_find_items_no_match(product_page, constraint):
     ],
 )
 def test_product_page_find_items_invalid_constraint(product_page, constraint):
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(TypeError):
         list(product_page.find_items(constraint))
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(TypeError):
         product_page.find_item(constraint)
 
 
@@ -1094,7 +1092,6 @@ def test_item_diff_exclude_missing():
 
 def test_item_diff_exclude_missing_edge_cases():
     """Test edge cases for exclude_missing parameter."""
-
     # Test: All items only in left page
     p_only_left = ProductPage(
         items=[
@@ -1226,17 +1223,16 @@ def test_iter_item_attr_defaults_and_uniqueness():
 
     # unique with unhashable values
     page.items.append(SubProduct(id_='5', context={'key': 'value'}))
-    assert list(page.iter_item_attr('context', default={}, unhashable=True)) == [
-        {},
-        {},
-        {},
+    assert list(
+        page.iter_item_attr('context', default={}, unique=True, hashable=False)
+    ) == [
         {},
         {'key': 'value'},
     ]
 
-    # TypeError on unhashable unique without flag
-    with pytest.raises(AttributeError):
-        list(page.iter_item_attr('context', unique=True))
+    # TypeError on unhashable unique without hashable=False
+    with pytest.raises(TypeError):
+        list(page.iter_item_attr('context', default={}, unique=True))
 
 
 @pytest.mark.parametrize(
@@ -1382,7 +1378,7 @@ def test_product_page_is_newer_than(p1, p2, precision, is_p1_newer_than_p2):
 def test_is_newer_than_invalid_precision():
     p1 = ProductPage(recorded_at=datetime(2024, 1, 1))
     p2 = ProductPage(recorded_at=datetime(2024, 1, 2))
-    with pytest.raises(FreshPointParserValueError):
+    with pytest.raises(ValueError):
         p1.is_newer_than(p2, precision='q')  # type: ignore[reportArgumentType]
 
 

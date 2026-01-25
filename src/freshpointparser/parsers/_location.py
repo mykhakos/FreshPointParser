@@ -2,7 +2,7 @@ import json
 import re
 from typing import Any, Dict, List, Union
 
-from ..exceptions import FreshPointParserValueError
+from ..exceptions import ParseError
 from ..models import Location, LocationPage
 from ._base import BasePageHTMLParser, ParseResult
 
@@ -36,7 +36,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
                 location page.
 
         Raises:
-            FreshPointParserValueError: If the location data cannot be found or parsed.
+            ParseError: If the location data cannot be found or parsed.
 
         Returns:
             List[Dict]: Raw location data dictionaries extracted from
@@ -48,7 +48,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         else:
             match_ = self._RE_SEARCH_PATTERN_BYTES.search(page_content)
         if not match_:
-            raise FreshPointParserValueError(
+            raise ParseError(
                 'Unable to find the location data in the HTML '
                 '(regex pattern not matched).'
             )
@@ -57,17 +57,17 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             # embedded in the HTML (a JSON string inside a JavaScript string)
             data = json.loads(json.loads(match_.group(1)))
         except IndexError as err:
-            raise FreshPointParserValueError(
+            raise ParseError(
                 'Unable to parse the location data in the HTML '
                 '(regex data group is missing).'
             ) from err
         except Exception as exc:
-            raise FreshPointParserValueError(
+            raise ParseError(
                 'Unable to parse the location data in the HTML '
                 '(Unexpected error during JSON parsing).'
             ) from exc
         if not isinstance(data, list):
-            raise FreshPointParserValueError(
+            raise ParseError(
                 'Unable to parse the location data in the HTML (data is not a list).'
             )
         return data
@@ -83,7 +83,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             location_data (Dict[str, Any]): Raw location data dictionary.
 
         Raises:
-            FreshPointParserValueError: Raised when the 'prop' key is missing or
+            ParseError: Raised when the 'prop' key is missing or
                 when other parsing errors occur.
 
         Returns:
@@ -92,13 +92,11 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         try:
             return Location.model_validate(location_data['prop'], context=self._context)
         except KeyError as err:
-            raise FreshPointParserValueError(
+            raise ParseError(
                 f"Missing 'prop' key in location item: {location_data}"
             ) from err
         except Exception as exc:
-            raise FreshPointParserValueError(
-                f'Error parsing location item: {location_data}'
-            ) from exc
+            raise ParseError(f'Error parsing location item: {location_data}') from exc
 
     def _parse_locations(self, page_content: Union[str, bytes]) -> List[Location]:
         """Parse multiple location items from the raw location data list.

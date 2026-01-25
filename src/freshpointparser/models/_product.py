@@ -11,8 +11,6 @@ from pydantic import (
     field_validator,
 )
 
-from freshpointparser.exceptions import FreshPointParserValueError
-
 from .._utils import normalize_text
 from ._base import BaseItem, BasePage
 
@@ -177,7 +175,7 @@ class Product(BaseItem):
         """Validate that the current selling price is not higher than the full price."""
         price_full = info.data.get('price_full')
         if price_full is not None and price_full < price_curr:
-            raise FreshPointParserValueError(
+            raise ValueError(
                 f'Full price ({price_full}) cannot be lower than '
                 f'current price ({price_curr}).'
             )
@@ -409,15 +407,15 @@ def get_product_page_url(location_id: Union[int, str]) -> str:
             the ID is 296.
 
     Raises:
-        FreshPointParserValueError: If the object does not represent a non-negative
-            integer (e.g., a negative integer, a float, or a non-numeric string).
+        ValueError: If the object does not represent a non-negative integer
+            (e.g., a negative integer, a float, or a non-numeric string).
 
     Returns:
         str: The full page URL for the given location ID.
     """
     if not str(location_id).isdigit():
-        raise FreshPointParserValueError(
-            f'Location ID must respresent a non-negative integer, got: {location_id!r}'
+        raise ValueError(
+            f'Location ID must represent a non-negative integer, got: {location_id!r}'
         )
     return f'https://my.freshpoint.cz/device/product-list/{location_id}'
 
@@ -443,12 +441,13 @@ class ProductPage(BasePage[Product]):
     """Name of the product location."""
 
     @property
-    def url(self) -> str:
-        """URL of the product page."""
+    def url(self) -> Optional[str]:
+        """URL of the product page.
+
+        Returns None if the location ID is not set.
+        """
         if self.location_id is None:
-            raise FreshPointParserValueError(
-                'Cannot generate product page URL: location ID is not set.'
-            )
+            return None
         return get_product_page_url(self.location_id)
 
     @property

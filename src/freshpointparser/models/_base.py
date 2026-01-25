@@ -33,8 +33,6 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel
 
-from ..exceptions import FreshPointParserTypeError, FreshPointParserValueError
-
 if sys.version_info >= (3, 11):
     from typing import Self, TypeAlias
 else:
@@ -372,7 +370,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
         attr: str,
         *,
         unique: bool = ...,
-        unhashable: bool = ...,
+        hashable: bool = ...,
     ) -> Iterator[Any]: ...
 
     @overload
@@ -382,7 +380,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
         default: T,
         *,
         unique: bool = ...,
-        unhashable: bool = ...,
+        hashable: bool = ...,
     ) -> Iterator[Union[Any, T]]: ...
 
     def iter_item_attr(
@@ -391,7 +389,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
         default: Union[T, _NoDefaultType] = _NO_DEFAULT,
         *,
         unique: bool = False,
-        unhashable: bool = False,
+        hashable: bool = True,
     ) -> Iterator[Union[Any, T]]:
         """Iterate over values of a specific attribute of the page's items,
         with optional default fallback and optional uniqueness filtering.
@@ -406,15 +404,15 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 If not provided, missing attributes will raise AttributeError.
             unique (bool, optional): If True, only distinct values will be
                 yielded. Defaults to False.
-            unhashable (bool, optional): If True, uniqueness is checked
+            hashable (bool, optional): If False, uniqueness is checked
                 by comparing values directly, which is useful for unhashable
-                types like lists or dictionaries, but is slower. Defaults to False.
+                types like lists or dictionaries, but is slower. Defaults to True.
 
         Raises:
-            AttributeError: If the attribute is not present in an item
-                and `default` is not provided.
-            FreshPointParserTypeError: If the attribute values are not hashable and
-                `unhashable` is set to False.
+            AttributeError: If the attribute is not present in an item and
+                ``default`` is not provided.
+            TypeError: If the attribute values are not hashable and
+                ``hashable`` is set to True.
 
         Yields:
             Iterator[Union[Any, T]]: Attribute values collected from each item
@@ -426,25 +424,18 @@ class BasePage(BestEffortModel, Generic[TItem]):
             values = (getattr(item, attr, default) for item in self.items)
 
         if unique:
-            if unhashable:
+            if hashable:
+                seen_hashable: Set[Any] = set()
+                for value in values:
+                    if value not in seen_hashable:
+                        seen_hashable.add(value)
+                        yield value
+            else:
                 seen_unhashable: List[Any] = []
                 for value in values:
                     if value not in seen_unhashable:
                         seen_unhashable.append(value)
                         yield value
-            else:
-                try:
-                    seen_hashable: Set[Any] = set()
-                    for value in values:
-                        if value not in seen_hashable:
-                            seen_hashable.add(value)
-                            yield value
-                except TypeError as err:
-                    raise FreshPointParserTypeError(
-                        f"Cannot yield unique values for attribute '{attr}': "
-                        f'the values are not hashable. '
-                        f"Set 'unhashable=True' to compare the values directly."
-                    ) from err
         else:
             yield from values
 
@@ -482,8 +473,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 ``'foo'``.
 
         Raises:
-            FreshPointParserTypeError: If the constraint is invalid, i.e., not a
-                Mapping or a Callable.
+            TypeError: If the constraint is not a Mapping or Callable.
 
         Returns:
             Optional[TBaseItem]: The first item on the page that matches
@@ -522,6 +512,9 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 Example: ``lambda item: 'foo' in item.name`` will match items
                 where the ``name`` attribute of the item contains ``'foo'``.
 
+        Raises:
+            TypeError: If the constraint is not a Mapping or Callable.
+
         Returns:
             Iterator[TBaseItem]: A lazy iterator over all items on the page that
             match the given constraint.
@@ -538,7 +531,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 ):
                     yield item
         else:
-            raise FreshPointParserTypeError(
+            raise TypeError(
                 f'Constraint must be either a Mapping or a Callable. '
                 f"Got type '{type(constraint).__name__}' instead."
             )
@@ -557,17 +550,11 @@ class BasePage(BestEffortModel, Generic[TItem]):
         Args:
             other (BasePage): The page to compare against.
             precision (Optional[Literal['s', 'm', 'h', 'd']]): The level of
-                precision for the comparison. Supported values:
-
-                - ``None``: full precision (microsecond) (default)
-                - ``s``: second precision
-                - ``m``: minute precision
-                - ``h``: hour precision
-                - ``d``: date precision
+                precision for the comparison (`None` for full precision (default),
+                's' for seconds, 'm' for minutes, 'h' for hours, and 'd' for days).
 
         Raises:
-            FreshPointParserValueError: If the precision is not one of
-                the supported values.
+            ValueError: If the precision is not one of the supported values.
 
         Returns:
             Optional[bool]: With the specified precision taken into account,
@@ -597,8 +584,9 @@ class BasePage(BestEffortModel, Generic[TItem]):
             recorded_at_self = self.recorded_at.date()
             recorded_at_other = other.recorded_at.date()
         else:
-            raise FreshPointParserValueError(
-                f"Invalid precision '{precision}'. Expected one of: 's', 'm', 'h', 'd'."
+            raise ValueError(
+                f"Invalid precision '{precision!r}'. "
+                f"Expected one of: None, 's', 'm', 'h', 'd'."
             )
         if recorded_at_self == recorded_at_other:
             return None

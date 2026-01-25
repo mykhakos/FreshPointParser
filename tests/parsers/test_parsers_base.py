@@ -3,9 +3,7 @@ from typing import Union
 
 import pytest
 
-from freshpointparser.exceptions import (
-    FreshPointParserValueError,
-)
+from freshpointparser.exceptions import ParseError
 from freshpointparser.models._base import BasePage
 from freshpointparser.parsers._base import BasePageHTMLParser
 
@@ -23,9 +21,7 @@ class DummyPageHTMLParserWithErrors(BasePageHTMLParser[BasePage]):
         if isinstance(page_content, str):
             page_content = page_content.encode('utf-8', errors='ignore')
         if b'error' in page_content:
-            self._context.register_error(
-                FreshPointParserValueError('Simulated parsing error')
-            )
+            self._context.register_error(ParseError('Simulated parsing error'))
         data = {'recorded_at': datetime.now()}
         return BasePage.model_validate(data, context=self._context)
 
@@ -165,7 +161,7 @@ def test_parse_errors_collected_in_metadata():
     result = parser.parse('<html>error here</html>')
 
     assert len(result.metadata.errors) == 1
-    assert isinstance(result.metadata.errors[0], FreshPointParserValueError)
+    assert isinstance(result.metadata.errors[0], ParseError)
 
 
 def test_parse_errors_cleared_on_successful_parse():
@@ -213,13 +209,13 @@ def test_safe_parse_method():
 
     # Test with FreshPointParserError
     def error_func() -> None:
-        raise FreshPointParserValueError('Test error')
+        raise ParseError('Test error')
 
     parser = DummyPageHTMLParser()
     result = parser._safe_parse(error_func)
     assert result is None
     assert len(parser._context.errors) == 1
-    assert isinstance(parser._context.errors[0], FreshPointParserValueError)
+    assert isinstance(parser._context.errors[0], ParseError)
 
 
 def test_safe_parse_non_freshpoint_error_propagates():

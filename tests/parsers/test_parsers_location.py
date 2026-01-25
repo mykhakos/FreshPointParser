@@ -5,9 +5,7 @@ from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from freshpointparser import parse_location_page
-from freshpointparser.exceptions import (
-    FreshPointParserValueError,
-)
+from freshpointparser.exceptions import ParseError
 from freshpointparser.models import Location, LocationPage
 from freshpointparser.parsers import LocationPageHTMLParser
 
@@ -66,17 +64,17 @@ def location_page_expected_meta(location_page_metadata_json_content):
 def test_load_json_errors():
     parser = LocationPageHTMLParser()
     # pattern not found
-    with pytest.raises(FreshPointParserValueError):
+    with pytest.raises(ParseError):
         parser._load_json('<html></html>')
 
     # invalid JSON in the matched text
     faulty = 'devices = "[{]" ;'
-    with pytest.raises(FreshPointParserValueError):
+    with pytest.raises(ParseError):
         parser._load_json(faulty)
 
     # data not a list
     not_list = 'devices = "{}";'
-    with pytest.raises(FreshPointParserValueError):
+    with pytest.raises(ParseError):
         parser._load_json(not_list)
 
 
@@ -184,7 +182,7 @@ def test_parse_location_missing_prop_key():
     """Test _parse_location raises error when 'prop' key is missing."""
     parser = LocationPageHTMLParser()
     location_data = {'location': {}}
-    with pytest.raises(FreshPointParserValueError) as exc_info:
+    with pytest.raises(ParseError) as exc_info:
         parser._parse_location(location_data)
     assert "Missing 'prop' key" in str(exc_info.value)
 
@@ -244,7 +242,7 @@ def test_parse_locations_partial_failure():
     assert locations[1].name == 'Valid 2'
     # Error should be collected in context
     assert len(parser._context.errors) == 1
-    assert isinstance(parser._context.errors[0], FreshPointParserValueError)
+    assert isinstance(parser._context.errors[0], ParseError)
 
 
 def test_parse_locations_all_invalid():
@@ -338,7 +336,7 @@ def test_parse_errors_collected_in_metadata():
     result = parser.parse(html_content)
     # Check that errors were collected
     assert len(result.metadata.errors) > 0
-    assert isinstance(result.metadata.errors[0], FreshPointParserValueError)
+    assert isinstance(result.metadata.errors[0], ParseError)
 
 
 def test_parse_location_page_function(location_page_html_content):
