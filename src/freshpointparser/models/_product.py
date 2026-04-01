@@ -159,7 +159,7 @@ class Product(BaseItem):
         ),
     )
     """Additional information about the product such as ingredients or nutritional values."""
-    allergens: Optional[str] = Field(
+    allergens: Optional[List[str]] = Field(
         default=None,
         title='Allergens',
         description='Allergen information for the product.',

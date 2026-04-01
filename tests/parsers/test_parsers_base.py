@@ -1,8 +1,6 @@
 from datetime import datetime
 from typing import Union
 
-import pytest
-
 from freshpointparser.exceptions import ParseError
 from freshpointparser.models._base import BasePage
 from freshpointparser.parsers._base import BasePageHTMLParser

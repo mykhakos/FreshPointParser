@@ -186,7 +186,7 @@ def test_find_allergens_success():
     tag = bs4.BeautifulSoup('<div data-allergens="Lepek, Ryby"></div>', 'lxml').div
     assert tag is not None
     allergens = ProductHTMLParser.find_allergens(tag)
-    assert allergens == 'Lepek, Ryby'
+    assert allergens == ['Lepek', 'Ryby']
 
 
 def test_find_allergens_missing_attribute():
@@ -202,15 +202,15 @@ def test_find_allergens_with_html_entities():
     tag = bs4.BeautifulSoup('<div data-allergens="Lepek &amp; Ryby"></div>', 'lxml').div
     assert tag is not None
     allergens = ProductHTMLParser.find_allergens(tag)
-    assert allergens == 'Lepek & Ryby'
+    assert allergens == ['Lepek & Ryby']
 
 
 def test_find_allergens_empty_string():
-    """Test that an empty data-allergens attribute returns empty string (not None)."""
+    """Test that an empty data-allergens attribute returns an empty list."""
     tag = bs4.BeautifulSoup('<div data-allergens=""></div>', 'lxml').div
     assert tag is not None
     allergens = ProductHTMLParser.find_allergens(tag)
-    assert allergens == ''
+    assert allergens == []
 
 
 def test_find_pic_url_success():

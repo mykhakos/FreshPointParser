@@ -124,9 +124,12 @@ class ProductHTMLParser:
         return '\n'.join(lines)
 
     @classmethod
-    def find_allergens(cls, product_data: bs4.Tag) -> str:
+    def find_allergens(cls, product_data: bs4.Tag) -> List[str]:
         """Extract allergen information from the given product data."""
-        return html.unescape(cls._get_attr_value('data-allergens', product_data))
+        raw = html.unescape(cls._get_attr_value('data-allergens', product_data))
+        if not raw:
+            return []
+        return [a.strip() for a in raw.split(',') if a.strip()]
 
     @classmethod
     def find_pic_url(cls, product_data: bs4.Tag) -> str:

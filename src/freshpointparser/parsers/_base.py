@@ -134,16 +134,14 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
             self._context.register_error(err)
             return None
         except Exception as exc:
-            err = ParseError(
-                f'Unexpected error in parser operation: {exc}'
-            )
-            err.__cause__ = exc
+            wrapped = ParseError(f'Unexpected error in parser operation: {exc}')
+            wrapped.__cause__ = exc
             logger.warning(
                 'Unexpected exception wrapped as ParseError in %s',
                 getattr(parser_func, '__name__', repr(parser_func)),
                 exc_info=True,
             )
-            self._context.register_error(err)
+            self._context.register_error(wrapped)
             return None
 
     @abstractmethod

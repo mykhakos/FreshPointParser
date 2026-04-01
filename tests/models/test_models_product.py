@@ -14,6 +14,7 @@ from freshpointparser.models.types import (
 
 # region Product
 
+
 @pytest.mark.parametrize(
     'product, expected_attrs',
     [
@@ -87,12 +88,12 @@ def test_product_allergens_field_defaults_to_none():
     assert p.allergens is None
 
 
-def test_product_allergens_field_accepts_string():
-    """Product allergens field accepts a string value."""
+def test_product_allergens_field_accepts_list():
+    """Product allergens field accepts a list of strings."""
     from freshpointparser.models import Product
 
-    p = Product(allergens='Obiloviny obsahující lepek, Ryby')
-    assert p.allergens == 'Obiloviny obsahující lepek, Ryby'
+    p = Product(allergens=['Lepek', 'Ryby'])
+    assert p.allergens == ['Lepek', 'Ryby']
 
 
 @pytest.mark.parametrize(
