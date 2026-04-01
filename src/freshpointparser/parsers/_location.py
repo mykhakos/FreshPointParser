@@ -35,12 +35,12 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             page_content (Union[str, bytes]): The HTML content of the
                 location page.
 
-        Raises:
-            ParseError: If the location data cannot be found or parsed.
-
         Returns:
             List[Dict]: Raw location data dictionaries extracted from
                 the JavaScript variable in the HTML content.
+
+        Raises:
+            ParseError: If the location data cannot be found or parsed.
         """
         match_: Union[re.Match[str], re.Match[bytes], None]
         if isinstance(page_content, str):
@@ -82,12 +82,12 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         Args:
             location_data (Dict[str, Any]): Raw location data dictionary.
 
+        Returns:
+            Location: Parsed and validated Location model instance.
+
         Raises:
             ParseError: Raised when the 'prop' key is missing or
                 when other parsing errors occur.
-
-        Returns:
-            Location: Parsed and validated Location model instance.
         """
         # 'location' key duplicates 'prop' data (name, address, lat/lon as strings) — ignored.
         try:

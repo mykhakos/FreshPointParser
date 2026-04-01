@@ -258,10 +258,12 @@ def test_parse_alternating_content():
 def test_parse_result_is_publicly_importable():
     """ParseResult must be importable from the public parsers package."""
     from freshpointparser.parsers import ParseResult
+
     assert ParseResult is not None
 
 
 def test_parse_metadata_is_publicly_importable():
     """ParseMetadata must be importable from the public parsers package."""
     from freshpointparser.parsers import ParseMetadata
+
     assert ParseMetadata is not None

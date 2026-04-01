@@ -88,6 +88,7 @@ def test_product_init(product, expected_attrs):
 def test_product_allergens_field_defaults_to_none():
     """Product allergens field defaults to None when not provided."""
     from freshpointparser.models import Product
+
     p = Product()
     assert p.allergens is None
 
@@ -95,6 +96,7 @@ def test_product_allergens_field_defaults_to_none():
 def test_product_allergens_field_accepts_string():
     """Product allergens field accepts a string value."""
     from freshpointparser.models import Product
+
     p = Product(allergens='Obiloviny obsahující lepek, Ryby')
     assert p.allergens == 'Obiloviny obsahující lepek, Ryby'
 

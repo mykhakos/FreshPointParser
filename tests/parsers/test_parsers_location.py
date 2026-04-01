@@ -435,9 +435,9 @@ def test_parse_data_from_internet():
 
     This test aims to validate the parser's ability to parse actual fresh data.
     """
-    import httpx  # noqa: PLC0415
+    import httpx
 
-    from freshpointparser import (  # noqa: PLC0415
+    from freshpointparser import (
         get_location_page_url,
         parse_location_page,
     )

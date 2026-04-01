@@ -412,12 +412,12 @@ def get_product_page_url(location_id: Union[int, str]) -> str:
             For example, in https://my.freshpoint.cz/device/product-list/296,
             the ID is 296.
 
+    Returns:
+        str: The full page URL for the given location ID.
+
     Raises:
         ValueError: If the object does not represent a non-negative integer
             (e.g., a negative integer, a float, or a non-numeric string).
-
-    Returns:
-        str: The full page URL for the given location ID.
     """
     if not str(location_id).isdigit():
         raise ValueError(

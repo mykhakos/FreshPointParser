@@ -168,7 +168,7 @@ def test_log_failed_validation_empty_string_vs_none():
     # field2 should be None, not 0 or empty string
     assert record.field2 is None
     assert record.field2 != 0
-    assert record.field2 != ''  # noqa: PLC1901
+    assert record.field2 != ''
 
 
 # endregion Test _log_failed_validation
@@ -176,9 +176,10 @@ def test_log_failed_validation_empty_string_vs_none():
 
 def test_best_effort_model_registers_error_in_context():
     """BestEffortModel registers ValidationError into the provided context."""
+    from pydantic import Field, field_validator
+
     from freshpointparser.models._base import BestEffortModel
     from freshpointparser.parsers._base import ParseContext
-    from pydantic import Field, field_validator
 
     class FailingModel(BestEffortModel):
         value: int = Field(default=0)
@@ -213,6 +214,7 @@ def test_best_effort_model_all_fields_fail_produces_default_model():
 def test_best_effort_model_is_publicly_importable():
     """BestEffortModel must be importable from the public models package."""
     from freshpointparser.models import BestEffortModel
+
     assert BestEffortModel is not None
 
 

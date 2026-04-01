@@ -183,9 +183,7 @@ def test_find_info_with_line_breaks():
 
 def test_find_allergens_success():
     """Test extracting allergens from tag."""
-    tag = bs4.BeautifulSoup(
-        '<div data-allergens="Lepek, Ryby"></div>', 'lxml'
-    ).div
+    tag = bs4.BeautifulSoup('<div data-allergens="Lepek, Ryby"></div>', 'lxml').div
     assert tag is not None
     allergens = ProductHTMLParser.find_allergens(tag)
     assert allergens == 'Lepek, Ryby'
@@ -201,9 +199,7 @@ def test_find_allergens_missing_attribute():
 
 def test_find_allergens_with_html_entities():
     """Test extracting allergens with HTML entities."""
-    tag = bs4.BeautifulSoup(
-        '<div data-allergens="Lepek &amp; Ryby"></div>', 'lxml'
-    ).div
+    tag = bs4.BeautifulSoup('<div data-allergens="Lepek &amp; Ryby"></div>', 'lxml').div
     assert tag is not None
     allergens = ProductHTMLParser.find_allergens(tag)
     assert allergens == 'Lepek & Ryby'
@@ -724,11 +720,11 @@ def test_parse_data_from_internet(product_page_id):
 
     This test aims to validate the parser's ability to parse actual fresh data.
     """
-    import time  # noqa: PLC0415
+    import time
 
-    import httpx  # noqa: PLC0415
+    import httpx
 
-    from freshpointparser import get_product_page_url  # noqa: PLC0415
+    from freshpointparser import get_product_page_url
 
     def get_response_with_retry(url, retries: int = 3) -> httpx.Response:
         if retries <= 0:

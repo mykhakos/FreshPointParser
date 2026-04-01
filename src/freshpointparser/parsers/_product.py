@@ -32,7 +32,7 @@ class ProductHTMLParser:
         is not found, catch the raised exception and return a placeholder.
         """
         try:
-            return product_data['data-id']  # type: ignore[attr-type]
+            return product_data['data-id']  # type: ignore[return-value]
         except Exception as exc:
             logger.warning(
                 'Unable to extract product ID from the provided html data (%s).', exc
@@ -177,11 +177,11 @@ class ProductHTMLParser:
         )
         if not quantity:  # sold out products don't have the quantity text
             return 0  # (should be caught by the "sold-out" check above)
-        quantity = normalize_text(quantity)
-        if 'posledn' in quantity:  # products that have only 1 item in stock
+        quantity_str = normalize_text(quantity)
+        if 'posledn' in quantity_str:  # products that have only 1 item in stock
             return 1  # have "posledni" in the quantity text
         return cls._run_converter(
-            lambda: int(quantity.split()[0]),  # regular ("2 kusy", "5 kusu")
+            lambda: int(quantity_str.split()[0]),  # regular ("2 kusy", "5 kusu")
             product_data,
         )
 
@@ -244,11 +244,11 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             bs4_parser (bs4.BeautifulSoup): The BeautifulSoup parser
                 initialized with the page HTML content.
 
-        Raises:
-            ParseError: If the page ID cannot be parsed.
-
         Returns:
             str: The ID number of the location.
+
+        Raises:
+            ParseError: If the page ID cannot be parsed.
         """
         script = bs4_parser.find(string=self._RE_PATTERN_DEVICE_ID)
         if script is None:
@@ -275,11 +275,11 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             bs4_parser (bs4.BeautifulSoup): The BeautifulSoup parser
                 initialized with the page HTML content.
 
-        Raises:
-            ParseError: If the location name cannot be parsed.
-
         Returns:
             str: The name of the location.
+
+        Raises:
+            ParseError: If the location name cannot be parsed.
         """
         title_tag = bs4_parser.find('title')
         if not title_tag:
