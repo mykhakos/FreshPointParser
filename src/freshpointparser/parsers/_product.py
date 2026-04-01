@@ -219,15 +219,8 @@ class ProductHTMLParser:
                     f'current price "{price_curr}" is greater than '
                     f'the regular full price "{price_full}".'
                 )
-            # elif price_curr < price_full:  # "data-isPromo" is unreliable
-            #     if not cls.find_is_promo(product_data):
-            #         id_ = cls._find_id_safe(product_data)
-            #         raise ValueError(
-            #             f'Unexpected product "id={id_}" parsing results: '
-            #             f'current price "{price_curr}" is different from '
-            #             f'the regular full price "{price_full}", '
-            #             f'but the "isPromo" flag is not set.'
-            #             )
+            # Note: price_curr < price_full does not require is_promo to be set.
+            # data-isPromo is unreliable and does not reliably correlate with discounts.
             return price_full, price_curr
         raise ParseError(
             f'Unexpected number of elements in the ResultSet'
