@@ -266,19 +266,20 @@ class Product(BaseItem):
         """
         return self.quantity is not None and self.quantity == 1
 
-    def compare_quantity(self, new: Product) -> ProductQuantityUpdateInfo:
+    def compare_quantity(self, other: Product) -> ProductQuantityUpdateInfo:
         """Compare the stock availability of the product in two different
         points in time.
 
-        This comparison is meaningful primarily when the ``new`` argument
+        This comparison is meaningful primarily when the ``other`` argument
         represents the same product at a different state or time, such as
-        after a stock update.
+        after a stock update. The result is symmetric: calling
+        ``a.compare_quantity(b)`` produces the mirror of ``b.compare_quantity(a)``.
 
         If either product does not have quantity information, the comparison
         will indicate no changes in quantity.
 
         Args:
-            new (Product): The instance of the product to compare against. It
+            other (Product): The instance of the product to compare against. It
                 should represent the same product at a different state or time.
 
         Returns:
@@ -287,21 +288,21 @@ class Product(BaseItem):
                 the provided product, such as decreases, increases, depletion,
                 or restocking.
         """
-        if self.quantity is None or new.quantity is None:
+        if self.quantity is None or other.quantity is None:
             quantity_decrease = 0
             quantity_increase = 0
             is_last_piece = False
             is_depleted = False
             is_restocked = False
-        elif self.quantity > new.quantity:
-            quantity_decrease = self.quantity - new.quantity
+        elif self.quantity > other.quantity:
+            quantity_decrease = self.quantity - other.quantity
             quantity_increase = 0
-            is_last_piece = new.quantity == 1 and self.quantity > 1
-            is_depleted = new.quantity == 0
+            is_last_piece = other.quantity == 1 and self.quantity > 1
+            is_depleted = other.quantity == 0
             is_restocked = False
-        elif self.quantity < new.quantity:
+        elif self.quantity < other.quantity:
             quantity_decrease = 0
-            quantity_increase = new.quantity - self.quantity
+            quantity_increase = other.quantity - self.quantity
             is_last_piece = False
             is_depleted = False
             is_restocked = self.quantity == 0
@@ -320,20 +321,21 @@ class Product(BaseItem):
             is_restocked,
         )
 
-    def compare_price(self, new: Product) -> ProductPriceUpdateInfo:
+    def compare_price(self, other: Product) -> ProductPriceUpdateInfo:
         """Compare the pricing details of the product in two different points
         in time.
 
-        This comparison is meaningful primarily when the ``new`` argument
+        This comparison is meaningful primarily when the ``other`` argument
         represents the same product but in a different pricing state, such as
-        after a price adjustment.
+        after a price adjustment. The result is symmetric: calling
+        ``a.compare_price(b)`` produces the mirror of ``b.compare_price(a)``.
 
         If either product does not specify full or current prices, the comparison
         will indicate no changes in those prices and related metrics such as
         discount rates or sale status.
 
         Args:
-            new (Product): The instance of the product to compare against. It
+            other (Product): The instance of the product to compare against. It
                 should represent the same product at a different state or time.
 
         Returns:
@@ -343,45 +345,45 @@ class Product(BaseItem):
                 rates, and flags indicating the start or end of a sale.
         """
         # compare full prices
-        if self.price_full is None or new.price_full is None:
+        if self.price_full is None or other.price_full is None:
             price_full_decrease = 0.0
             price_full_increase = 0.0
-        elif self.price_full > new.price_full:
-            price_full_decrease = self.price_full - new.price_full
+        elif self.price_full > other.price_full:
+            price_full_decrease = self.price_full - other.price_full
             price_full_increase = 0.0
-        elif self.price_full < new.price_full:
+        elif self.price_full < other.price_full:
             price_full_decrease = 0.0
-            price_full_increase = new.price_full - self.price_full
+            price_full_increase = other.price_full - self.price_full
         else:
             price_full_decrease = 0.0
             price_full_increase = 0.0
 
         # compare current prices
-        if self.price_curr is None or new.price_curr is None:
+        if self.price_curr is None or other.price_curr is None:
             price_curr_decrease = 0.0
             price_curr_increase = 0.0
-        elif self.price_curr > new.price_curr:
-            price_curr_decrease = self.price_curr - new.price_curr
+        elif self.price_curr > other.price_curr:
+            price_curr_decrease = self.price_curr - other.price_curr
             price_curr_increase = 0.0
-        elif self.price_curr < new.price_curr:
+        elif self.price_curr < other.price_curr:
             price_curr_decrease = 0.0
-            price_curr_increase = new.price_curr - self.price_curr
+            price_curr_increase = other.price_curr - self.price_curr
         else:
             price_curr_decrease = 0.0
             price_curr_increase = 0.0
 
         # compare discount rates
         self_discount_rate = self.discount_rate
-        new_discount_rate = new.discount_rate
-        if self_discount_rate is None or new_discount_rate is None:
+        other_discount_rate = other.discount_rate
+        if self_discount_rate is None or other_discount_rate is None:
             discount_rate_decrease = 0.0
             discount_rate_increase = 0.0
-        elif self_discount_rate > new_discount_rate:
-            discount_rate_decrease = self_discount_rate - new_discount_rate
+        elif self_discount_rate > other_discount_rate:
+            discount_rate_decrease = self_discount_rate - other_discount_rate
             discount_rate_increase = 0.0
-        elif self_discount_rate < new_discount_rate:
+        elif self_discount_rate < other_discount_rate:
             discount_rate_decrease = 0.0
-            discount_rate_increase = new_discount_rate - self_discount_rate
+            discount_rate_increase = other_discount_rate - self_discount_rate
         else:
             discount_rate_decrease = 0.0
             discount_rate_increase = 0.0
@@ -393,8 +395,8 @@ class Product(BaseItem):
             price_curr_increase,
             discount_rate_decrease,
             discount_rate_increase,
-            has_sale_started=(not self.is_on_sale and new.is_on_sale),
-            has_sale_ended=(self.is_on_sale and not new.is_on_sale),
+            has_sale_started=(not self.is_on_sale and other.is_on_sale),
+            has_sale_ended=(self.is_on_sale and not other.is_on_sale),
         )
 
 
