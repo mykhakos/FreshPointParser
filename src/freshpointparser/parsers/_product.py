@@ -1,6 +1,6 @@
 import html
 import re
-from typing import Callable, List, Tuple, TypeVar, Union
+from typing import List, Tuple, Union
 
 import bs4
 
@@ -8,8 +8,6 @@ from .._utils import normalize_text
 from ..exceptions import ParseError
 from ..models import Product, ProductPage
 from ._base import BasePageHTMLParser, ParseResult, logger
-
-T = TypeVar('T')
 
 
 class ProductHTMLParser:
@@ -40,21 +38,6 @@ class ProductHTMLParser:
             return '?'
 
     @classmethod
-    def _run_converter(cls, converter: Callable[[], T], product_data: bs4.Tag) -> T:
-        """Run the given converter function and return the converted value.
-
-        Args:
-            converter (Callable[[], T]): The converter function
-                to be executed.
-            product_data (bs4.Tag): The product data to be passed to
-                the converter function.
-
-        Returns:
-            T: The converted value.
-        """
-        return converter()
-
-    @classmethod
     def _get_attr_value(cls, attr_name: str, tag: bs4.Tag) -> str:
         """Get the value of a specified attribute from a Tag.
 
@@ -76,7 +59,7 @@ class ProductHTMLParser:
                 f"Data of product with id='{cls._find_id_safe(tag)}' "
                 f"does not contain keyword '{attr_name}'."
             ) from err
-        return cls._run_converter(lambda: str(attr).strip(), tag)
+        return str(attr).strip()
 
     @classmethod
     def find_name(cls, product_data: bs4.Tag) -> str:
@@ -174,10 +157,7 @@ class ProductHTMLParser:
         quantity_str = normalize_text(quantity)
         if 'posledn' in quantity_str:  # products that have only 1 item in stock
             return 1  # have "posledni" in the quantity text
-        return cls._run_converter(
-            lambda: int(quantity_str.split()[0]),  # regular ("2 kusy", "5 kusu")
-            product_data,
-        )
+        return int(quantity_str.split()[0])  # regular ("2 kusy", "5 kusu")
 
     @classmethod
     def find_price(cls, product_data: bs4.Tag) -> Tuple[float, float]:
@@ -192,20 +172,11 @@ class ProductHTMLParser:
             ),
         )
         if len(prices) == 1:
-            price_full = cls._run_converter(
-                lambda: float(prices[0]),
-                product_data,  # price_full_str
-            )
+            price_full = float(prices[0])
             return price_full, price_full
         if len(prices) == 2:
-            price_full = cls._run_converter(
-                lambda: float(prices[0]),
-                product_data,  # price_full_str
-            )
-            price_curr = cls._run_converter(
-                lambda: float(prices[1]),
-                product_data,  # price_curr_str
-            )
+            price_full = float(prices[0])
+            price_curr = float(prices[1])
             if price_curr > price_full:
                 id_ = cls._find_id_safe(product_data)
                 raise ParseError(
