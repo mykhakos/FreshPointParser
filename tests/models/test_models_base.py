@@ -172,3 +172,19 @@ def test_log_failed_validation_empty_string_vs_none():
 
 
 # endregion Test _log_failed_validation
+
+
+def test_best_effort_model_all_fields_fail_produces_default_model():
+    """When every field fails validation, BestEffortModel returns all-defaults."""
+    from pydantic import Field, field_validator
+
+    class StrictModel(BestEffortModel):
+        value: int = Field(default=0)
+
+        @field_validator('value', mode='after')
+        @classmethod
+        def always_fail(cls, v: int) -> int:
+            raise ValueError('always fails')
+
+    result = StrictModel.model_validate({'value': 42})
+    assert result.value == 0  # default, not 42
