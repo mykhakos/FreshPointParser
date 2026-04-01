@@ -10,8 +10,8 @@ from ._location import (
     LocationCoordinates,
 )
 from ._product import (
-    ProductPriceUpdateInfo,
-    ProductQuantityUpdateInfo,
+    ProductPriceChange,
+    ProductQuantityChange,
 )
 
 __all__ = [
@@ -19,7 +19,7 @@ __all__ = [
     'FieldDiffMapping',
     'LocationCoordinates',
     'ModelDiffMapping',
-    'ProductPriceUpdateInfo',
-    'ProductQuantityUpdateInfo',
+    'ProductPriceChange',
+    'ProductQuantityChange',
     'ValidationContext',
 ]

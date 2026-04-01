@@ -16,7 +16,7 @@ from ._base import BaseItem, BasePage
 
 
 @dataclass
-class ProductQuantityUpdateInfo:
+class ProductQuantityChange:
     """Summarizes the details of stock quantity changes in a product."""
 
     quantity_decrease: int = 0
@@ -47,7 +47,7 @@ class ProductQuantityUpdateInfo:
 
 
 @dataclass
-class ProductPriceUpdateInfo:
+class ProductPriceChange:
     """Summarizes the details of pricing changes of a product."""
 
     price_full_decrease: float = 0.0
@@ -266,7 +266,7 @@ class Product(BaseItem):
         """
         return self.quantity is not None and self.quantity == 1
 
-    def compare_quantity(self, other: Product) -> ProductQuantityUpdateInfo:
+    def compare_quantity(self, other: Product) -> ProductQuantityChange:
         """Compare the stock availability of the product in two different
         points in time.
 
@@ -283,7 +283,7 @@ class Product(BaseItem):
                 should represent the same product at a different state or time.
 
         Returns:
-            ProductQuantityUpdateInfo: A dataclass containing information about
+            ProductQuantityChange: A dataclass containing information about
                 changes in stock quantity of this product when compared to
                 the provided product, such as decreases, increases, depletion,
                 or restocking.
@@ -313,7 +313,7 @@ class Product(BaseItem):
             is_depleted = False
             is_restocked = False
 
-        return ProductQuantityUpdateInfo(
+        return ProductQuantityChange(
             quantity_decrease,
             quantity_increase,
             is_last_piece,
@@ -321,7 +321,7 @@ class Product(BaseItem):
             is_restocked,
         )
 
-    def compare_price(self, other: Product) -> ProductPriceUpdateInfo:
+    def compare_price(self, other: Product) -> ProductPriceChange:
         """Compare the pricing details of the product in two different points
         in time.
 
@@ -339,7 +339,7 @@ class Product(BaseItem):
                 should represent the same product at a different state or time.
 
         Returns:
-            ProductPriceUpdateInfo: A dataclass containing information about
+            ProductPriceChange: A dataclass containing information about
                 changes in pricing between this product and the provided
                 product, such as changes in full price, current price, discount
                 rates, and flags indicating the start or end of a sale.
@@ -388,7 +388,7 @@ class Product(BaseItem):
             discount_rate_decrease = 0.0
             discount_rate_increase = 0.0
 
-        return ProductPriceUpdateInfo(
+        return ProductPriceChange(
             price_full_decrease,
             price_full_increase,
             price_curr_decrease,
