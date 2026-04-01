@@ -5,7 +5,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any, Callable, Generic, List, Optional, TypeVar, Union
 
-from ..exceptions import FreshPointParserError
+from ..exceptions import FreshPointParserError, ParseError
 from ..models._base import BasePage
 
 logger = logging.getLogger('freshpointparser.parsers')
@@ -132,6 +132,16 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         except FreshPointParserError as err:
             logger.info('Parsing error occurred: %s', err)
             self._context.register_error(err)
+            return None
+        except Exception as exc:
+            wrapped = ParseError(f'Unexpected error in parser operation: {exc}')
+            wrapped.__cause__ = exc
+            logger.warning(
+                'Unexpected exception wrapped as ParseError in %s',
+                getattr(parser_func, '__name__', repr(parser_func)),
+                exc_info=True,
+            )
+            self._context.register_error(wrapped)
             return None
 
     @abstractmethod

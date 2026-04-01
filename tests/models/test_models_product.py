@@ -14,11 +14,6 @@ from freshpointparser.models.types import (
 
 # region Product
 
-DEFAULT_PRODUCT_PIC_URL = (
-    r'https://images.weserv.nl/?url=http://freshpoint.freshserver.cz/'
-    r'backend/web/media/photo/1_f587dd3fa21b22.jpg'
-)
-
 
 @pytest.mark.parametrize(
     'product, expected_attrs',
@@ -36,7 +31,7 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_curr=None,
                 info=None,
                 allergens=None,
-                pic_url=DEFAULT_PRODUCT_PIC_URL,
+                pic_url=None,
             ),
             id='default args',
         ),
@@ -93,12 +88,12 @@ def test_product_allergens_field_defaults_to_none():
     assert p.allergens is None
 
 
-def test_product_allergens_field_accepts_string():
-    """Product allergens field accepts a string value."""
+def test_product_allergens_field_accepts_list():
+    """Product allergens field accepts a list of strings."""
     from freshpointparser.models import Product
 
-    p = Product(allergens='Obiloviny obsahující lepek, Ryby')
-    assert p.allergens == 'Obiloviny obsahující lepek, Ryby'
+    p = Product(allergens=['Lepek', 'Ryby'])
+    assert p.allergens == ['Lepek', 'Ryby']
 
 
 @pytest.mark.parametrize(

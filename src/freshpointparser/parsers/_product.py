@@ -51,17 +51,8 @@ class ProductHTMLParser:
 
         Returns:
             T: The converted value.
-
-        Raises:
-            ParseError: If an error occurs during the conversion process.
         """
-        try:
-            return converter()
-        except Exception as exc:
-            raise ParseError(
-                f'Unable to convert a parsed value for the product '
-                f"with id='{cls._find_id_safe(product_data)}'."
-            ) from exc
+        return converter()
 
     @classmethod
     def _get_attr_value(cls, attr_name: str, tag: bs4.Tag) -> str:
@@ -133,9 +124,12 @@ class ProductHTMLParser:
         return '\n'.join(lines)
 
     @classmethod
-    def find_allergens(cls, product_data: bs4.Tag) -> str:
+    def find_allergens(cls, product_data: bs4.Tag) -> List[str]:
         """Extract allergen information from the given product data."""
-        return html.unescape(cls._get_attr_value('data-allergens', product_data))
+        raw = html.unescape(cls._get_attr_value('data-allergens', product_data))
+        if not raw:
+            return []
+        return [a.strip() for a in raw.split(',') if a.strip()]
 
     @classmethod
     def find_pic_url(cls, product_data: bs4.Tag) -> str:
