@@ -66,6 +66,12 @@ def _safe_validate(cls, data, handler, info):
 
 This is field-level partial recovery: a product with an invalid price still has its name, quantity, and allergens. The entire model is not discarded. Errors flow into `ParseContext` and surface in `ParseResult.metadata.errors`.
 
+**Why `mode='wrap'` and not a simpler approach?** Four options were evaluated:
+- **Option A — all fields `Optional` with defaults:** fails when data is *present* but invalid (e.g. `price_curr=-5.0` raises `ValidationError` on `NonNegativeFloat` even though the field has a `None` default).
+- **Option B — `mode='before'` sanitizer:** can only strip `None` values before validation, cannot recover from type mismatches or constraint violations.
+- **Option C — `mode='wrap'` (what `BestEffortModel` uses):** catches `ValidationError`, identifies which fields failed, strips them, and retries with their defaults. The only option that provides field-level partial recovery for all failure categories.
+- **Option D — catch `ValidationError` at call site:** simplest, but drops the *entire* model on any single field failure — no partial data preserved.
+
 **Why two levels?** Extraction failures ("the HTML didn't have what we expected") and validation failures ("the data was present but logically invalid") are semantically different failure modes. An extraction failure signals a site structure change; a validation failure signals a data quality issue. Keeping them separate preserves this diagnostic information.
 
 ### Error surfacing
@@ -113,6 +119,10 @@ src/freshpointparser/
 - `recorded_at: datetime` — populated from `ParseContext.parsed_at` at parse time.
 
 **`Product`** — fields extracted from product `<div>` elements. All fields are `Optional` with `None` defaults. Key properties (computed, not stored): `price` (curr if set, else full), `discount_rate`, `is_on_sale`, `is_available`, `is_sold_out`, `is_last_piece`. `compare_quantity(new)` and `compare_price(new)` return rich dataclasses describing transitions (e.g., `is_depleted`, `has_sale_started`).
+
+Two non-obvious constraints:
+- `price_curr` cannot exceed `price_full` (enforced by `_validate_price_curr` field validator). When violated on direct model construction, `BestEffortModel` drops `price_curr` and retries — `price_full` is preserved, `price_curr` becomes `None`. This validator never fires through the parser because `ProductHTMLParser.find_price()` already checks this.
+- `is_promo: Optional[bool]` is parsed from `data-isPromo` but is **unreliable** as a site data quality issue — a product can be on sale without `is_promo=True` and vice versa. Do not use `is_promo` to infer discount status; use `is_on_sale` instead.
 
 **`Location`** — fields extracted from the embedded JSON. Uses `AliasChoices` because the JSON uses short keys (`lat`, `lon`, `username`, `discount`, `active`, `suspended`) while the model uses descriptive names.
 
