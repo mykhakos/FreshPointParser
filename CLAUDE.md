@@ -126,7 +126,7 @@ Two non-obvious constraints:
 
 **`Location`** — fields extracted from the embedded JSON. Uses `AliasChoices` because the JSON uses short keys (`lat`, `lon`, `username`, `discount`, `active`, `suspended`) while the model uses descriptive names.
 
-**`types.py`** — re-exports auxiliary types: `FieldDiff`, `FieldDiffMapping`, `ModelDiffMapping`, `ValidationContext`, `LocationCoordinates`, `ProductQuantityUpdateInfo`, `ProductPriceUpdateInfo`. Import from `freshpointparser.models.types`.
+**`types.py`** — re-exports auxiliary types: `FieldDiff`, `FieldDiffMapping`, `ModelDiffMapping`, `ValidationContext`, `LocationCoordinates`, `ProductQuantityChange`, `ProductPriceChange`. Import from `freshpointparser.models.types`.
 
 ### Parsers layer
 
@@ -188,7 +188,7 @@ from freshpointparser.models import (
     BaseItem, BasePage,
 )
 from freshpointparser.models.types import (
-    ProductQuantityUpdateInfo, ProductPriceUpdateInfo,
+    ProductQuantityChange, ProductPriceChange,
     FieldDiff, FieldDiffMapping, ModelDiffMapping,
     LocationCoordinates, ValidationContext,
 )
