@@ -133,6 +133,11 @@ class ProductHTMLParser:
         return '\n'.join(lines)
 
     @classmethod
+    def find_allergens(cls, product_data: bs4.Tag) -> str:
+        """Extract allergen information from the given product data."""
+        return html.unescape(cls._get_attr_value('data-allergens', product_data))
+
+    @classmethod
     def find_pic_url(cls, product_data: bs4.Tag) -> str:
         """Extract the URL of the product's picture
         from the given product data.
@@ -314,6 +319,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             ('is_promo', ProductHTMLParser.find_is_promo),
             ('quantity', ProductHTMLParser.find_quantity),
             ('info', ProductHTMLParser.find_info),
+            ('allergens', ProductHTMLParser.find_allergens),
             ('pic_url', ProductHTMLParser.find_pic_url),
         ):
             value = self._safe_parse(parser_func, product_data=product_data)

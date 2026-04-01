@@ -81,6 +81,20 @@ def test_product_init(product, expected_attrs):
     assert product.pic_url == expected_attrs['pic_url']
 
 
+def test_product_allergens_field_defaults_to_none():
+    """Product allergens field defaults to None when not provided."""
+    from freshpointparser.models import Product
+    p = Product()
+    assert p.allergens is None
+
+
+def test_product_allergens_field_accepts_string():
+    """Product allergens field accepts a string value."""
+    from freshpointparser.models import Product
+    p = Product(allergens='Obiloviny obsahující lepek, Ryby')
+    assert p.allergens == 'Obiloviny obsahující lepek, Ryby'
+
+
 @pytest.mark.parametrize(
     'product, expected_price_full, expected_price_curr',
     [

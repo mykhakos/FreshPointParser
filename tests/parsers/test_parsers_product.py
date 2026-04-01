@@ -181,6 +181,34 @@ def test_find_info_with_line_breaks():
     assert 'Line 3' in info
 
 
+def test_find_allergens_success():
+    """Test extracting allergens from tag."""
+    tag = bs4.BeautifulSoup(
+        '<div data-allergens="Lepek, Ryby"></div>', 'lxml'
+    ).div
+    assert tag is not None
+    allergens = ProductHTMLParser.find_allergens(tag)
+    assert allergens == 'Lepek, Ryby'
+
+
+def test_find_allergens_missing_attribute():
+    """Test error when data-allergens attribute is missing."""
+    tag = bs4.BeautifulSoup('<div></div>', 'lxml').div
+    assert tag is not None
+    with pytest.raises(ParseError):
+        ProductHTMLParser.find_allergens(tag)  # type: ignore
+
+
+def test_find_allergens_with_html_entities():
+    """Test extracting allergens with HTML entities."""
+    tag = bs4.BeautifulSoup(
+        '<div data-allergens="Lepek &amp; Ryby"></div>', 'lxml'
+    ).div
+    assert tag is not None
+    allergens = ProductHTMLParser.find_allergens(tag)
+    assert allergens == 'Lepek & Ryby'
+
+
 def test_find_pic_url_success():
     """Test extracting product picture URL."""
     tag = bs4.BeautifulSoup(
