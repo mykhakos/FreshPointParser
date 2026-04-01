@@ -80,7 +80,7 @@ def test_log_failed_validation_multiple_fields():
     assert record.field2 is None
     assert record.field3 is None
 
-    # All three validation errors should be stored
+    # BestEffortModel collects one ValidationError (which internally contains all field errors)
     assert len(context.parse_errors) == 1
     assert all(isinstance(err, ValidationError) for err in context.parse_errors)
 

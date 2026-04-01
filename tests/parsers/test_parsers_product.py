@@ -425,6 +425,8 @@ def test_parse_product_success():
     assert product.is_vegetarian is True
     assert product.price_full == 50.0
     assert product.quantity == 2
+    assert product.allergens is None
+    assert any(isinstance(e, ParseError) for e in parser._context.errors)
 
 
 def test_parse_product_minimal_data():
