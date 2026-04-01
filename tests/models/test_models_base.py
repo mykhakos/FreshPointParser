@@ -190,6 +190,12 @@ def test_best_effort_model_all_fields_fail_produces_default_model():
     assert result.value == 0  # default, not 42
 
 
+def test_best_effort_model_is_publicly_importable():
+    """BestEffortModel must be importable from the public models package."""
+    from freshpointparser.models import BestEffortModel
+    assert BestEffortModel is not None
+
+
 def test_is_newer_than_returns_none_when_equal():
     """is_newer_than returns None when both pages have identical recorded_at."""
     from datetime import datetime
