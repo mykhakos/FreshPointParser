@@ -14,12 +14,6 @@ from freshpointparser.models.types import (
 
 # region Product
 
-DEFAULT_PRODUCT_PIC_URL = (
-    r'https://images.weserv.nl/?url=http://freshpoint.freshserver.cz/'
-    r'backend/web/media/photo/1_f587dd3fa21b22.jpg'
-)
-
-
 @pytest.mark.parametrize(
     'product, expected_attrs',
     [
@@ -36,7 +30,7 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_curr=None,
                 info=None,
                 allergens=None,
-                pic_url=DEFAULT_PRODUCT_PIC_URL,
+                pic_url=None,
             ),
             id='default args',
         ),

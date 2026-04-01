@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import (
     Field,
@@ -165,11 +165,8 @@ class Product(BaseItem):
         description='Allergen information for the product.',
     )
     """Allergen information for the product."""
-    pic_url: str = Field(
-        default=(
-            r'https://images.weserv.nl/?url=http://freshpoint.freshserver.cz/'
-            r'backend/web/media/photo/1_f587dd3fa21b22.jpg'
-        ),
+    pic_url: Optional[str] = Field(
+        default=None,
         title='Illustrative Product Picture URL',
         description='URL of the illustrative product image.',
     )
