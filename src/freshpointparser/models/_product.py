@@ -159,6 +159,12 @@ class Product(BaseItem):
         ),
     )
     """Additional information about the product such as ingredients or nutritional values."""
+    allergens: Optional[str] = Field(
+        default=None,
+        title='Allergens',
+        description='Allergen information for the product.',
+    )
+    """Allergen information for the product."""
     pic_url: str = Field(
         default=(
             r'https://images.weserv.nl/?url=http://freshpoint.freshserver.cz/'
@@ -406,12 +412,12 @@ def get_product_page_url(location_id: Union[int, str]) -> str:
             For example, in https://my.freshpoint.cz/device/product-list/296,
             the ID is 296.
 
+    Returns:
+        str: The full page URL for the given location ID.
+
     Raises:
         ValueError: If the object does not represent a non-negative integer
             (e.g., a negative integer, a float, or a non-numeric string).
-
-    Returns:
-        str: The full page URL for the given location ID.
     """
     if not str(location_id).isdigit():
         raise ValueError(

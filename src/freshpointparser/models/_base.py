@@ -101,12 +101,12 @@ class BestEffortModel(BaseModel):
             info (ValidationInfo): Additional validation information
                 (injected by Pydantic).
 
+        Returns:
+            Self: The validated model instance.
+
         Raises:
             ValidationError: Raised when validation fails, and the fallback
                 mechanism cannot be applied.
-
-        Returns:
-            Self: The validated model instance.
         """
         try:
             return handler(data)
@@ -124,7 +124,7 @@ class BestEffortModel(BaseModel):
             )
             try:
                 context: Optional[ValidationContext] = info.context
-                context.register_error(validation_err)  # type: ignore[arg-type]
+                context.register_error(validation_err)  # type: ignore[union-attr]
             except Exception as ctx_err:
                 logger.warning(
                     'Failed to record validation error to the context (%s)',
@@ -408,15 +408,15 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 by comparing values directly, which is useful for unhashable
                 types like lists or dictionaries, but is slower. Defaults to True.
 
+        Yields:
+            Iterator[Union[Any, T]]: Attribute values collected from each item
+            on the page.
+
         Raises:
             AttributeError: If the attribute is not present in an item and
                 ``default`` is not provided.
             TypeError: If the attribute values are not hashable and
                 ``hashable`` is set to True.
-
-        Yields:
-            Iterator[Union[Any, T]]: Attribute values collected from each item
-            on the page.
         """
         if default is _NO_DEFAULT:
             values = (getattr(item, attr) for item in self.items)
@@ -472,12 +472,12 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 where the ``name`` attribute of the item contains the string
                 ``'foo'``.
 
-        Raises:
-            TypeError: If the constraint is not a Mapping or Callable.
-
         Returns:
             Optional[TBaseItem]: The first item on the page that matches
             the given constraint, or None if no such item is found.
+
+        Raises:
+            TypeError: If the constraint is not a Mapping or Callable.
         """
         return next(self.find_items(constraint), None)
 
@@ -512,12 +512,12 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 Example: ``lambda item: 'foo' in item.name`` will match items
                 where the ``name`` attribute of the item contains ``'foo'``.
 
-        Raises:
-            TypeError: If the constraint is not a Mapping or Callable.
-
         Returns:
             Iterator[TBaseItem]: A lazy iterator over all items on the page that
             match the given constraint.
+
+        Raises:
+            TypeError: If the constraint is not a Mapping or Callable.
         """
         if callable(constraint):
             for item in self.items:
@@ -553,14 +553,14 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 precision for the comparison (`None` for full precision (default),
                 's' for seconds, 'm' for minutes, 'h' for hours, and 'd' for days).
 
-        Raises:
-            ValueError: If the precision is not one of the supported values.
-
         Returns:
             Optional[bool]: With the specified precision taken into account,
                 - True if this model's record datetime is newer than the other's
                 - False if this model's record datetime is older than the other's
                 - None if the record datetimes are the same
+
+        Raises:
+            ValueError: If the precision is not one of the supported values.
         """
         recorded_at_self: Union[datetime, date]
         recorded_at_other: Union[datetime, date]

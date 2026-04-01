@@ -80,7 +80,7 @@ def test_log_failed_validation_multiple_fields():
     assert record.field2 is None
     assert record.field3 is None
 
-    # All three validation errors should be stored
+    # BestEffortModel collects one ValidationError (which internally contains all field errors)
     assert len(context.parse_errors) == 1
     assert all(isinstance(err, ValidationError) for err in context.parse_errors)
 
@@ -168,7 +168,68 @@ def test_log_failed_validation_empty_string_vs_none():
     # field2 should be None, not 0 or empty string
     assert record.field2 is None
     assert record.field2 != 0
-    assert record.field2 != ''  # noqa: PLC1901
+    assert record.field2 != ''
 
 
 # endregion Test _log_failed_validation
+
+
+def test_best_effort_model_registers_error_in_context():
+    """BestEffortModel registers ValidationError into the provided context."""
+    from pydantic import Field, field_validator
+
+    from freshpointparser.models._base import BestEffortModel
+    from freshpointparser.parsers._base import ParseContext
+
+    class FailingModel(BestEffortModel):
+        value: int = Field(default=0)
+
+        @field_validator('value', mode='after')
+        @classmethod
+        def always_fail(cls, v: int) -> int:
+            raise ValueError('always fails')
+
+    ctx = ParseContext()
+    result = FailingModel.model_validate({'value': 42}, context=ctx)
+    assert result.value == 0
+    assert len(ctx.errors) == 1
+
+
+def test_best_effort_model_all_fields_fail_produces_default_model():
+    """When every field fails validation, BestEffortModel returns all-defaults."""
+    from pydantic import Field, field_validator
+
+    class StrictModel(BestEffortModel):
+        value: int = Field(default=0)
+
+        @field_validator('value', mode='after')
+        @classmethod
+        def always_fail(cls, v: int) -> int:
+            raise ValueError('always fails')
+
+    result = StrictModel.model_validate({'value': 42})
+    assert result.value == 0  # default, not 42
+
+
+def test_best_effort_model_is_publicly_importable():
+    """BestEffortModel must be importable from the public models package."""
+    from freshpointparser.models import BestEffortModel
+
+    assert BestEffortModel is not None
+
+
+def test_is_newer_than_returns_none_when_equal():
+    """is_newer_than returns None when both pages have identical recorded_at."""
+    from datetime import datetime
+    from typing import List
+
+    from freshpointparser.models._base import BaseItem, BasePage
+
+    t = datetime(2024, 1, 1, 12, 0, 0)
+
+    class ConcretePage(BasePage[BaseItem]):
+        items: List[BaseItem] = []
+
+    a = ConcretePage(recorded_at=t)
+    b = ConcretePage(recorded_at=t)
+    assert a.is_newer_than(b) is None

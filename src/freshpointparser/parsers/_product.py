@@ -32,7 +32,7 @@ class ProductHTMLParser:
         is not found, catch the raised exception and return a placeholder.
         """
         try:
-            return product_data['data-id']  # type: ignore[attr-type]
+            return product_data['data-id']  # type: ignore[return-value]
         except Exception as exc:
             logger.warning(
                 'Unable to extract product ID from the provided html data (%s).', exc
@@ -133,6 +133,11 @@ class ProductHTMLParser:
         return '\n'.join(lines)
 
     @classmethod
+    def find_allergens(cls, product_data: bs4.Tag) -> str:
+        """Extract allergen information from the given product data."""
+        return html.unescape(cls._get_attr_value('data-allergens', product_data))
+
+    @classmethod
     def find_pic_url(cls, product_data: bs4.Tag) -> str:
         """Extract the URL of the product's picture
         from the given product data.
@@ -172,11 +177,11 @@ class ProductHTMLParser:
         )
         if not quantity:  # sold out products don't have the quantity text
             return 0  # (should be caught by the "sold-out" check above)
-        quantity = normalize_text(quantity)
-        if 'posledn' in quantity:  # products that have only 1 item in stock
+        quantity_str = normalize_text(quantity)
+        if 'posledn' in quantity_str:  # products that have only 1 item in stock
             return 1  # have "posledni" in the quantity text
         return cls._run_converter(
-            lambda: int(quantity.split()[0]),  # regular ("2 kusy", "5 kusu")
+            lambda: int(quantity_str.split()[0]),  # regular ("2 kusy", "5 kusu")
             product_data,
         )
 
@@ -214,15 +219,8 @@ class ProductHTMLParser:
                     f'current price "{price_curr}" is greater than '
                     f'the regular full price "{price_full}".'
                 )
-            # elif price_curr < price_full:  # "data-isPromo" is unreliable
-            #     if not cls.find_is_promo(product_data):
-            #         id_ = cls._find_id_safe(product_data)
-            #         raise ValueError(
-            #             f'Unexpected product "id={id_}" parsing results: '
-            #             f'current price "{price_curr}" is different from '
-            #             f'the regular full price "{price_full}", '
-            #             f'but the "isPromo" flag is not set.'
-            #             )
+            # Note: price_curr < price_full does not require is_promo to be set.
+            # data-isPromo is unreliable and does not reliably correlate with discounts.
             return price_full, price_curr
         raise ParseError(
             f'Unexpected number of elements in the ResultSet'
@@ -246,11 +244,11 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             bs4_parser (bs4.BeautifulSoup): The BeautifulSoup parser
                 initialized with the page HTML content.
 
-        Raises:
-            ParseError: If the page ID cannot be parsed.
-
         Returns:
             str: The ID number of the location.
+
+        Raises:
+            ParseError: If the page ID cannot be parsed.
         """
         script = bs4_parser.find(string=self._RE_PATTERN_DEVICE_ID)
         if script is None:
@@ -277,11 +275,11 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             bs4_parser (bs4.BeautifulSoup): The BeautifulSoup parser
                 initialized with the page HTML content.
 
-        Raises:
-            ParseError: If the location name cannot be parsed.
-
         Returns:
             str: The name of the location.
+
+        Raises:
+            ParseError: If the location name cannot be parsed.
         """
         title_tag = bs4_parser.find('title')
         if not title_tag:
@@ -314,6 +312,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             ('is_promo', ProductHTMLParser.find_is_promo),
             ('quantity', ProductHTMLParser.find_quantity),
             ('info', ProductHTMLParser.find_info),
+            ('allergens', ProductHTMLParser.find_allergens),
             ('pic_url', ProductHTMLParser.find_pic_url),
         ):
             value = self._safe_parse(parser_func, product_data=product_data)

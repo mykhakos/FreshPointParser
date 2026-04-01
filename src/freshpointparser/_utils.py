@@ -15,12 +15,12 @@ def normalize_text(text: Any) -> str:
     Args:
         text (Any): The text to be normalized.
 
+    Returns:
+        str: The normalized text.
+
     Raises:
         ValueError: If the text cannot be normalized due to an unexpected error,
             such as encoding issues.
-
-    Returns:
-        str: The normalized text.
     """
     if text is None:
         return ''
