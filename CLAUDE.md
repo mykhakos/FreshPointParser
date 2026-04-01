@@ -1,0 +1,241 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Purpose
+
+FreshPointParser is a pure HTML parser library for [my.freshpoint.cz](https://my.freshpoint.cz) — a Czech vending machine service that provides snacks, lunches, and desserts at company locations. FreshPoint has no public API, so this library extracts product and location data directly from their webpage HTML.
+
+**The library's contract is simple:**
+```python
+parse_product_page(html: str | bytes) -> ParseResult[ProductPage]
+parse_location_page(html: str | bytes) -> ParseResult[LocationPage]
+```
+
+No HTTP client is included by design. The caller fetches HTML however they choose (httpx, requests, async, sync — all outside scope). The library owns only the HTML → structured model conversion.
+
+---
+
+## Core Design Philosophy: Best-Effort Parsing
+
+Raw HTML from an external site is inherently unstable. The site structure can change without notice, individual fields may be missing or malformed, and the library has no control over what it receives. The core principle is: **losing a field is better than losing the entire result.**
+
+This philosophy is implemented at two distinct levels:
+
+### Level 1 — Extraction (parser layer)
+
+`_safe_parse()` in `parsers/_base.py` is the universal exception firewall. Every field extraction call routes through it:
+
+```python
+def _safe_parse(self, parser_func, *args, **kwargs):
+    try:
+        return parser_func(*args, **kwargs)
+    except FreshPointParserError as err:
+        # Expected extraction failure — field missing or malformed
+        self._context.register_error(err)
+        return None
+    except Exception as exc:
+        # Unexpected failure — wrap as ParseError to preserve __cause__
+        err = ParseError(f'Unexpected error: {exc}')
+        err.__cause__ = exc
+        logger.warning('Unexpected exception wrapped as ParseError', exc_info=True)
+        self._context.register_error(err)
+        return None
+```
+
+When extraction fails for any reason, `None` is returned for that field and the error is recorded. The parse continues. This mirrors Parsel's philosophy: absence is signalled via return value, never raised to the caller.
+
+Extraction methods (`ProductHTMLParser.find_*`) deliberately use exceptions internally — they raise `ParseError` on failure. This keeps the happy-path code clean (no nested `if result is None` checks). `_safe_parse` translates these at the boundary.
+
+### Level 2 — Validation (model layer)
+
+`BestEffortModel` in `models/_base.py` handles the case where data was extracted successfully but fails Pydantic validation (type mismatch, constraint violation, or cross-field validator failure). It uses `model_validator(mode='wrap')`:
+
+```python
+@model_validator(mode='wrap')
+@classmethod
+def _safe_validate(cls, data, handler, info):
+    try:
+        return handler(data)
+    except ValidationError as e:
+        # Strip the failing fields, retry with their defaults
+        failed_fields = {err['loc'][0] for err in e.errors() if err.get('loc')}
+        cleaned = {k: v for k, v in data.items() if k not in failed_fields}
+        return handler(cleaned)
+```
+
+This is field-level partial recovery: a product with an invalid price still has its name, quantity, and allergens. The entire model is not discarded. Errors flow into `ParseContext` and surface in `ParseResult.metadata.errors`.
+
+**Why two levels?** Extraction failures ("the HTML didn't have what we expected") and validation failures ("the data was present but logically invalid") are semantically different failure modes. An extraction failure signals a site structure change; a validation failure signals a data quality issue. Keeping them separate preserves this diagnostic information.
+
+### Error surfacing
+
+Every soft error — whether from extraction or validation — is appended to `ParseContext.errors` and surfaced as `ParseResult.metadata.errors`. Nothing is silently discarded. **Silence means success**: an empty `metadata.errors` list means the parse was clean.
+
+`ParseResult.metadata.errors` is `List[Exception]` because it contains both `FreshPointParserError` (extraction) and `pydantic.ValidationError` (validation). The original exception is always preserved via `__cause__` on wrapped errors.
+
+---
+
+## Architecture
+
+```
+src/freshpointparser/
+├── __init__.py              # Public API
+├── exceptions.py            # FreshPointParserError, ParseError
+├── _utils.py                # normalize_text(), root logger
+├── models/
+│   ├── _base.py             # BestEffortModel, BaseItem, BasePage
+│   ├── _product.py          # Product, ProductPage, comparison dataclasses
+│   ├── _location.py         # Location, LocationPage, LocationCoordinates
+│   ├── types.py             # Re-exports of auxiliary types
+│   └── __init__.py
+└── parsers/
+    ├── _base.py             # ParseContext, ParseMetadata, ParseResult,
+    │                        # BasePageHTMLParser
+    ├── _product.py          # ProductHTMLParser, ProductPageHTMLParser
+    ├── _location.py         # LocationPageHTMLParser
+    └── __init__.py
+```
+
+### Models layer
+
+**`BestEffortModel`** — base for all data models. Provides the wrap-validator recovery described above. Exported from `freshpointparser.models` for users who want to build custom models with the same behaviour.
+
+**`BaseItem`** — base for individual items (`Product`, `Location`). Provides:
+- `id_: Optional[str]` — trailing underscore is the Python convention for avoiding `id()` builtin clash; `validation_alias='id'` and `serialization_alias='id'` handle the rename (split aliases are a Pyright/Pylance workaround).
+- `model_diff(other)` — field-by-field comparison returning `FieldDiffMapping`.
+
+**`BasePage[TItem]`** — generic container for a page of items. Provides:
+- `item_diff(other, exclude_missing=False)` — cross-page diff by item ID, returns `ModelDiffMapping`.
+- `find_item(constraint)` / `find_items(constraint)` — search by attribute dict or callable predicate.
+- `iter_item_attr(attr, default?, *, unique=False, hashable=True)` — iterate over a single attribute across all items, with optional deduplication.
+- `is_newer_than(other, precision?)` — three-valued return: `True`, `False`, or `None` (equal). Precision truncates to `'s'`, `'m'`, `'h'`, `'d'`.
+- `recorded_at: datetime` — populated from `ParseContext.parsed_at` at parse time.
+
+**`Product`** — fields extracted from product `<div>` elements. All fields are `Optional` with `None` defaults. Key properties (computed, not stored): `price` (curr if set, else full), `discount_rate`, `is_on_sale`, `is_available`, `is_sold_out`, `is_last_piece`. `compare_quantity(new)` and `compare_price(new)` return rich dataclasses describing transitions (e.g., `is_depleted`, `has_sale_started`).
+
+**`Location`** — fields extracted from the embedded JSON. Uses `AliasChoices` because the JSON uses short keys (`lat`, `lon`, `username`, `discount`, `active`, `suspended`) while the model uses descriptive names.
+
+**`types.py`** — re-exports auxiliary types: `FieldDiff`, `FieldDiffMapping`, `ModelDiffMapping`, `ValidationContext`, `LocationCoordinates`, `ProductQuantityUpdateInfo`, `ProductPriceUpdateInfo`. Import from `freshpointparser.models.types`.
+
+### Parsers layer
+
+**`ParseContext`** — a dataclass that holds a `parsed_at` timestamp and accumulates errors during a parse. It implements the `ValidationContext` protocol, so it can be passed directly as Pydantic's `context=` parameter. `BestEffortModel` calls `context.register_error(err)` during validation. This is the coupling mechanism between model validation and parser error collection.
+
+**`ParseMetadata`** — frozen dataclass returned in every `ParseResult`. Contains `content_digest` (SHA-1 bytes), `parsed_at`, `from_cache`, and `errors`. Exported from `freshpointparser.parsers`.
+
+**`ParseResult[TPage]`** — the top-level return type of every `parse()` call. Contains `page` and `metadata`. `result.errors` is a convenience forwarding to `result.metadata.errors`. Exported from `freshpointparser.parsers`.
+
+**`BasePageHTMLParser[TPage]`** — abstract base for both parsers. Manages:
+- SHA-1 content hashing: `parse()` compares the hash of new content against the last-seen hash. If unchanged, `from_cache=True` is set and the previous result is returned immediately without re-parsing.
+- `_parse_page_content()` is the abstract method subclasses implement.
+- `parse()` always returns a deep copy (`model_copy(deep=True)`) so mutations to `result.page` cannot affect the parser's internal cache.
+
+**`ProductHTMLParser`** — a stateless class of `@classmethod`s. Each method extracts one product attribute from a BS4 `Tag`. The class (rather than module-level functions) groups the extraction logic and allows subclassing to override individual methods for custom HTML structures. Key implementation details:
+- `find_category()` looks for the preceding `<h2>` sibling — category is not a `data-*` attribute but a section header in the HTML.
+- `find_quantity()` matches Czech stock strings via regex: `^((posledni)|(\d+))\s(kus|kusy|kusu)!?$`. "posledni kus" = last piece = quantity 1.
+- `find_price()` finds all text nodes matching `^\d+\.\d+$` within the product `<div>`. One match = regular price (full == curr). Two matches = discounted price (first is full, second is current).
+- `find_allergens()` parses `data-allergens` into `List[str]` by splitting on `','`. Empty string → `[]`. Missing attribute → raises `ParseError` (caught by `_safe_parse` → `None`).
+
+**`ProductPageHTMLParser`** — the main product parser. Extracts `location_id` from a `deviceId = "..."` JavaScript variable and `location_name` from the `<title>` tag. Products are found via `find_all('div', class_='product')`.
+
+**`LocationPageHTMLParser`** — the location parser. Location data is embedded as a JavaScript string variable: `devices = "[{\"prop\":{...}}]";`. This requires double JSON parsing: the outer `json.loads` un-escapes the JS string; the inner `json.loads` parses the JSON array. Only the `prop` key of each item is used — the `location` key is confirmed to be a duplicate of `prop` data in a different format.
+
+### Exceptions
+
+```
+FreshPointParserError
+└── ParseError
+```
+
+`ParseError` is raised for all extraction and structural failures. No subclasses — all `ParseError` instances are extraction/structural failures with no semantic distinction callers need to handle differently.
+
+### Utilities
+
+`normalize_text(text: Any) -> str` — converts any value to lowercase ASCII by stripping whitespace, running `unidecode()` (removes Czech diacritics: `ě→e`, `š→s`, `ř→r`, etc.), then `casefold()`. Returns `''` for `None`. Used for `name_lowercase_ascii` and `address_lowercase_ascii` properties to enable case/diacritic-insensitive search.
+
+---
+
+## Public API
+
+Everything a user needs is importable from public modules (no `_private` imports required):
+
+```python
+# Top-level convenience
+from freshpointparser import (
+    parse_product_page,       # stateless, creates fresh parser each call
+    parse_location_page,
+    get_product_page_url,     # builds https://my.freshpoint.cz/device/product-list/<id>
+    get_location_page_url,    # returns https://my.freshpoint.cz
+    logger,                   # root logger for the library
+)
+
+# Models
+from freshpointparser.models import (
+    Product, ProductPage,
+    Location, LocationPage,
+    BestEffortModel,           # for custom model subclassing
+    BaseItem, BasePage,
+)
+from freshpointparser.models.types import (
+    ProductQuantityUpdateInfo, ProductPriceUpdateInfo,
+    FieldDiff, FieldDiffMapping, ModelDiffMapping,
+    LocationCoordinates, ValidationContext,
+)
+
+# Parsers (when stateful caching is needed)
+from freshpointparser.parsers import (
+    ProductPageHTMLParser,     # stateful, reuse instance for SHA-1 caching
+    LocationPageHTMLParser,
+    BasePageHTMLParser,        # for custom parser subclassing
+    ParseResult, ParseMetadata,
+)
+```
+
+The stateless `parse_product_page(html)` creates a new parser on every call (no caching). For polling scenarios where the same page is fetched repeatedly, reuse a `ProductPageHTMLParser` instance — `parse()` will return cached results when content hasn't changed.
+
+---
+
+## Commands
+
+### Testing
+```bash
+# Run all tests (excluding live parser tests)
+pytest tests -m "not is_parser_up_to_date"
+
+# Run a single test file
+pytest tests/models/test_models_product.py
+
+# Run live parser tests (require FreshPoint website to be up)
+# Range of product page IDs is intentionally narrow (range(10, 30)) to keep
+# runtime short — adjust manually when spot-checking different IDs
+pytest tests -m "is_parser_up_to_date"
+
+# Run via tox for a specific Python version
+tox -e py313-test
+```
+
+### Linting & Formatting
+```bash
+ruff format src tests --check   # check only
+ruff format src tests           # auto-format
+ruff check src tests            # lint
+mypy src                        # type checking
+tox -e lint                     # all lint checks
+```
+
+## Code Style
+
+- Single quotes throughout (ruff-enforced).
+- Google-style docstrings.
+- Line length: 88 characters.
+- `disallow_untyped_defs = true` for `src/`; relaxed for tests.
+- Tests relax `ANN`, `D10x`, `S101`, `PLC0415` rules.
+
+## Test Structure
+
+- `tests/models/` — unit tests for model behaviour (validation, diffing, search, comparison).
+- `tests/parsers/` — unit + integration tests for parsers. HTML fixtures and expected JSON live here alongside the test files.
+- `tests/utils/` — tests for `normalize_text`.
+- `is_parser_up_to_date` marker — live tests against the real site. Skipped by default.
+- Fixture files: `product_page.html` / `product_page.json` / `product_page_meta.json` (location 296, "Elektroline"), `location_page.html` / `location_page.json` / `location_page_meta.json`. Refresh periodically against the live site when the HTML structure changes significantly.
