@@ -714,7 +714,10 @@ def test_validate_generated_product_page(product_page_html_parse_result, product
 @pytest.mark.is_parser_up_to_date
 @pytest.mark.parametrize(
     'product_page_id',
-    [pytest.param(id_, id=f'ID={id_}') for id_ in range(10, 10)],
+    # Range is intentionally narrow to keep live test runtime short.
+    # Adjust the range manually when spot-checking different location IDs.
+    # IDs that redirect (no machine at that location) are automatically skipped.
+    [pytest.param(id_, id=f'ID={id_}') for id_ in range(10, 30)],
 )
 def test_parse_data_from_internet(product_page_id):
     """Go through all product pages fetched from the internet and validate them.

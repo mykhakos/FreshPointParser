@@ -174,6 +174,26 @@ def test_log_failed_validation_empty_string_vs_none():
 # endregion Test _log_failed_validation
 
 
+def test_best_effort_model_registers_error_in_context():
+    """BestEffortModel registers ValidationError into the provided context."""
+    from freshpointparser.models._base import BestEffortModel
+    from freshpointparser.parsers._base import ParseContext
+    from pydantic import Field, field_validator
+
+    class FailingModel(BestEffortModel):
+        value: int = Field(default=0)
+
+        @field_validator('value', mode='after')
+        @classmethod
+        def always_fail(cls, v: int) -> int:
+            raise ValueError('always fails')
+
+    ctx = ParseContext()
+    result = FailingModel.model_validate({'value': 42}, context=ctx)
+    assert result.value == 0
+    assert len(ctx.errors) == 1
+
+
 def test_best_effort_model_all_fields_fail_produces_default_model():
     """When every field fails validation, BestEffortModel returns all-defaults."""
     from pydantic import Field, field_validator
