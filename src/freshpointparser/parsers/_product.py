@@ -51,17 +51,8 @@ class ProductHTMLParser:
 
         Returns:
             T: The converted value.
-
-        Raises:
-            ParseError: If an error occurs during the conversion process.
         """
-        try:
-            return converter()
-        except Exception as exc:
-            raise ParseError(
-                f'Unable to convert a parsed value for the product '
-                f"with id='{cls._find_id_safe(product_data)}'."
-            ) from exc
+        return converter()
 
     @classmethod
     def _get_attr_value(cls, attr_name: str, tag: bs4.Tag) -> str:

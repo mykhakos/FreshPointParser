@@ -218,14 +218,21 @@ def test_safe_parse_method():
     assert isinstance(parser._context.errors[0], ParseError)
 
 
-def test_safe_parse_non_freshpoint_error_propagates():
-    """Test that non-FreshPointParser errors are not caught by _safe_parse."""
+def test_safe_parse_wraps_unexpected_exception_as_parse_error():
+    """_safe_parse wraps non-FreshPointParserError exceptions as ParseError."""
+    from freshpointparser.exceptions import ParseError
+    from freshpointparser.parsers import LocationPageHTMLParser
 
-    def error_func() -> None:
-        raise ValueError('Regular ValueError')
+    parser = LocationPageHTMLParser()
 
-    with pytest.raises(ValueError):
-        DummyPageHTMLParser()._safe_parse(error_func)
+    def raises_unexpected():
+        raise RuntimeError('boom')
+
+    result_val = parser._safe_parse(raises_unexpected)
+    assert result_val is None
+    assert len(parser._context.errors) == 1
+    assert isinstance(parser._context.errors[0], ParseError)
+    assert parser._context.errors[0].__cause__ is not None
 
 
 def test_parse_alternating_content():
