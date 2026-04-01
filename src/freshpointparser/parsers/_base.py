@@ -41,7 +41,11 @@ class ParseMetadata:
     """Holds the metadata of a FreshPoint.cz page HTML content parsing operation."""
 
     content_digest: bytes
-    """SHA-1 hash digest of the page HTML content that was parsed."""
+    """SHA-1 hash digest of the page HTML content that was parsed.
+
+    Use ``.hex()`` to get a human-readable hex string representation,
+    e.g. for logging or storage.
+    """
 
     parsed_at: datetime
     """Timestamp of when the page HTML content was last parsed.
