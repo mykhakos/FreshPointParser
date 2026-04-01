@@ -188,3 +188,20 @@ def test_best_effort_model_all_fields_fail_produces_default_model():
 
     result = StrictModel.model_validate({'value': 42})
     assert result.value == 0  # default, not 42
+
+
+def test_is_newer_than_returns_none_when_equal():
+    """is_newer_than returns None when both pages have identical recorded_at."""
+    from datetime import datetime
+    from typing import List
+
+    from freshpointparser.models._base import BaseItem, BasePage
+
+    t = datetime(2024, 1, 1, 12, 0, 0)
+
+    class ConcretePage(BasePage[BaseItem]):
+        items: List[BaseItem] = []
+
+    a = ConcretePage(recorded_at=t)
+    b = ConcretePage(recorded_at=t)
+    assert a.is_newer_than(b) is None
