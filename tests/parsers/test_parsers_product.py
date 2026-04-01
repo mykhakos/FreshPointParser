@@ -209,6 +209,14 @@ def test_find_allergens_with_html_entities():
     assert allergens == 'Lepek & Ryby'
 
 
+def test_find_allergens_empty_string():
+    """Test that an empty data-allergens attribute returns empty string (not None)."""
+    tag = bs4.BeautifulSoup('<div data-allergens=""></div>', 'lxml').div
+    assert tag is not None
+    allergens = ProductHTMLParser.find_allergens(tag)
+    assert allergens == ''
+
+
 def test_find_pic_url_success():
     """Test extracting product picture URL."""
     tag = bs4.BeautifulSoup(

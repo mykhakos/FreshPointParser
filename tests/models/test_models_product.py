@@ -35,6 +35,7 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_full=None,
                 price_curr=None,
                 info=None,
+                allergens=None,
                 pic_url=DEFAULT_PRODUCT_PIC_URL,
             ),
             id='default args',
@@ -50,6 +51,7 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_full=4.0,
                 price_curr=3.0,
                 info='Info',
+                allergens=None,
                 pic_url='https://example.com/pic.jpg',
             ),
             dict(
@@ -62,6 +64,7 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_full=4.0,
                 price_curr=3.0,
                 info='Info',
+                allergens=None,
                 pic_url='https://example.com/pic.jpg',
             ),
             id='custom args',
@@ -78,6 +81,7 @@ def test_product_init(product, expected_attrs):
     assert product.price_full == expected_attrs['price_full']
     assert product.price_curr == expected_attrs['price_curr']
     assert product.info == expected_attrs['info']
+    assert product.allergens == expected_attrs['allergens']
     assert product.pic_url == expected_attrs['pic_url']
 
 
