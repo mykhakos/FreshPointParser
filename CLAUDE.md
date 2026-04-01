@@ -206,6 +206,20 @@ The stateless `parse_product_page(html)` creates a new parser on every call (no 
 
 ---
 
+## Development Setup
+
+```bash
+uv sync          # install all dependencies into .venv/
+```
+
+The virtual environment is at `.venv/` in the project root. The build backend is `uv_build`. Python 3.8+ is required; the project is tested against 3.8–3.14.
+
+The active development branch is **`dev`**. `main` tracks stable releases. Work on `dev`; merge to `main` only for releases.
+
+`docs/superpowers/` is gitignored — local design specs and notes live there, never commit them.
+
+---
+
 ## Commands
 
 ### Testing
