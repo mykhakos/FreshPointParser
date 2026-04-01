@@ -118,7 +118,7 @@ src/freshpointparser/
 - `is_newer_than(other, precision?)` — three-valued return: `True`, `False`, or `None` (equal). Precision truncates to `'s'`, `'m'`, `'h'`, `'d'`.
 - `recorded_at: datetime` — populated from `ParseContext.parsed_at` at parse time.
 
-**`Product`** — fields extracted from product `<div>` elements. All fields are `Optional` with `None` defaults. Key properties (computed, not stored): `price` (curr if set, else full), `discount_rate`, `is_on_sale`, `is_available`, `is_sold_out`, `is_last_piece`. `compare_quantity(new)` and `compare_price(new)` return rich dataclasses describing transitions (e.g., `is_depleted`, `has_sale_started`).
+**`Product`** — fields extracted from product `<div>` elements. All fields are `Optional` with `None` defaults. Key properties (computed, not stored): `price` (curr if set, else full), `discount_rate`, `is_on_sale`, `is_available`, `is_sold_out`, `is_last_piece`. `compare_quantity(other)` and `compare_price(other)` return `ProductQuantityChange` / `ProductPriceChange` dataclasses describing transitions (e.g., `is_depleted`, `has_sale_started`). The comparison is symmetric — either product can be `self`.
 
 Two non-obvious constraints:
 - `price_curr` cannot exceed `price_full` (enforced by `_validate_price_curr` field validator). When violated on direct model construction, `BestEffortModel` drops `price_curr` and retries — `price_full` is preserved, `price_curr` becomes `None`. This validator never fires through the parser because `ProductHTMLParser.find_price()` already checks this.
