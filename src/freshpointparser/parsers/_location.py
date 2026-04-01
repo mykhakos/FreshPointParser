@@ -89,6 +89,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         Returns:
             Location: Parsed and validated Location model instance.
         """
+        # 'location' key duplicates 'prop' data (name, address, lat/lon as strings) — ignored.
         try:
             return Location.model_validate(location_data['prop'], context=self._context)
         except KeyError as err:
