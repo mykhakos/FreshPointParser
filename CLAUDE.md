@@ -251,12 +251,29 @@ tox -e lint                     # all lint checks
 - Line length: 88 characters.
 - `disallow_untyped_defs = true` for `src/`; relaxed for tests.
 - Tests relax `ANN`, `D10x`, `S101`, `PLC0415` rules.
+- In `except` clauses: use `err` when the exception class reads as "Error" (e.g. `except ParseError as err`), `exc` when it reads as "Exception" (e.g. `except Exception as exc`). Never single-letter names.
 - In log and exception messages, identifiers (IDs, names, function names, field names, etc.) must be wrapped in single quotes: `"func '%s' failed"` not `"func %s failed"`.
 - In docstrings, inline code/monospace uses double backticks:
   ```
   ``correct``   ✓
   `wrong`       ✗
   ```
+
+## Docstrings
+
+- Use imperative mood in summary lines: "Parse the page", not "Parses the page".
+- Properties use descriptive style: `"""The effective selling price."""`, not imperative.
+- Pydantic model fields are documented via `Field(description=...)` only — no standalone field docstrings below the field definition.
+- Don't restate the class or method name. If `ParseError` already communicates meaning, the docstring adds context beyond what the name says — it doesn't paraphrase it.
+- Describe purpose, not implementation. Don't mention base classes, internal patterns, or third-party tools unless essential.
+- Module docstrings describe the module's responsibility, not its contents. Write what it *does*, not what it currently contains.
+
+## Logging
+
+- Root logger has a `NullHandler` — library best practice; callers configure their own handlers.
+- Log expected actions **before** they happen, in present tense. Add a follow-up log after only if the action can fail or has important results worth surfacing.
+- Use `%`-style formatting in log calls (deferred interpolation): `logger.debug("Parsing '%s'", name)`.
+- Identifiers in log messages must be wrapped in single quotes (see Code Style above).
 
 ## Test Structure
 
@@ -272,5 +289,21 @@ src/freshpointparser/parsers/_location.py-> tests/parsers/test_parsers_location.
 src/freshpointparser/_utils.py           -> tests/utils/test_utils.py
 ```
 
+- No `__init__.py` in test directories — pytest discovers tests as namespace packages.
+- Use snake_case field names when constructing Pydantic models in tests (not camelCase aliases). Use `model_validate()` with camelCase data only when specifically testing alias behaviour.
+- Test helper functions and module-level constants are not private — no underscore prefix.
+- Use `pytest.param(..., id="...")` for all parametrized cases.
 - `is_parser_up_to_date` marker — live tests against the real site. Skipped by default.
 - Fixture files (`tests/parsers/`): `product_page.html` / `product_page.json` / `product_page_meta.json` (location 296, "Elektroline"), `location_page.html` / `location_page.json` / `location_page_meta.json`. Refresh periodically when the site HTML structure changes significantly.
+
+## Agent Guidelines
+
+- Be direct. Lead with the action or answer, not preamble.
+- Fix typos and awkward phrasing on sight — do not leave them for a follow-up.
+- Consider second-order effects. Think about what actually happens when a command runs or a pattern is applied.
+- Do not transplant patterns from other codebases without verifying they fit this project's architecture.
+- Do not over-abstract. Introduce abstractions only when there is a concrete second use case.
+- Prefer reversible decisions. If unsure whether something belongs, implement it in a way that is easy to remove.
+- Describe what *is*, not what *is not*. Stating negatives reads as a limitation warning.
+- Trim prose aggressively. State the point once, directly.
+- Do not make unverified factual claims about external systems. Verify or phrase conservatively.
