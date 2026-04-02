@@ -6,6 +6,8 @@ from unidecode import unidecode
 logger = logging.getLogger('freshpointparser')
 """Top-level logger of the ``freshpointparser`` package."""
 
+logger.addHandler(logging.NullHandler())
+
 
 def normalize_text(text: Any) -> str:
     """Normalize the given text by removing diacritics, leading/trailing

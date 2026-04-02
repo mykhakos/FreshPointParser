@@ -110,37 +110,37 @@ class BestEffortModel(BaseModel):
         """
         try:
             return handler(data)
-        except ValidationError as validation_err:
+        except ValidationError as err:
             if not isinstance(data, Mapping):
                 logger.warning(
                     "Cannot fall back in '%s': data is not a mapping (got '%s').",
                     cls.__name__,
                     type(data).__name__,
                 )
-                raise validation_err
+                raise err
 
             if info.config and info.config.get('strict'):
                 logger.warning(
                     "Cannot fall back in '%s': strict mode is enabled.",
                     cls.__name__,
                 )
-                raise validation_err
+                raise err
 
             logger.info(
-                "Validation error in model '%s':\n%s", cls.__name__, validation_err
+                "Validation error in model '%s':\n%s", cls.__name__, err
             )
             try:
                 context: Optional[ValidationContext] = info.context
-                context.register_error(validation_err)  # type: ignore[union-attr]
-            except Exception as ctx_err:
+                context.register_error(err)  # type: ignore[union-attr]
+            except Exception as exc:
                 logger.warning(
                     "Failed to record validation error to the context (%s).",
-                    ctx_err,
+                    exc,
                 )
 
             failed_fields = set()
-            for err in validation_err.errors():
-                err_loc = err.get('loc')
+            for field_err in err.errors():
+                err_loc = field_err.get('loc')
                 if not err_loc:  # usually means a model validator failed
                     logger.debug(
                         "Model-level validator failed in '%s', falling back to all-defaults.",
