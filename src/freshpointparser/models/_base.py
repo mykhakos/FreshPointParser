@@ -219,11 +219,14 @@ class BaseItem(BestEffortModel):
 
         Example:
             ```python
-            {
-                'field_common': {'left': 12.5, 'right': 15.0},
-                'field_missing_in_other': {'left': 'foo', 'right': None},
-                'field_missing_in_self': {'left': None, 'right': 'bar'},
-            }
+            from freshpointparser.models import Product
+
+            morning = Product(id_='42', quantity=5, price_curr=89.0)
+            evening = Product(id_='42', quantity=2, price_curr=67.0)
+
+            diff = morning.model_diff(evening)
+            # {'quantity': {'left': 5, 'right': 2},
+            #  'price_curr': {'left': 89.0, 'right': 67.0}}
             ```
         """
         if self is other:
@@ -329,16 +332,20 @@ class BasePage(BestEffortModel, Generic[TItem]):
 
         Example:
             ```python
-            {
-                '1001': {
-                    'field_common': {'left': 12.5, 'right': 15.0},
-                    'field_missing_in_other': {'left': 'foo', 'right': None},
-                },
-                '1002': {
-                    'field_common': {'left': 10.0, 'right': 12.0},
-                    'field_missing_in_self': {'left': None, 'right': 'qux'},
-                },
-            }
+            from freshpointparser.models import Product, ProductPage
+
+            old = ProductPage(items=[
+                Product(id_='42', quantity=5),
+                Product(id_='43', quantity=3),
+            ])
+            new = ProductPage(items=[
+                Product(id_='42', quantity=0),
+                Product(id_='43', quantity=3),
+            ])
+
+            diff = old.item_diff(new, exclude={'recorded_at'})
+            # {'42': {'quantity': {'left': 5, 'right': 0}}}
+            # item '43' is unchanged and does not appear
             ```
         """
         if self is other:
