@@ -184,6 +184,16 @@ class Product(BaseItem):
         return normalize_text(self.category)
 
     @property
+    def allergens_lowercase_ascii(self) -> List[str]:
+        """Lowercase ASCII representation of each allergen in ``allergens``.
+
+        Returns an empty list when ``allergens`` is unset or empty.
+        """
+        if self.allergens is None:
+            return []
+        return [normalize_text(allergen) for allergen in self.allergens]
+
+    @property
     def price(self) -> Optional[float]:
         """The effective selling price.
 
