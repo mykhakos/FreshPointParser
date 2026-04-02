@@ -96,6 +96,38 @@ def test_product_allergens_field_accepts_list():
     assert p.allergens == ['Lepek', 'Ryby']
 
 
+def test_allergens_lowercase_ascii_none():
+    """Returns empty list when allergens is None."""
+    from freshpointparser.models import Product
+
+    p = Product()
+    assert p.allergens_lowercase_ascii == []
+
+
+def test_allergens_lowercase_ascii_empty_list():
+    """Returns empty list when allergens is an empty list."""
+    from freshpointparser.models import Product
+
+    p = Product(allergens=[])
+    assert p.allergens_lowercase_ascii == []
+
+
+def test_allergens_lowercase_ascii_normalizes():
+    """Strips diacritics and lowercases each allergen."""
+    from freshpointparser.models import Product
+
+    p = Product(allergens=['Obiloviny obsahující lepek', 'Vejce'])
+    assert p.allergens_lowercase_ascii == ['obiloviny obsahujici lepek', 'vejce']
+
+
+def test_allergens_lowercase_ascii_preserves_order():
+    """Preserves the original order of allergens."""
+    from freshpointparser.models import Product
+
+    p = Product(allergens=['Ryby', 'Lepek', 'Sója'])
+    assert p.allergens_lowercase_ascii == ['ryby', 'lepek', 'soja']
+
+
 @pytest.mark.parametrize(
     'product, expected_price_full, expected_price_curr',
     [
