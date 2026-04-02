@@ -118,15 +118,13 @@ class BestEffortModel(BaseModel):
                 )
                 raise err
 
-            logger.info(
-                "Validation error in model '%s':\n%s", cls.__name__, err
-            )
+            logger.info("Validation error in model '%s':\n%s", cls.__name__, err)
             try:
                 context: Optional[ValidationContext] = info.context
                 context.register_error(err)  # type: ignore[union-attr]
             except Exception as exc:
                 logger.warning(
-                    "Failed to record validation error to the context (%s).",
+                    'Failed to record validation error to the context (%s).',
                     exc,
                 )
 
@@ -448,7 +446,9 @@ class BasePage(BestEffortModel, Generic[TItem]):
 
                 # For unhashable attributes like allergens (List[str]):
                 unique_allergen_sets = list(
-                    page.iter_item_attr('allergens', default=[], unique=True, hashable=False)
+                    page.iter_item_attr(
+                        'allergens', default=[], unique=True, hashable=False
+                    )
                 )
         """
         if default is _NO_DEFAULT:
