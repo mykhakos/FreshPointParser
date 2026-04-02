@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 
 from ..exceptions import ParseError
 from ..models import Location, LocationPage
-from ._base import BasePageHTMLParser, ParseResult
+from ._base import BasePageHTMLParser, ParseResult, logger
 
 
 class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
@@ -116,6 +116,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             )
             if location is not None:
                 locations.append(location)
+        logger.debug('Parsed %d location(s).', len(locations))
         return locations
 
     def _parse_page_content(self, page_content: Union[str, bytes]) -> LocationPage:
@@ -137,6 +138,10 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         if locations is not None:
             parsed_data['items'] = locations
 
+        logger.debug(
+            'Location page parsed: %d location(s).',
+            len(locations) if locations is not None else 0,
+        )
         return LocationPage.model_validate(parsed_data, context=self._context)
 
 

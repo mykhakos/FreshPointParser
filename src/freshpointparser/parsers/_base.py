@@ -134,14 +134,18 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
         try:
             return parser_func(*args, **kwargs)
         except FreshPointParserError as err:
-            logger.info('Parsing error occurred: %s', err)
+            logger.info(
+                "Parsing error in '%s': %s",
+                getattr(parser_func, '__name__', repr(parser_func)),
+                err,
+            )
             self._context.register_error(err)
             return None
         except Exception as exc:
             wrapped = ParseError(f'Unexpected error in parser operation: {exc}')
             wrapped.__cause__ = exc
             logger.warning(
-                'Unexpected exception wrapped as ParseError in %s',
+                "Unexpected exception wrapped as ParseError in '%s'",
                 getattr(parser_func, '__name__', repr(parser_func)),
                 exc_info=True,
             )
@@ -189,7 +193,11 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
             or force
             or content_digest != self._metadata.content_digest
         ):
-            logger.debug('Parsing HTML content (force=%s).', force)
+            logger.debug(
+                "'%s': parsing HTML content (force=%s).",
+                type(self).__name__,
+                force,
+            )
             self._reset_context()
             self._parsed_page = self._parse_page_content(page_content)
             self._metadata = replace(
@@ -200,7 +208,10 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
                 errors=self._context.errors,
             )
         else:
-            logger.debug('HTML content is unchanged, skipping parsing.')
+            logger.debug(
+                "'%s': HTML content is unchanged, returning cached result.",
+                type(self).__name__,
+            )
             self._metadata = replace(
                 self._metadata,
                 from_cache=True,

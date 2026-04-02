@@ -112,11 +112,18 @@ class BestEffortModel(BaseModel):
             return handler(data)
         except ValidationError as validation_err:
             if not isinstance(data, Mapping):
-                logger.warning('Cannot fallback on non-mapping data')
+                logger.warning(
+                    "Cannot fall back in '%s': data is not a mapping (got '%s').",
+                    cls.__name__,
+                    type(data).__name__,
+                )
                 raise validation_err
 
             if info.config and info.config.get('strict'):
-                logger.warning('Cannot fallback on validation error in strict mode.')
+                logger.warning(
+                    "Cannot fall back in '%s': strict mode is enabled.",
+                    cls.__name__,
+                )
                 raise validation_err
 
             logger.info(
@@ -127,7 +134,7 @@ class BestEffortModel(BaseModel):
                 context.register_error(validation_err)  # type: ignore[union-attr]
             except Exception as ctx_err:
                 logger.warning(
-                    'Failed to record validation error to the context (%s)',
+                    "Failed to record validation error to the context (%s).",
                     ctx_err,
                 )
 
@@ -135,9 +142,18 @@ class BestEffortModel(BaseModel):
             for err in validation_err.errors():
                 err_loc = err.get('loc')
                 if not err_loc:  # usually means a model validator failed
+                    logger.debug(
+                        "Model-level validator failed in '%s', falling back to all-defaults.",
+                        cls.__name__,
+                    )
                     return handler({})
                 failed_fields.add(err_loc[0])
 
+            logger.debug(
+                "Stripped failing fields %s from '%s', retrying with defaults.",
+                sorted(str(f) for f in failed_fields),
+                cls.__name__,
+            )
             cleaned_data = {
                 key: value for key, value in data.items() if key not in failed_fields
             }

@@ -49,8 +49,8 @@ class ProductHTMLParser:
             str: The value of the specified attribute.
 
         Raises:
-            ParseError: If the attribute is missing.
-            ParseError: If the attribute value cannot be converted to a string.
+            ParseError: If the attribute is missing or
+                the attribute value cannot be converted to a string.
         """
         try:
             attr = tag[attr_name]
@@ -87,9 +87,7 @@ class ProductHTMLParser:
 
     @classmethod
     def find_is_promo(cls, product_data: bs4.Tag) -> bool:
-        """Determine whether the product is being promoted
-        from the given product data.
-        """
+        """Determine whether the product is being promoted from the given product data."""
         return cls._get_attr_value('data-ispromo', product_data) == '1'
 
     @classmethod
@@ -116,9 +114,7 @@ class ProductHTMLParser:
 
     @classmethod
     def find_pic_url(cls, product_data: bs4.Tag) -> str:
-        """Extract the URL of the product's picture
-        from the given product data.
-        """
+        """Extract the URL of the product's picture from the given product data."""
         return cls._get_attr_value('data-photourl', product_data)
 
     @classmethod
@@ -161,9 +157,7 @@ class ProductHTMLParser:
 
     @classmethod
     def find_price(cls, product_data: bs4.Tag) -> Tuple[float, float]:
-        """Extract the full and current price of the product
-        from the given product data.
-        """
+        """Extract the full and current price of the product from the given product data."""
         prices = product_data.find_all(
             string=(
                 lambda text: bool(
@@ -308,6 +302,7 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
             product = self._safe_parse(self._parse_product, product_data=product_data)
             if product is not None:
                 products.append(product)
+        logger.debug('Parsed %d product(s).', len(products))
         return products
 
     def _parse_page_content(self, page_content: Union[str, bytes]) -> ProductPage:
@@ -337,6 +332,12 @@ class ProductPageHTMLParser(BasePageHTMLParser[ProductPage]):
         if products is not None:
             parsed_data['items'] = products
 
+        logger.debug(
+            "Product page parsed: location_id='%s', location_name='%s', products=%d.",
+            parsed_data.get('location_id'),
+            parsed_data.get('location_name'),
+            len(products) if products is not None else 0,
+        )
         return ProductPage.model_validate(parsed_data, context=self._context)
 
 
