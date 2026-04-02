@@ -251,6 +251,7 @@ tox -e lint                     # all lint checks
 - Line length: 88 characters.
 - `disallow_untyped_defs = true` for `src/`; relaxed for tests.
 - Tests relax `ANN`, `D10x`, `S101`, `PLC0415` rules.
+- In log and exception messages, identifiers (IDs, names, function names, field names, etc.) must be wrapped in single quotes: `"func '%s' failed"` not `"func %s failed"`.
 
 ## Test Structure
 
