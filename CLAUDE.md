@@ -253,6 +253,13 @@ tox -e lint                     # all lint checks
 - Tests relax `ANN`, `D10x`, `S101`, `PLC0415` rules.
 - In `except` clauses: use `err` when the exception class reads as "Error" (e.g. `except ParseError as err`), `exc` when it reads as "Exception" (e.g. `except Exception as exc`). Never single-letter names.
 - In log and exception messages, identifiers (IDs, names, function names, field names, etc.) must be wrapped in single quotes: `"func '%s' failed"` not `"func %s failed"`.
+- Code examples in docstrings use fenced Markdown blocks with a language tag — **not** RST ``::`` blocks:
+  ```
+  Example:
+      ```python
+      result = parse_product_page(html)
+      ```
+  ```
 - In docstrings, inline code/monospace uses double backticks:
   ```
   ``correct``   ✓
