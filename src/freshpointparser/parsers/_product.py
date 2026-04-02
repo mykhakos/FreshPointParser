@@ -361,15 +361,15 @@ def parse_product_page(page_content: Union[str, bytes]) -> ParseResult[ProductPa
             An empty ``result.metadata.errors`` list means parsing was clean.
 
     Example:
-        ::
+        ```python
+        import httpx
+        from freshpointparser import parse_product_page, get_product_page_url
 
-            import httpx
-            from freshpointparser import parse_product_page, get_product_page_url
-
-            html = httpx.get(get_product_page_url(296)).text
-            result = parse_product_page(html)
-            for product in result.page.items:
-                if product.is_available:
-                    print(product.name, product.price)
+        html = httpx.get(get_product_page_url(296)).text
+        result = parse_product_page(html)
+        for product in result.page.items:
+            if product.is_available:
+                print(product.name, product.price)
+        ```
     """
     return ProductPageHTMLParser().parse(page_content)

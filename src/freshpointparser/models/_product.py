@@ -254,13 +254,13 @@ class Product(BaseItem):
                 or restocking.
 
         Example:
-            ::
-
-                morning = Product(id_='42', quantity=5)
-                evening = Product(id_='42', quantity=0)
-                change = morning.compare_quantity(evening)
-                change.is_depleted  # True
-                change.quantity_decrease  # 5
+            ```python
+            morning = Product(id_='42', quantity=5)
+            evening = Product(id_='42', quantity=0)
+            change = morning.compare_quantity(evening)
+            change.is_depleted  # True
+            change.quantity_decrease  # 5
+            ```
         """
         if self.quantity is None or other.quantity is None:
             quantity_decrease = 0
@@ -318,13 +318,13 @@ class Product(BaseItem):
                 rates, and flags indicating the start or end of a sale.
 
         Example:
-            ::
-
-                before = Product(id_='42', price_full=100.0, price_curr=100.0)
-                after = Product(id_='42', price_full=100.0, price_curr=75.0)
-                change = before.compare_price(after)
-                change.has_sale_started  # True
-                change.price_curr_decrease  # 25.0
+            ```python
+            before = Product(id_='42', price_full=100.0, price_curr=100.0)
+            after = Product(id_='42', price_full=100.0, price_curr=75.0)
+            change = before.compare_price(after)
+            change.has_sale_started  # True
+            change.price_curr_decrease  # 25.0
+            ```
         """
         # compare full prices
         if self.price_full is None or other.price_full is None:

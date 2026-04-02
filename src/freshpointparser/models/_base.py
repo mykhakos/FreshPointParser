@@ -218,13 +218,15 @@ class BaseItem(BestEffortModel):
             respectively. If a field is missing in any of the models, its value
             is considered to be ``None`` in this model.
 
-            FieldDiffMapping structure example::
+            FieldDiffMapping structure example:
 
-                {
-                    'field_common': {'left': 12.5, 'right': 15.0},
-                    'field_missing_in_other': {'left': 'foo', 'right': None},
-                    'field_missing_in_self': {'left': None, 'right': 'bar'},
-                }
+            ```python
+            {
+                'field_common': {'left': 12.5, 'right': 15.0},
+                'field_missing_in_other': {'left': 'foo', 'right': None},
+                'field_missing_in_self': {'left': None, 'right': 'bar'},
+            }
+            ```
         """
         if self is other:
             return {}
@@ -331,18 +333,20 @@ class BasePage(BestEffortModel, Generic[TItem]):
             respectively. If a field is missing in any of the models, its value
             is considered to be ``None`` in this model.
 
-            ModelDiffMapping structure example::
+            ModelDiffMapping structure example:
 
-                {
-                    '1001': {
-                        'field_common': {'left': 12.5, 'right': 15.0},
-                        'field_missing_in_other': {'left': 'foo', 'right': None},
-                    },
-                    '1002': {
-                        'field_common': {'left': 10.0, 'right': 12.0},
-                        'field_missing_in_self': {'left': None, 'right': 'qux'},
-                    },
-                }
+            ```python
+            {
+                '1001': {
+                    'field_common': {'left': 12.5, 'right': 15.0},
+                    'field_missing_in_other': {'left': 'foo', 'right': None},
+                },
+                '1002': {
+                    'field_common': {'left': 10.0, 'right': 12.0},
+                    'field_missing_in_self': {'left': None, 'right': 'qux'},
+                },
+            }
+            ```
         """
         if self is other:
             return {}
@@ -431,17 +435,15 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 ``hashable`` is set to True.
 
         Example:
-            ::
+            ```python
+            names = list(page.iter_item_attr('name'))
+            unique_categories = list(page.iter_item_attr('category', unique=True))
 
-                names = list(page.iter_item_attr('name'))
-                unique_categories = list(page.iter_item_attr('category', unique=True))
-
-                # For unhashable attributes like allergens (List[str]):
-                unique_allergen_sets = list(
-                    page.iter_item_attr(
-                        'allergens', default=[], unique=True, hashable=False
-                    )
-                )
+            # For unhashable attributes like allergens (List[str]):
+            unique_allergen_sets = list(
+                page.iter_item_attr('allergens', default=[], unique=True, hashable=False)
+            )
+            ```
         """
         if default is _NO_DEFAULT:
             values = (getattr(item, attr) for item in self.items)
@@ -485,13 +487,13 @@ class BasePage(BestEffortModel, Generic[TItem]):
             TypeError: If ``constraint`` is not a ``Mapping`` or callable.
 
         Example:
-            ::
+            ```python
+            # Mapping constraint — match by attribute value
+            product = page.find_item({'name': 'Caesar Salad'})
 
-                # Mapping constraint — match by attribute value
-                product = page.find_item({'name': 'Caesar Salad'})
-
-                # Callable constraint — arbitrary predicate
-                product = page.find_item(lambda p: p.is_on_sale and p.quantity > 1)
+            # Callable constraint — arbitrary predicate
+            product = page.find_item(lambda p: p.is_on_sale and p.quantity > 1)
+            ```
         """
         return next(self.find_items(constraint), None)
 
@@ -517,12 +519,12 @@ class BasePage(BestEffortModel, Generic[TItem]):
             TypeError: If ``constraint`` is not a ``Mapping`` or callable.
 
         Example:
-            ::
-
-                available = list(page.find_items({'is_available': True}))
-                vegetarian_on_sale = list(
-                    page.find_items(lambda p: p.is_vegetarian and p.is_on_sale)
-                )
+            ```python
+            available = list(page.find_items({'is_available': True}))
+            vegetarian_on_sale = list(
+                page.find_items(lambda p: p.is_vegetarian and p.is_on_sale)
+            )
+            ```
         """
         if callable(constraint):
             for item in self.items:
@@ -567,15 +569,15 @@ class BasePage(BestEffortModel, Generic[TItem]):
             ValueError: If the precision is not one of the supported values.
 
         Example:
-            ::
-
-                result = new_page.is_newer_than(old_page, precision='m')
-                if result is True:
-                    process(new_page)  # newer
-                elif result is False:
-                    pass  # older
-                else:
-                    pass  # same minute, no action needed
+            ```python
+            result = new_page.is_newer_than(old_page, precision='m')
+            if result is True:
+                process(new_page)  # newer
+            elif result is False:
+                pass  # older
+            else:
+                pass  # same minute, no action needed
+            ```
         """
         recorded_at_self: Union[datetime, date]
         recorded_at_other: Union[datetime, date]

@@ -173,21 +173,23 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
             ParseResult[TPage]: Parsed page data and parsing metadata.
 
         Example:
-            Stateful caching pattern for a polling loop::
+            Stateful caching pattern for a polling loop:
 
-                import time
-                import httpx
-                from freshpointparser.parsers import ProductPageHTMLParser
-                from freshpointparser import get_product_page_url
+            ```python
+            import time
+            import httpx
+            from freshpointparser.parsers import ProductPageHTMLParser
+            from freshpointparser import get_product_page_url
 
-                parser = ProductPageHTMLParser()
-                url = get_product_page_url(296)
+            parser = ProductPageHTMLParser()
+            url = get_product_page_url(296)
 
-                while True:
-                    result = parser.parse(httpx.get(url).text)
-                    if not result.metadata.from_cache:
-                        process(result.page)  # page content changed
-                    time.sleep(60)
+            while True:
+                result = parser.parse(httpx.get(url).text)
+                if not result.metadata.from_cache:
+                    process(result.page)  # page content changed
+                time.sleep(60)
+            ```
         """
         content_digest = self._hash_sha1(page_content)
 

@@ -32,12 +32,12 @@ def normalize_text(text: Any) -> str:
         ValueError: If normalisation fails due to an unexpected encoding error.
 
     Example:
-        ::
-
-            >>> normalize_text('Café Ústí nad Labem')
-            'cafe usti nad labem'
-            >>> normalize_text(None)
-            ''
+        ```python
+        >>> normalize_text('Café Ústí nad Labem')
+        'cafe usti nad labem'
+        >>> normalize_text(None)
+        ''
+        ```
     """
     if text is None:
         return ''

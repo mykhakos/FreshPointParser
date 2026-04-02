@@ -124,14 +124,14 @@ def parse_location_page(page_content: Union[str, bytes]) -> ParseResult[Location
             An empty ``result.metadata.errors`` list means parsing was clean.
 
     Example:
-        ::
+        ```python
+        import httpx
+        from freshpointparser import parse_location_page, get_location_page_url
 
-            import httpx
-            from freshpointparser import parse_location_page, get_location_page_url
-
-            html = httpx.get(get_location_page_url()).text
-            result = parse_location_page(html)
-            for location in result.page.items:
-                print(location.name, location.address)
+        html = httpx.get(get_location_page_url()).text
+        result = parse_location_page(html)
+        for location in result.page.items:
+            print(location.name, location.address)
+        ```
     """
     return LocationPageHTMLParser().parse(page_content)
