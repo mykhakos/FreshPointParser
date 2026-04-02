@@ -213,10 +213,9 @@ class BaseItem(BestEffortModel):
             FieldDiffMapping: A dictionary mapping field names to their
             corresponding difference pairs.
 
-            Each field difference is a
-            (:class:`~freshpointparser.models.types.FieldDiff`) dictionary
-            containing the ``left`` and ``right`` values from this model and the other
-            model, respectively. If a field is missing in any of the models, its value
+            Each field difference is a ``FieldDiff`` dictionary containing the
+            ``left`` and ``right`` values from this model and the other model,
+            respectively. If a field is missing in any of the models, its value
             is considered to be ``None`` in this model.
 
             FieldDiffMapping structure example:
@@ -321,14 +320,12 @@ class BasePage(BestEffortModel, Generic[TItem]):
             ModelDiffMapping: A dictionary mapping numeric item IDs to their
             corresponding differences.
 
-            Each item difference is a
-            (:class:`~freshpointparser.models.types.FieldDiffMapping`) dictionary
-            that maps fields to the corresponding field differences.
+            Each item difference is a ``FieldDiffMapping`` dictionary that maps
+            fields to the corresponding field differences.
 
-            Each field difference is a
-            (:class:`~freshpointparser.models.types.FieldDiff`) dictionary
-            containing the ``left`` and ``right`` values from this model and the other
-            model, respectively. If a field is missing in any of the models, its value
+            Each field difference is a ``FieldDiff`` dictionary containing the
+            ``left`` and ``right`` values from this model and the other model,
+            respectively. If a field is missing in any of the models, its value
             is considered to be ``None`` in this model.
 
             ModelDiffMapping structure example:
