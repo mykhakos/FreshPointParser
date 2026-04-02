@@ -566,7 +566,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
         Args:
             other (BasePage): The page to compare against.
             precision (Optional[Literal['s', 'm', 'h', 'd']]): The level of
-                precision for the comparison (`None` for full precision (default),
+                precision for the comparison (``None`` for full precision (default),
                 's' for seconds, 'm' for minutes, 'h' for hours, and 'd' for days).
 
         Returns:
