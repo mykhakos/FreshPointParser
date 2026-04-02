@@ -17,9 +17,8 @@ else:
 class LocationCoordinates(NamedTuple):
     """Geographic coordinates of a FreshPoint location as a ``(latitude, longitude)`` named pair.
 
-    Immutable and lightweight — not a Pydantic model. Supports tuple unpacking::
-
-        lat, lon = location.coordinates
+    Immutable and lightweight — not a Pydantic model.
+    Supports unpacking: ``lat, lon = location.coordinates``.
     """
 
     latitude: float
