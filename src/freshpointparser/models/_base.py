@@ -53,7 +53,7 @@ T = TypeVar('T')
 class ToCamel:
     """Alias for the ``to_camel`` function from ``pydantic.alias_generators``."""
 
-    def __repr__(self) -> str:  # nicer formatting for Sphinx docs
+    def __repr__(self) -> str:  # nicer formatting in docs
         return 'to_camel'
 
     def __call__(self, string: str) -> str:
