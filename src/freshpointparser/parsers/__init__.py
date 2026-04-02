@@ -1,4 +1,11 @@
-"""FreshPoint webpage HTML parsers of the ``freshpointparser`` library."""
+"""HTML parsers for FreshPoint webpages.
+
+The stateless ``parse_product_page`` and ``parse_location_page`` functions
+handle one-off parsing. ``ProductPageHTMLParser`` and
+``LocationPageHTMLParser`` are the stateful variants with SHA-1 content
+caching, suitable for polling scenarios. ``ParseResult`` and ``ParseMetadata``
+are the return types.
+"""
 
 from ._base import (
     BasePageHTMLParser,
