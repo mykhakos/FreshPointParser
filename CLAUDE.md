@@ -66,11 +66,7 @@ def _safe_validate(cls, data, handler, info):
 
 This is field-level partial recovery: a product with an invalid price still has its name, quantity, and allergens. The entire model is not discarded. Errors flow into `ParseContext` and surface in `ParseResult.metadata.errors`.
 
-**Why `mode='wrap'` and not a simpler approach?** Four options were evaluated:
-- **Option A — all fields `Optional` with defaults:** fails when data is *present* but invalid (e.g. `price_curr=-5.0` raises `ValidationError` on `NonNegativeFloat` even though the field has a `None` default).
-- **Option B — `mode='before'` sanitizer:** can only strip `None` values before validation, cannot recover from type mismatches or constraint violations.
-- **Option C — `mode='wrap'` (what `BestEffortModel` uses):** catches `ValidationError`, identifies which fields failed, strips them, and retries with their defaults. The only option that provides field-level partial recovery for all failure categories.
-- **Option D — catch `ValidationError` at call site:** simplest, but drops the *entire* model on any single field failure — no partial data preserved.
+**Why `mode='wrap'`?** All fields are already `Optional` with `None` defaults, which handles missing data. But `Optional` alone fails when data is *present* but invalid — e.g. `price_curr=-5.0` raises `ValidationError` on `NonNegativeFloat` even though the field has a default. The wrap-validator catches that `ValidationError`, strips the failing fields, and retries with their defaults — giving field-level partial recovery for all failure categories regardless of whether data is absent or logically invalid.
 
 **Why two levels?** Extraction failures ("the HTML didn't have what we expected") and validation failures ("the data was present but logically invalid") are semantically different failure modes. An extraction failure signals a site structure change; a validation failure signals a data quality issue. Keeping them separate preserves this diagnostic information.
 
