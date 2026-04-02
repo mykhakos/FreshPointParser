@@ -120,7 +120,7 @@ def parse_location_page(page_content: Union[str, bytes]) -> ParseResult[Location
         page_content (Union[str, bytes]): Raw HTML of the location directory page.
 
     Returns:
-        ParseResult[LocationPage]: Parsed page and metadata.
+        ParseResult[LocationPage]: Parsed page and parsing metadata.
             An empty ``result.metadata.errors`` list means parsing was clean.
 
     Example:
@@ -130,6 +130,7 @@ def parse_location_page(page_content: Union[str, bytes]) -> ParseResult[Location
 
         html = httpx.get(get_location_page_url()).text
         result = parse_location_page(html)
+
         for location in result.page.items:
             print(location.name, location.address)
         ```

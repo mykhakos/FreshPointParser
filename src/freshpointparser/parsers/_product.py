@@ -357,7 +357,7 @@ def parse_product_page(page_content: Union[str, bytes]) -> ParseResult[ProductPa
         page_content (Union[str, bytes]): Raw HTML of the product page.
 
     Returns:
-        ParseResult[ProductPage]: Parsed page and metadata.
+        ParseResult[ProductPage]: Parsed page and parsing metadata.
             An empty ``result.metadata.errors`` list means parsing was clean.
 
     Example:
@@ -367,9 +367,9 @@ def parse_product_page(page_content: Union[str, bytes]) -> ParseResult[ProductPa
 
         html = httpx.get(get_product_page_url(296)).text
         result = parse_product_page(html)
-        for product in result.page.items:
-            if product.is_available:
-                print(product.name, product.price)
+
+        available = [p for p in result.page.items if p.is_available]
+        print(f"{result.page.location_name}: {len(available)} products available")
         ```
     """
     return ProductPageHTMLParser().parse(page_content)
