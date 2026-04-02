@@ -16,7 +16,13 @@ TPage = TypeVar('TPage', bound=BasePage)
 
 @dataclass
 class ParseContext:
-    """Holds context information about the parsing operation."""
+    """Accumulates errors and timestamps during a single parse operation.
+
+    Passed as ``context=`` to Pydantic's ``model_validate`` so that
+    ``BestEffortModel`` can register validation errors here rather than
+    raising. Callers do not interact with ``ParseContext`` directly —
+    errors surface in ``ParseResult.metadata.errors``.
+    """
 
     parsed_at: datetime = field(default_factory=datetime.now)
     """Timestamp of when the parsing operation was performed."""
@@ -25,20 +31,18 @@ class ParseContext:
     """Exceptions encountered during the parsing operation."""
 
     def register_error(self, error: Exception) -> None:
-        """Register a parsing error in the context.
-
-        NOTE: This method is an implementation of the interface required by
-        the validation context used in model validation.
-
-        Args:
-            error (Exception): The exception to register.
-        """
+        """Append an error to the context error list."""
         self.errors.append(error)
 
 
 @dataclass(frozen=True, eq=True)
 class ParseMetadata:
-    """Holds the metadata of a FreshPoint.cz page HTML content parsing operation."""
+    """Metadata produced by a single ``BasePageHTMLParser.parse`` call.
+
+    Reports the content digest, when parsing occurred, whether the result
+    was served from cache, and any soft errors collected. An empty ``errors``
+    list means the parse completed cleanly.
+    """
 
     content_digest: bytes
     """SHA-1 hash digest of the page HTML content that was parsed.
@@ -63,7 +67,12 @@ class ParseMetadata:
 
 @dataclass(frozen=True, eq=True)
 class ParseResult(Generic[TPage]):
-    """Holds the result of a FreshPoint.cz page HTML content parsing operation."""
+    """Result of a single ``parse`` call.
+
+    ``page`` contains the structured data; ``metadata`` provides diagnostics
+    (digest, timestamp, cache status, errors). ``errors`` is a convenience
+    shortcut for ``metadata.errors``.
+    """
 
     page: TPage
     """Parsed page data."""
@@ -73,20 +82,20 @@ class ParseResult(Generic[TPage]):
 
     @property
     def errors(self) -> List[Exception]:
-        """List of exceptions encountered during the parsing operation.
-
-        This is a convenience property that forwards to the metadata's errors.
-
-        Returns:
-            List[Exception]: List of parsing exceptions.
-        """
+        """Shortcut for ``metadata.errors``."""
         return self.metadata.errors
 
 
 class BasePageHTMLParser(ABC, Generic[TPage]):
-    """Provides common functionality for parsing HTML content of FreshPoint.cz pages.
+    """Abstract base parser for FreshPoint HTML pages.
 
-    Note: This is a base class that is not intended to be used directly.
+    Maintains a SHA-1 digest of the last parsed content and returns a cached
+    deep copy when the content has not changed, making it efficient for
+    polling scenarios.
+
+    Prefer the stateless convenience functions (``parse_product_page``,
+    ``parse_location_page``) for one-off parsing. Instantiate a subclass
+    directly when parsing the same page URL repeatedly.
     """
 
     def __init__(self) -> None:
@@ -102,34 +111,21 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
 
     @staticmethod
     def _hash_sha1(content: Union[str, bytes]) -> bytes:
-        """Hash the given text using the SHA-1 algorithm and return the
-        hexadecimal representation of the hash.
-
-        Args:
-            content (Union[str, bytes]): The text to be hashed.
-
-        Returns:
-            bytes: The SHA-1 hash of the text.
-        """
+        """Return the SHA-1 digest of ``content`` as bytes."""
         if isinstance(content, str):
             content = content.encode('utf-8')
         return hashlib.sha1(content).digest()  # noqa: S324
 
     def _reset_context(self) -> None:
-        """Reset the internal parsing context to a new, empty state."""
+        """Replace the current parse context with a fresh empty one."""
         self._context = ParseContext()
 
     def _safe_parse(self, parser_func: Callable, *args: Any, **kwargs: Any) -> Any:
-        """Wrap a parsing function call to safely handle exceptions. The exceptions
-        are recorded in the current parsing context instead of being raised.
+        """Call ``parser_func`` and return its result, or ``None`` on any exception.
 
-        Args:
-            parser_func (Callable): The parsing function to be called.
-            *args: Positional arguments to pass to the parsing function.
-            **kwargs: Additional keyword arguments to pass to the parsing function.
-
-        Returns:
-            Any: The result of the parsing function, or None if an error occurred.
+        ``FreshPointParserError`` is logged at INFO; any other exception is wrapped
+        as ``ParseError`` (preserving ``__cause__``) and logged at WARNING. All
+        exceptions are registered in the current parse context.
         """
         try:
             return parser_func(*args, **kwargs)
@@ -154,28 +150,18 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
 
     @abstractmethod
     def _parse_page_content(self, page_content: Union[str, bytes]) -> TPage:
-        """Parse the HTML content of the page to a Pydantic model.
-
-        Implementations should extract relevant data from the HTML content
-        and construct a page model instance. This method is called
-        when the HTML content is updated or when the parser is forced to
-        re-parse the content.
-
-        This method should not raise exceptions directly. Instead, any parsing errors
-        should be collected in the current parsing context.
-
-        Args:
-            page_content (Union[str, bytes]): The HTML content of the page.
-
-        Returns:
-            TPage: A page model containing the parsed data.
-        """
+        """Parse HTML into a page model. Must not raise — collect errors into context."""
         pass
 
     def parse(
         self, page_content: Union[str, bytes], force: bool = False
     ) -> ParseResult[TPage]:
-        """Parse the HTML content of a FreshPoint webpage.
+        """Parse HTML content into a structured page model.
+
+        Returns a deep copy of the result so the caller can mutate it freely.
+        When ``page_content`` has the same SHA-1 digest as the previous call,
+        the cached result is returned immediately with ``metadata.from_cache``
+        set to ``True``.
 
         Args:
             page_content (Union[str, bytes]): HTML content of the page.
@@ -185,6 +171,25 @@ class BasePageHTMLParser(ABC, Generic[TPage]):
 
         Returns:
             ParseResult[TPage]: Parsed page data and parsing metadata.
+
+        Example:
+            Stateful caching pattern for a polling loop:
+
+            ```python
+            import time
+            import httpx
+            from freshpointparser.parsers import ProductPageHTMLParser
+            from freshpointparser import get_product_page_url
+
+            parser = ProductPageHTMLParser()
+            url = get_product_page_url(296)
+
+            while True:
+                result = parser.parse(httpx.get(url).text)
+                if not result.metadata.from_cache:
+                    process(result.page)  # page content changed
+                time.sleep(60)
+            ```
         """
         content_digest = self._hash_sha1(page_content)
 

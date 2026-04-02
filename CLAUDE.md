@@ -253,6 +253,13 @@ tox -e lint                     # all lint checks
 - Tests relax `ANN`, `D10x`, `S101`, `PLC0415` rules.
 - In `except` clauses: use `err` when the exception class reads as "Error" (e.g. `except ParseError as err`), `exc` when it reads as "Exception" (e.g. `except Exception as exc`). Never single-letter names.
 - In log and exception messages, identifiers (IDs, names, function names, field names, etc.) must be wrapped in single quotes: `"func '%s' failed"` not `"func %s failed"`.
+- Code examples in docstrings use fenced Markdown blocks with a language tag — **not** RST ``::`` blocks:
+  ```
+  Example:
+      ```python
+      result = parse_product_page(html)
+      ```
+  ```
 - In docstrings, inline code/monospace uses double backticks:
   ```
   ``correct``   ✓
@@ -262,8 +269,8 @@ tox -e lint                     # all lint checks
 ## Docstrings
 
 - Use imperative mood in summary lines: "Parse the page", not "Parses the page".
-- Properties use descriptive style: `"""The effective selling price."""`, not imperative.
-- Pydantic model fields are documented via `Field(description=...)` only — no standalone field docstrings below the field definition.
+- Properties use descriptive style: `"""The effective selling price."""`, not imperative. **Never add `Args:`, `Returns:`, or `Raises:` sections to a property docstring** — a property takes no arguments and its return value is described by the summary line itself.
+- Pydantic model fields are documented in **both** `Field(description=...)` and a standalone docstring below the field definition. Both must be present and carry identical text. When polishing a field, update both together.
 - Don't restate the class or method name. If `ParseError` already communicates meaning, the docstring adds context beyond what the name says — it doesn't paraphrase it.
 - Describe purpose, not implementation. Don't mention base classes, internal patterns, or third-party tools unless essential.
 - Module docstrings describe the module's responsibility, not its contents. Write what it *does*, not what it currently contains.

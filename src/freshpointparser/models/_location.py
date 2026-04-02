@@ -15,12 +15,10 @@ else:
 
 
 class LocationCoordinates(NamedTuple):
-    """Latitude and longitude of a location as a named tuple.
+    """Geographic coordinates of a FreshPoint location as a ``(latitude, longitude)`` named pair.
 
-    Immutable and lightweight — not a Pydantic model. Supports tuple
-    unpacking::
-
-        lat, lon = location.coordinates
+    Immutable and lightweight — not a Pydantic model.
+    Supports unpacking: ``lat, lon = location.coordinates``.
     """
 
     latitude: float
@@ -33,8 +31,9 @@ class Location(BaseItem):
     """Data model of a FreshPoint vending machine location.
 
     All fields are ``Optional`` with ``None`` as the sentinel for "not available".
-    The ``coordinates`` property returns a ``LocationCoordinates`` named tuple
-    when both ``latitude`` and ``longitude`` are set.
+    Key computed properties: ``coordinates`` (returns a ``LocationCoordinates``
+    named tuple when both lat/lon are set), ``name_lowercase_ascii``, and
+    ``address_lowercase_ascii`` for diacritic-insensitive search.
     """
 
     name: Optional[str] = Field(
@@ -111,19 +110,16 @@ LOCATION_PAGE_URL = 'https://my.freshpoint.cz'
 
 
 def get_location_page_url() -> str:
-    """Get the FreshPoint.cz location page HTTPS URL.
-
-    Returns:
-        str: The FreshPoint.cz location page URL.
-    """
+    """Return the FreshPoint.cz location directory URL (``https://my.freshpoint.cz``)."""
     return LOCATION_PAGE_URL
 
 
 class LocationPage(BasePage[Location]):
     """Data model of the FreshPoint location directory (my.freshpoint.cz).
 
-    Contains all known vending machine locations. Use ``find_item`` or
-    ``find_items`` to search by name, address, or other attributes.
+    Contains all known vending machine locations. Extends ``BasePage`` with
+    no additional fields. Use ``find_item`` or ``find_items`` to search by
+    name, address, or other attributes.
     """
 
     @property

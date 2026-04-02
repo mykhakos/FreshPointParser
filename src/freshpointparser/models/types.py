@@ -1,4 +1,9 @@
-"""Annotations and auxiliary types for FreshPoint data models."""
+"""Supplementary types for FreshPoint data models.
+
+Re-exports the types used when working with ``BaseItem.model_diff``,
+``BasePage.item_diff``, and the best-effort validation pipeline.
+Import from ``freshpointparser.models.types``.
+"""
 
 from ._base import (
     FieldDiff,

@@ -8,7 +8,13 @@ from ._base import BasePageHTMLParser, ParseResult, logger
 
 
 class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
-    """Parses HTML content of a FreshPoint location webpage ``my.freshpoint.cz``."""
+    """Parser for the FreshPoint location directory (``my.freshpoint.cz``).
+
+    Location data is embedded in the page as a doubly-encoded JSON string
+    inside a JavaScript variable (``devices = "[...]";``). Only the ``prop``
+    key of each entry is used; the ``location`` key is a confirmed duplicate
+    and is ignored. Reuse a single instance across calls for SHA-1 caching.
+    """
 
     _RE_SEARCH_PATTERN_STR = re.compile(
         r'\bdevices\b\s*=\s*("\[(?:\\.|[^"\\])*\]")\s*;',
@@ -22,25 +28,14 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
     """Regex pattern to search for the location data in the HTML bytes."""
 
     def _load_json(self, page_content: Union[str, bytes]) -> List[Dict]:
-        r"""Extract the JSON location data embedded in the HTML.
+        r"""Extract and doubly-decode the JSON location array from the HTML.
 
-        The location data is stored in the page HTML as a JavaScript string
-        variable: ``devices = "[{\"prop\":{...}}]";``
-
-        Regex is used to find this variable assignment and extract the JSON string.
-        A double JSON parsing approach is used because the data is essentially
-        double-quoted in the source (a JSON string within a JavaScript string).
-
-        Args:
-            page_content (Union[str, bytes]): The HTML content of the
-                location page.
-
-        Returns:
-            List[Dict]: Raw location data dictionaries extracted from
-                the JavaScript variable in the HTML content.
+        The source embeds location data as a JSON-encoded string inside a JS
+        variable: ``devices = "[{...}]";``. Two ``json.loads`` calls are required.
 
         Raises:
-            ParseError: If the location data cannot be found or parsed.
+            ParseError: If the variable is missing, JSON is invalid, or the
+                result is not a list.
         """
         match_: Union[re.Match[str], re.Match[bytes], None]
         if isinstance(page_content, str):
@@ -73,21 +68,10 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         return data
 
     def _parse_location(self, location_data: Dict[str, Any]) -> Location:
-        """Parse a single location item from the raw location data.
-
-        The data is expected to contain both 'prop' and 'location' keys, but only
-        the 'prop' data is used for parsing as it contains all necessary information.
-        The 'recorded_at' timestamp is added to the data before validation.
-
-        Args:
-            location_data (Dict[str, Any]): Raw location data dictionary.
-
-        Returns:
-            Location: Parsed and validated Location model instance.
+        """Parse a single location entry dict (using its ``'prop'`` key) into a ``Location``.
 
         Raises:
-            ParseError: Raised when the 'prop' key is missing or
-                when other parsing errors occur.
+            ParseError: If the ``'prop'`` key is missing or validation fails.
         """
         # 'location' key duplicates 'prop' data (name, address, lat/lon as strings) — ignored.
         try:
@@ -100,15 +84,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
             raise ParseError(f'Error parsing location item: {location_data}') from exc
 
     def _parse_locations(self, page_content: Union[str, bytes]) -> List[Location]:
-        """Parse multiple location items from the raw location data list.
-
-        Args:
-            page_content (Union[str, bytes]): HTML content of
-                the location page to parse.
-
-        Returns:
-            List[Location]: Parsed and validated Location model instances.
-        """
+        """Parse all location entries from the page HTML."""
         locations = []
         for location_data in self._load_json(page_content):
             location = self._safe_parse(
@@ -120,18 +96,7 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
         return locations
 
     def _parse_page_content(self, page_content: Union[str, bytes]) -> LocationPage:
-        """Parse the HTML content of the location page to a Pydantic model.
-
-        This method fully parses the raw JSON data extracted from the HTML content to
-        a structured LocationPage model.
-
-        Args:
-            page_content (Union[str, bytes]): HTML content of
-                the location page to parse.
-
-        Returns:
-            LocationPage: The location page model containing all parsed locations.
-        """
+        """Parse the full location directory HTML into a ``LocationPage`` model."""
         parsed_data = {'recorded_at': self._context.parsed_at}
 
         locations = self._safe_parse(self._parse_locations, page_content=page_content)
@@ -146,14 +111,28 @@ class LocationPageHTMLParser(BasePageHTMLParser[LocationPage]):
 
 
 def parse_location_page(page_content: Union[str, bytes]) -> ParseResult[LocationPage]:
-    """Parse the HTML content of a FreshPoint location webpage
-    ``my.freshpoint.cz`` to a structured LocationPage model.
+    """Parse the FreshPoint location directory HTML into a ``LocationPage``.
+
+    Convenience function for one-off parsing. Use ``LocationPageHTMLParser``
+    directly for repeated calls with caching.
 
     Args:
-        page_content (Union[str, bytes]): HTML content of the location page.
+        page_content (Union[str, bytes]): Raw HTML of the location directory page.
 
     Returns:
-        ParseResult[LocationPage]: Parse result containing the page data and metadata.
-            Access the page via result.page, metadata via result.metadata.
+        ParseResult[LocationPage]: Parsed page and parsing metadata.
+            An empty ``result.metadata.errors`` list means parsing was clean.
+
+    Example:
+        ```python
+        import httpx
+        from freshpointparser import parse_location_page, get_location_page_url
+
+        html = httpx.get(get_location_page_url()).text
+        result = parse_location_page(html)
+
+        for location in result.page.items:
+            print(location.name, location.address)
+        ```
     """
     return LocationPageHTMLParser().parse(page_content)
