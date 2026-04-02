@@ -15,9 +15,12 @@ else:
 
 
 class LocationCoordinates(NamedTuple):
-    """Holds the latitude and longitude of a location as a pair of floats.
-    Latitude is the first value in the pair, and longitude is the second
-    value in the pair.
+    """Latitude and longitude of a location as a named tuple.
+
+    Immutable and lightweight — not a Pydantic model. Supports tuple
+    unpacking::
+
+        lat, lon = location.coordinates
     """
 
     latitude: float
@@ -27,7 +30,12 @@ class LocationCoordinates(NamedTuple):
 
 
 class Location(BaseItem):
-    """Data model of a FreshPoint location."""
+    """Data model of a FreshPoint vending machine location.
+
+    All fields are ``Optional`` with ``None`` as the sentinel for "not available".
+    The ``coordinates`` property returns a ``LocationCoordinates`` named tuple
+    when both ``latitude`` and ``longitude`` are set.
+    """
 
     name: Optional[str] = Field(
         default=None,
@@ -60,9 +68,9 @@ class Location(BaseItem):
         default=None,
         validation_alias=AliasChoices('discount', 'discountRate'),
         title='Discount Rate',
-        description='Discount rate applied at the location.',
+        description='Location-level discount rate (0-1) applied to products at this location.',
     )
-    """Discount rate applied at the location."""
+    """Location-level discount rate (0-1) applied to products at this location."""
     is_active: Optional[bool] = Field(
         default=None,
         validation_alias=AliasChoices('active', 'isActive'),
@@ -80,25 +88,19 @@ class Location(BaseItem):
 
     @property
     def name_lowercase_ascii(self) -> str:
-        """Lowercase ASCII representation of the location name.
-
-        If the name is not set, the representation is an empty string.
-        """
+        """Lowercase ASCII representation of ``name``. Empty string when unset."""
         return normalize_text(self.name)
 
     @property
     def address_lowercase_ascii(self) -> str:
-        """Lowercase ASCII representation of the location address.
-
-        If the address is not set, the representation is an empty string.
-        """
+        """Lowercase ASCII representation of ``address``. Empty string when unset."""
         return normalize_text(self.address)
 
     @property
     def coordinates(self) -> Optional[LocationCoordinates]:
-        """Coordinates of the location as tuple (latitude, longitude).
+        """Coordinates as a ``LocationCoordinates`` named tuple.
 
-        If either latitude or longitude is not set, None is returned.
+        ``None`` when either ``latitude`` or ``longitude`` is unset.
         """
         if self.latitude is None or self.longitude is None:
             return None
@@ -118,9 +120,13 @@ def get_location_page_url() -> str:
 
 
 class LocationPage(BasePage[Location]):
-    """Data model of a FreshPoint location webpage."""
+    """Data model of the FreshPoint location directory (my.freshpoint.cz).
+
+    Contains all known vending machine locations. Use ``find_item`` or
+    ``find_items`` to search by name, address, or other attributes.
+    """
 
     @property
     def url(self) -> str:
-        """URL of the location page."""
+        """URL of the location directory page."""
         return LOCATION_PAGE_URL
