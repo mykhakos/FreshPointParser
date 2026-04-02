@@ -263,7 +263,7 @@ tox -e lint                     # all lint checks
 
 - Use imperative mood in summary lines: "Parse the page", not "Parses the page".
 - Properties use descriptive style: `"""The effective selling price."""`, not imperative.
-- Pydantic model fields are documented via `Field(description=...)` only — no standalone field docstrings below the field definition.
+- Pydantic model fields are documented in **both** `Field(description=...)` and a standalone docstring below the field definition. Both must be present and carry identical text. When polishing a field, update both together.
 - Don't restate the class or method name. If `ParseError` already communicates meaning, the docstring adds context beyond what the name says — it doesn't paraphrase it.
 - Describe purpose, not implementation. Don't mention base classes, internal patterns, or third-party tools unless essential.
 - Module docstrings describe the module's responsibility, not its contents. Write what it *does*, not what it currently contains.
