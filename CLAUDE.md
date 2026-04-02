@@ -254,8 +254,17 @@ tox -e lint                     # all lint checks
 
 ## Test Structure
 
-- `tests/models/` — unit tests for model behaviour (validation, diffing, search, comparison).
-- `tests/parsers/` — unit + integration tests for parsers. HTML fixtures and expected JSON live here alongside the test files.
-- `tests/utils/` — tests for `normalize_text`.
+Each test file corresponds to exactly one source module and mirrors its path under `tests/`:
+
+```
+src/freshpointparser/models/_base.py     -> tests/models/test_models_base.py
+src/freshpointparser/models/_product.py  -> tests/models/test_models_product.py
+src/freshpointparser/models/_location.py -> tests/models/test_models_location.py
+src/freshpointparser/parsers/_base.py    -> tests/parsers/test_parsers_base.py
+src/freshpointparser/parsers/_product.py -> tests/parsers/test_parsers_product.py
+src/freshpointparser/parsers/_location.py-> tests/parsers/test_parsers_location.py
+src/freshpointparser/_utils.py           -> tests/utils/test_utils.py
+```
+
 - `is_parser_up_to_date` marker — live tests against the real site. Skipped by default.
-- Fixture files: `product_page.html` / `product_page.json` / `product_page_meta.json` (location 296, "Elektroline"), `location_page.html` / `location_page.json` / `location_page_meta.json`. Refresh periodically against the live site when the HTML structure changes significantly.
+- Fixture files (`tests/parsers/`): `product_page.html` / `product_page.json` / `product_page_meta.json` (location 296, "Elektroline"), `location_page.html` / `location_page.json` / `location_page_meta.json`. Refresh periodically when the site HTML structure changes significantly.
