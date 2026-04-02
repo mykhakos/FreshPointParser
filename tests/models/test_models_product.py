@@ -8,16 +8,11 @@ from pydantic import Field
 from freshpointparser import get_product_page_url
 from freshpointparser.models import Product, ProductPage
 from freshpointparser.models.types import (
-    ProductPriceUpdateInfo,
-    ProductQuantityUpdateInfo,
+    ProductPriceChange,
+    ProductQuantityChange,
 )
 
 # region Product
-
-DEFAULT_PRODUCT_PIC_URL = (
-    r'https://images.weserv.nl/?url=http://freshpoint.freshserver.cz/'
-    r'backend/web/media/photo/1_f587dd3fa21b22.jpg'
-)
 
 
 @pytest.mark.parametrize(
@@ -35,7 +30,8 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_full=None,
                 price_curr=None,
                 info=None,
-                pic_url=DEFAULT_PRODUCT_PIC_URL,
+                allergens=None,
+                pic_url=None,
             ),
             id='default args',
         ),
@@ -50,6 +46,7 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_full=4.0,
                 price_curr=3.0,
                 info='Info',
+                allergens=None,
                 pic_url='https://example.com/pic.jpg',
             ),
             dict(
@@ -62,6 +59,7 @@ DEFAULT_PRODUCT_PIC_URL = (
                 price_full=4.0,
                 price_curr=3.0,
                 info='Info',
+                allergens=None,
                 pic_url='https://example.com/pic.jpg',
             ),
             id='custom args',
@@ -78,7 +76,56 @@ def test_product_init(product, expected_attrs):
     assert product.price_full == expected_attrs['price_full']
     assert product.price_curr == expected_attrs['price_curr']
     assert product.info == expected_attrs['info']
+    assert product.allergens == expected_attrs['allergens']
     assert product.pic_url == expected_attrs['pic_url']
+
+
+def test_product_allergens_field_defaults_to_none():
+    """Product allergens field defaults to None when not provided."""
+    from freshpointparser.models import Product
+
+    p = Product()
+    assert p.allergens is None
+
+
+def test_product_allergens_field_accepts_list():
+    """Product allergens field accepts a list of strings."""
+    from freshpointparser.models import Product
+
+    p = Product(allergens=['Lepek', 'Ryby'])
+    assert p.allergens == ['Lepek', 'Ryby']
+
+
+def test_allergens_lowercase_ascii_none():
+    """Returns empty list when allergens is None."""
+    from freshpointparser.models import Product
+
+    p = Product()
+    assert p.allergens_lowercase_ascii == []
+
+
+def test_allergens_lowercase_ascii_empty_list():
+    """Returns empty list when allergens is an empty list."""
+    from freshpointparser.models import Product
+
+    p = Product(allergens=[])
+    assert p.allergens_lowercase_ascii == []
+
+
+def test_allergens_lowercase_ascii_normalizes():
+    """Strips diacritics and lowercases each allergen."""
+    from freshpointparser.models import Product
+
+    p = Product(allergens=['Obiloviny obsahující lepek', 'Vejce'])
+    assert p.allergens_lowercase_ascii == ['obiloviny obsahujici lepek', 'vejce']
+
+
+def test_allergens_lowercase_ascii_preserves_order():
+    """Preserves the original order of allergens."""
+    from freshpointparser.models import Product
+
+    p = Product(allergens=['Ryby', 'Lepek', 'Sója'])
+    assert p.allergens_lowercase_ascii == ['ryby', 'lepek', 'soja']
 
 
 @pytest.mark.parametrize(
@@ -315,7 +362,7 @@ def test_product_quantity_update_info(
     stock_depleted,
     stock_restocked,
 ):
-    update_info = ProductQuantityUpdateInfo(
+    update_info = ProductQuantityChange(
         quantity_decrease=stock_decrease,
         quantity_increase=stock_increase,
         is_last_piece=stock_is_last_piece,
@@ -335,7 +382,7 @@ def test_product_quantity_update_info(
         pytest.param(
             Product(),
             Product(),
-            ProductQuantityUpdateInfo(
+            ProductQuantityChange(
                 quantity_decrease=0,
                 quantity_increase=0,
                 is_last_piece=False,
@@ -347,7 +394,7 @@ def test_product_quantity_update_info(
         pytest.param(
             Product(quantity=0),
             Product(quantity=0),
-            ProductQuantityUpdateInfo(
+            ProductQuantityChange(
                 quantity_decrease=0,
                 quantity_increase=0,
                 is_last_piece=False,
@@ -359,7 +406,7 @@ def test_product_quantity_update_info(
         pytest.param(
             Product(quantity=5),
             Product(quantity=2),
-            ProductQuantityUpdateInfo(
+            ProductQuantityChange(
                 quantity_decrease=3,
                 quantity_increase=0,
                 is_last_piece=False,
@@ -371,7 +418,7 @@ def test_product_quantity_update_info(
         pytest.param(
             Product(quantity=2),
             Product(quantity=5),
-            ProductQuantityUpdateInfo(
+            ProductQuantityChange(
                 quantity_decrease=0,
                 quantity_increase=3,
                 is_last_piece=False,
@@ -383,7 +430,7 @@ def test_product_quantity_update_info(
         pytest.param(
             Product(quantity=2),
             Product(quantity=0),
-            ProductQuantityUpdateInfo(
+            ProductQuantityChange(
                 quantity_decrease=2,
                 quantity_increase=0,
                 is_last_piece=False,
@@ -395,7 +442,7 @@ def test_product_quantity_update_info(
         pytest.param(
             Product(quantity=0),
             Product(quantity=2),
-            ProductQuantityUpdateInfo(
+            ProductQuantityChange(
                 quantity_decrease=0,
                 quantity_increase=2,
                 is_last_piece=False,
@@ -407,7 +454,7 @@ def test_product_quantity_update_info(
         pytest.param(
             Product(quantity=1),
             Product(quantity=0),
-            ProductQuantityUpdateInfo(
+            ProductQuantityChange(
                 quantity_decrease=1,
                 quantity_increase=0,
                 is_last_piece=False,
@@ -419,7 +466,7 @@ def test_product_quantity_update_info(
         pytest.param(
             Product(quantity=0),
             Product(quantity=1),
-            ProductQuantityUpdateInfo(
+            ProductQuantityChange(
                 quantity_decrease=0,
                 quantity_increase=1,
                 is_last_piece=False,
@@ -431,7 +478,7 @@ def test_product_quantity_update_info(
         pytest.param(
             Product(quantity=1),
             Product(quantity=1),
-            ProductQuantityUpdateInfo(
+            ProductQuantityChange(
                 quantity_decrease=0,
                 quantity_increase=0,
                 is_last_piece=False,
@@ -443,7 +490,7 @@ def test_product_quantity_update_info(
         pytest.param(
             Product(quantity=2),
             Product(quantity=1),
-            ProductQuantityUpdateInfo(
+            ProductQuantityChange(
                 quantity_decrease=1,
                 quantity_increase=0,
                 is_last_piece=True,
@@ -456,7 +503,7 @@ def test_product_quantity_update_info(
 )
 def test_product_compare_quantity(product_this, product_other, info):
     assert product_this.compare_quantity(product_other) == info
-    info_no_diff = ProductQuantityUpdateInfo()
+    info_no_diff = ProductQuantityChange()
     assert product_this.compare_quantity(product_this) == info_no_diff
 
 
@@ -507,7 +554,7 @@ def test_product_price_update_info(
     sale_started,
     sale_ended,
 ):
-    update_info = ProductPriceUpdateInfo(
+    update_info = ProductPriceChange(
         price_full_decrease=price_full_decrease,
         price_full_increase=price_full_increase,
         price_curr_decrease=price_curr_decrease,
@@ -533,7 +580,7 @@ def test_product_price_update_info(
         pytest.param(
             Product(),
             Product(),
-            ProductPriceUpdateInfo(
+            ProductPriceChange(
                 price_full_decrease=0,
                 price_full_increase=0,
                 price_curr_decrease=0,
@@ -548,7 +595,7 @@ def test_product_price_update_info(
         pytest.param(
             Product(price_full=10, price_curr=10),
             Product(price_full=10, price_curr=10),
-            ProductPriceUpdateInfo(
+            ProductPriceChange(
                 price_full_decrease=0,
                 price_full_increase=0,
                 price_curr_decrease=0,
@@ -563,7 +610,7 @@ def test_product_price_update_info(
         pytest.param(
             Product(price_full=10, price_curr=10),
             Product(price_full=10, price_curr=5),
-            ProductPriceUpdateInfo(
+            ProductPriceChange(
                 price_full_decrease=0,
                 price_full_increase=0,
                 price_curr_decrease=5,
@@ -578,7 +625,7 @@ def test_product_price_update_info(
         pytest.param(
             Product(price_full=10, price_curr=5),
             Product(price_full=10, price_curr=10),
-            ProductPriceUpdateInfo(
+            ProductPriceChange(
                 price_full_decrease=0,
                 price_full_increase=0,
                 price_curr_decrease=0,
@@ -593,7 +640,7 @@ def test_product_price_update_info(
         pytest.param(
             Product(price_full=10, price_curr=5),
             Product(price_full=20, price_curr=10),
-            ProductPriceUpdateInfo(
+            ProductPriceChange(
                 price_full_decrease=0,
                 price_full_increase=10,
                 price_curr_decrease=0,
@@ -608,7 +655,7 @@ def test_product_price_update_info(
         pytest.param(
             Product(price_full=20, price_curr=15),
             Product(price_full=10, price_curr=5),
-            ProductPriceUpdateInfo(
+            ProductPriceChange(
                 price_full_decrease=10,
                 price_full_increase=0,
                 price_curr_decrease=10,
@@ -624,7 +671,7 @@ def test_product_price_update_info(
 )
 def test_compare_price(product_this, product_other, info):
     assert product_this.compare_price(product_other) == info
-    info_no_diff = ProductPriceUpdateInfo()
+    info_no_diff = ProductPriceChange()
     assert product_this.compare_price(product_this) == info_no_diff
 
 

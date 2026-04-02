@@ -181,6 +181,38 @@ def test_find_info_with_line_breaks():
     assert 'Line 3' in info
 
 
+def test_find_allergens_success():
+    """Test extracting allergens from tag."""
+    tag = bs4.BeautifulSoup('<div data-allergens="Lepek, Ryby"></div>', 'lxml').div
+    assert tag is not None
+    allergens = ProductHTMLParser.find_allergens(tag)
+    assert allergens == ['Lepek', 'Ryby']
+
+
+def test_find_allergens_missing_attribute():
+    """Test error when data-allergens attribute is missing."""
+    tag = bs4.BeautifulSoup('<div></div>', 'lxml').div
+    assert tag is not None
+    with pytest.raises(ParseError):
+        ProductHTMLParser.find_allergens(tag)  # type: ignore
+
+
+def test_find_allergens_with_html_entities():
+    """Test extracting allergens with HTML entities."""
+    tag = bs4.BeautifulSoup('<div data-allergens="Lepek &amp; Ryby"></div>', 'lxml').div
+    assert tag is not None
+    allergens = ProductHTMLParser.find_allergens(tag)
+    assert allergens == ['Lepek & Ryby']
+
+
+def test_find_allergens_empty_string():
+    """Test that an empty data-allergens attribute returns an empty list."""
+    tag = bs4.BeautifulSoup('<div data-allergens=""></div>', 'lxml').div
+    assert tag is not None
+    allergens = ProductHTMLParser.find_allergens(tag)
+    assert allergens == []
+
+
 def test_find_pic_url_success():
     """Test extracting product picture URL."""
     tag = bs4.BeautifulSoup(
@@ -393,6 +425,8 @@ def test_parse_product_success():
     assert product.is_vegetarian is True
     assert product.price_full == 50.0
     assert product.quantity == 2
+    assert product.allergens is None
+    assert any(isinstance(e, ParseError) for e in parser._context.errors)
 
 
 def test_parse_product_minimal_data():
@@ -678,18 +712,21 @@ def test_validate_generated_product_page(product_page_html_parse_result, product
 @pytest.mark.is_parser_up_to_date
 @pytest.mark.parametrize(
     'product_page_id',
-    [pytest.param(id_, id=f'ID={id_}') for id_ in range(10, 10)],
+    # Range is intentionally narrow to keep live test runtime short.
+    # Adjust the range manually when spot-checking different location IDs.
+    # IDs that redirect (no machine at that location) are automatically skipped.
+    [pytest.param(id_, id=f'ID={id_}') for id_ in range(10, 30)],
 )
 def test_parse_data_from_internet(product_page_id):
     """Go through all product pages fetched from the internet and validate them.
 
     This test aims to validate the parser's ability to parse actual fresh data.
     """
-    import time  # noqa: PLC0415
+    import time
 
-    import httpx  # noqa: PLC0415
+    import httpx
 
-    from freshpointparser import get_product_page_url  # noqa: PLC0415
+    from freshpointparser import get_product_page_url
 
     def get_response_with_retry(url, retries: int = 3) -> httpx.Response:
         if retries <= 0:

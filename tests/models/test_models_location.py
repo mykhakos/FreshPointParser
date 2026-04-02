@@ -386,8 +386,9 @@ def test_location_page_find_items_invalid_constraint(locations_page, constraint)
             id='lambda constraint: multiple attributes, one partial',
         ),
         pytest.param(
-            lambda p: p.neam == 'ABB'
-            or p.address == 'Vyskočilova 1561/4a, Praha Michle',
+            lambda p: (
+                p.neam == 'ABB' or p.address == 'Vyskočilova 1561/4a, Praha Michle'
+            ),
             id='lambda constraint: multiple attributes, one misspelled',
         ),
     ],

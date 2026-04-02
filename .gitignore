@@ -105,3 +105,8 @@ cython_debug/
 
 # Ruff
 .ruff_cache/
+
+# Claude Code
+.superpowers/
+docs/superpowers/
+.worktrees/

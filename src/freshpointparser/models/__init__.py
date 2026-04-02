@@ -1,15 +1,19 @@
-"""Pydantic models and other data containers of the ``freshpointparser`` library.
-The ``types`` submodule is available for additional data types.
+"""Pydantic models for FreshPoint products and locations.
+
+The primary models are ``Product``, ``ProductPage``, ``Location``, and
+``LocationPage``. ``BestEffortModel`` is available for building custom
+fault-tolerant models. Supplementary types are in the ``types`` submodule.
 """
 
 from . import types
-from ._base import BaseItem, BasePage, logger
+from ._base import BaseItem, BasePage, BestEffortModel, logger
 from ._location import Location, LocationPage, get_location_page_url
 from ._product import Product, ProductPage, get_product_page_url
 
 __all__ = [
     'BaseItem',
     'BasePage',
+    'BestEffortModel',
     'Location',
     'LocationPage',
     'Product',
