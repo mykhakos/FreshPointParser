@@ -17,81 +17,63 @@ from ._base import BaseItem, BasePage
 
 @dataclass
 class ProductQuantityChange:
-    """Summarizes the details of stock quantity changes in a product."""
+    """Result of comparing the stock quantity of a product at two points in time.
+
+    Produced by ``Product.compare_quantity``. The comparison is symmetric:
+    ``a.compare_quantity(b)`` produces the mirror of ``b.compare_quantity(a)``.
+    Fields with zero or ``False`` values indicate no change in that dimension.
+    """
 
     quantity_decrease: int = 0
-    """Decrease in stock quantity. Represents how many items
-    are fewer in the new product compared to the old product.
-    A value of 0 implies no decrease.
-    """
+    """How many fewer units exist compared to the other product. Zero means no decrease."""
     quantity_increase: int = 0
-    """Increase in stock quantity. Indicates how many items
-    are more in the new product compared to the old product.
-    A value of 0 implies no increase.
-    """
+    """How many more units exist compared to the other product. Zero means no increase."""
     is_last_piece: bool = False
-    """A flag indicating the product is the last piece in stock.
-    True if the new product's stock quantity is one while the old
-    product's stock was greater than one.
+    """Transition flag: quantity crossed from greater than one to exactly one.
+
+    Captures the transition to last-piece status, not just the state.
+    Use ``Product.is_last_piece`` to check current state instead.
     """
     is_depleted: bool = False
-    """A flag indicating complete depletion of the product stock.
-    True if the new product's stock quantity is zero while the old
-    product's stock was greater than zero.
-    """
+    """Transition flag: quantity crossed from greater than zero to zero."""
     is_restocked: bool = False
-    """A flag indicating the product has been restocked.
-    True if the new product's stock quantity is greater than zero
-    while the old product's stock was zero.
-    """
+    """Transition flag: quantity crossed from zero to greater than zero."""
 
 
 @dataclass
 class ProductPriceChange:
-    """Summarizes the details of pricing changes of a product."""
+    """Result of comparing the pricing of a product at two points in time.
+
+    Produced by ``Product.compare_price``. The comparison is symmetric:
+    ``a.compare_price(b)`` produces the mirror of ``b.compare_price(a)``.
+    Fields with zero or ``False`` values indicate no change in that dimension.
+    """
 
     price_full_decrease: float = 0.0
-    """Decrease in the full price of the product. Represents the difference
-    between its old full price and its new full price.
-    A value of 0.0 indicates no decrease.
-    """
+    """How much the full price decreased. Zero means no decrease."""
     price_full_increase: float = 0.0
-    """Increase of the full price of the product. Represents the difference
-    between its new full price and its old full price.
-    A value of 0.0 indicates no increase.
-    """
+    """How much the full price increased. Zero means no increase."""
     price_curr_decrease: float = 0.0
-    """Decrease in the current selling price of the product. Represents
-    the difference between its old selling price and its new selling price.
-    A value of 0.0 indicates no decrease.
-    """
+    """How much the current selling price decreased. Zero means no decrease."""
     price_curr_increase: float = 0.0
-    """Increase in the current selling price of the product. Represents
-    the difference between its new selling price and its old selling price.
-    A value of 0.0 indicates no increase.
-    """
+    """How much the current selling price increased. Zero means no increase."""
     discount_rate_decrease: float = 0.0
-    """Decrease in the discount rate of the product. Indicates the reduction
-    of the discount rate in the new product compared to the old product.
-    A value of 0.0 indicates that the discount rate has not decreased.
-    """
+    """How much the discount rate decreased (0-1 scale). Zero means no decrease."""
     discount_rate_increase: float = 0.0
-    """Increase in the discount rate of the product. Indicates the increment
-    of the discount rate in the new product compared to the old product.
-    A value of 0.0 indicates that the discount rate has not increased.
-    """
+    """How much the discount rate increased (0-1 scale). Zero means no increase."""
     has_sale_started: bool = False
-    """A flag indicating whether a sale has started on the product.
-    True if the new product is on sale and the old product was not.
-    """
+    """Transition flag: the product moved from not on sale to on sale."""
     has_sale_ended: bool = False
-    """A flag indicating whether a sale has ended on the product.
-    True if the new product is not on sale and the old product was.
-    """
+    """Transition flag: the product moved from on sale to not on sale."""
 
 
 class Product(BaseItem):
-    """Data model of a FreshPoint product."""
+    """Data model of a FreshPoint product.
+
+    All fields are ``Optional`` with ``None`` as the sentinel for "not available".
+    Computed properties (``price``, ``discount_rate``, ``is_on_sale``, etc.) are
+    always safe to access regardless of which fields were successfully parsed.
+    """
 
     name: Optional[str] = Field(
         default=None,
@@ -121,16 +103,15 @@ class Product(BaseItem):
         default=None,
         title='Promo',
         description=(
-            'Indicates if the product is being promoted. Note that the '
-            'product being on a promo does not guarantee that the product '
-            'currently has a discount and vice versa.'
+            'Whether the product is marked as a promotional item. Unreliable: '
+            'a product may be on sale without this flag set, and vice versa. '
+            'Use ``is_on_sale`` to check for an active discount.'
         ),
     )
-    """Indicates whether the product is being promoted.
+    """Whether the product is marked as a promotional item.
 
-    **The product being a promo does not guarantee that the product currently
-    has a discount and vice versa.** Use ``is_on_sale`` to check if the product is
-    on sale.
+    Unreliable: a product may be on sale without this flag set, and vice versa.
+    Use ``is_on_sale`` to check for an active discount.
     """
     quantity: Optional[NonNegativeInt] = Field(
         default=None,
@@ -162,9 +143,17 @@ class Product(BaseItem):
     allergens: Optional[List[str]] = Field(
         default=None,
         title='Allergens',
-        description='Allergen information for the product.',
+        description=(
+            "Allergen list parsed from the site's comma-separated string. "
+            'An empty list means the attribute was present but blank; '
+            '``None`` means the attribute was absent entirely.'
+        ),
     )
-    """Allergen information for the product."""
+    """Allergen list parsed from the site's comma-separated string.
+
+    An empty list means the attribute was present but blank; ``None`` means
+    the attribute was absent entirely.
+    """
     pic_url: Optional[str] = Field(
         default=None,
         title='Illustrative Product Picture URL',
@@ -186,27 +175,20 @@ class Product(BaseItem):
 
     @property
     def name_lowercase_ascii(self) -> str:
-        """Lowercase ASCII representation of the product name.
-
-        If the name is not set, the representation is an empty string.
-        """
+        """Lowercase ASCII representation of ``name``. Empty string when unset."""
         return normalize_text(self.name)
 
     @property
     def category_lowercase_ascii(self) -> str:
-        """Lowercase ASCII representation of the product category.
-
-        If the category is not set, the representation is an empty string.
-        """
+        """Lowercase ASCII representation of ``category``. Empty string when unset."""
         return normalize_text(self.category)
 
     @property
     def price(self) -> Optional[float]:
-        """Effective price of the product.
+        """The effective selling price.
 
-        If the product has a current selling price, it is considered the effective
-        price. If the product only has a full price, then the full price is considered
-        the effective price. If neither price is set, the effective price is None.
+        Returns ``price_curr`` when set, falls back to ``price_full``.
+        ``None`` when neither price is set.
         """
         if self.price_curr is not None:
             return self.price_curr
@@ -216,12 +198,10 @@ class Product(BaseItem):
 
     @property
     def discount_rate(self) -> Optional[float]:
-        """Discount rate (<0; 1>) of the product, calculated based on the difference
-        between the full price and the current selling price. Precision is up to
-        two decimal places.
+        """The discount rate as a value between 0 and 1, rounded to two decimal places.
 
-        If either the full price or the current selling price is not set,
-        the discount rate is None.
+        Calculated as ``(price_full - price_curr) / price_full``. Returns 0.0 when
+        ``price_full`` is zero. ``None`` when either price is unset.
         """
         if self.price_full is None or self.price_curr is None:
             return None
@@ -232,38 +212,24 @@ class Product(BaseItem):
 
     @property
     def is_on_sale(self) -> bool:
-        """A product is considered on sale if
-        its current selling price is lower than its full price.
-
-        If either the full price or the current selling price is not set,
-        the product is not considered on sale.
-        """
+        """``True`` when ``price_curr`` is set and lower than ``price_full``."""
         if self.price_full is None or self.price_curr is None:
             return False
         return self.price_curr < self.price_full
 
     @property
     def is_available(self) -> bool:
-        """A product is considered available if its quantity is greater than zero.
-
-        If the quantity is not set, the product is not considered available.
-        """
+        """``True`` when ``quantity`` is set and greater than zero."""
         return self.quantity is not None and self.quantity != 0
 
     @property
     def is_sold_out(self) -> bool:
-        """A product is considered sold out if its quantity equals zero.
-
-        If the quantity is not set, the product is not considered sold out.
-        """
+        """``True`` when ``quantity`` is set and equals zero."""
         return self.quantity is not None and self.quantity == 0
 
     @property
     def is_last_piece(self) -> bool:
-        """A product is considered the last piece if its quantity is one.
-
-        If the quantity is not set, the product is not considered the last piece.
-        """
+        """``True`` when ``quantity`` is set and equals one."""
         return self.quantity is not None and self.quantity == 1
 
     def compare_quantity(self, other: Product) -> ProductQuantityChange:
@@ -287,6 +253,15 @@ class Product(BaseItem):
                 changes in stock quantity of this product when compared to
                 the provided product, such as decreases, increases, depletion,
                 or restocking.
+
+        Example:
+            ::
+
+                morning = Product(id_='42', quantity=5)
+                evening = Product(id_='42', quantity=0)
+                change = morning.compare_quantity(evening)
+                change.is_depleted   # True
+                change.quantity_decrease  # 5
         """
         if self.quantity is None or other.quantity is None:
             quantity_decrease = 0
@@ -343,6 +318,15 @@ class Product(BaseItem):
                 changes in pricing between this product and the provided
                 product, such as changes in full price, current price, discount
                 rates, and flags indicating the start or end of a sale.
+
+        Example:
+            ::
+
+                before = Product(id_='42', price_full=100.0, price_curr=100.0)
+                after = Product(id_='42', price_full=100.0, price_curr=75.0)
+                change = before.compare_price(after)
+                change.has_sale_started   # True
+                change.price_curr_decrease  # 25.0
         """
         # compare full prices
         if self.price_full is None or other.price_full is None:
@@ -426,7 +410,11 @@ def get_product_page_url(location_id: Union[int, str]) -> str:
 
 
 class ProductPage(BasePage[Product]):
-    """Data model of a FreshPoint product webpage."""
+    """Data model of a FreshPoint product page.
+
+    Extends ``BasePage`` with location context (``location_id``, ``location_name``)
+    identifying which vending machine the products belong to.
+    """
 
     location_id: Optional[str] = Field(
         default=None,
@@ -447,18 +435,12 @@ class ProductPage(BasePage[Product]):
 
     @property
     def url(self) -> Optional[str]:
-        """URL of the product page.
-
-        Returns None if the location ID is not set.
-        """
+        """URL of this product page. ``None`` when ``location_id`` is not set."""
         if self.location_id is None:
             return None
         return get_product_page_url(self.location_id)
 
     @property
     def location_name_lowercase_ascii(self) -> str:
-        """Lowercase ASCII representation of the location name.
-
-        If the name is not set, the representation is an empty string.
-        """
+        """Lowercase ASCII representation of ``location_name``. Empty string when unset."""
         return normalize_text(self.location_name)
