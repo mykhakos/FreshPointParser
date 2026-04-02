@@ -210,17 +210,14 @@ class BaseItem(BestEffortModel):
 
         Returns:
             FieldDiffMapping: A dictionary mapping field names to their
-            corresponding difference pairs.
+            corresponding difference pairs. Each value is a ``FieldDiff``
+            containing the ``left`` (this model) and ``right`` (other model)
+            values. Fields absent from one model are treated as ``None``,
+            with one exception: a field present only in ``other`` with a
+            ``None`` value is omitted entirely (it compares equal to the
+            implicit ``None`` in ``self``).
 
-            Each field difference is a ``FieldDiff`` dictionary containing the
-            ``left`` and ``right`` values from this model and the other model
-            respectively. Fields absent from one model are treated as ``None``
-            for comparison purposes, with one exception: a field present only
-            in ``other`` with a ``None`` value is omitted from the result
-            entirely (it compares equal to the implicit ``None`` in ``self``).
-
-            FieldDiffMapping structure example:
-
+        Example:
             ```python
             {
                 'field_common': {'left': 12.5, 'right': 15.0},
@@ -324,16 +321,13 @@ class BasePage(BestEffortModel, Generic[TItem]):
 
         Returns:
             ModelDiffMapping: A dictionary mapping item ID strings to their
-            corresponding field differences. Items whose ``id_`` is ``None``
-            are excluded from comparison entirely. When ``exclude_missing`` is
-            ``False`` (the default), items present in only one page appear with
-            all their fields compared against an empty baseline item.
+            corresponding ``FieldDiffMapping`` differences. Items whose
+            ``id_`` is ``None`` are excluded. When ``exclude_missing`` is
+            ``False`` (the default), items present in only one page are
+            compared against an empty baseline item. See
+            ``BaseItem.model_diff`` for the ``None``-omission edge case.
 
-            Each value is a ``FieldDiffMapping`` — see ``BaseItem.model_diff``
-            for the exact structure and the ``None``-omission edge case.
-
-            ModelDiffMapping structure example:
-
+        Example:
             ```python
             {
                 '1001': {
