@@ -208,7 +208,7 @@ The stateless `parse_product_page(html)` creates a new parser on every call (no 
 uv sync          # install all dependencies into .venv/
 ```
 
-The virtual environment is at `.venv/` in the project root. The build backend is `uv_build`. Python 3.8+ is required; the project is tested against 3.8–3.14.
+The virtual environment is at `.venv/` in the project root. The build backend is `uv_build`. **Target Python versions: 3.8–3.14.** The minimum is 3.8; the project is tested against all versions in that range via tox.
 
 The active development branch is **`dev`**. `main` tracks stable releases. Work on `dev`; merge to `main` only for releases.
 
