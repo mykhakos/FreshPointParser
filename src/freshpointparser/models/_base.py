@@ -86,8 +86,8 @@ class BestEffortModel(BaseModel):
     ``ValidationContext`` passed as ``context=`` to ``model_validate``, so
     they surface in ``ParseResult.metadata.errors``.
 
-    Subclass this to build custom models with the same fault-tolerant
-    behaviour as ``Product`` and ``Location``.
+    Subclass this to build custom models with the same fault-tolerant behaviour
+    as ``Product`` and ``Location``.
     """
 
     @model_validator(mode='wrap')
@@ -176,10 +176,9 @@ FieldDiffMapping: TypeAlias = Dict[str, FieldDiff]
 class BaseItem(BestEffortModel):
     """Base model for a single FreshPoint item (product or location).
 
-    Provides a string ``id_`` field and ``model_diff`` for field-level
-    comparison between two instances. The trailing underscore on ``id_``
-    avoids shadowing Python's built-in ``id()``. All subclasses use
-    camelCase aliases for serialisation.
+    Provides a string ``id_`` field and ``model_diff`` for field-level comparison
+    between two instances. The trailing underscore on ``id_`` avoids shadowing
+    Python's built-in ``id()``. All subclasses use camelCase aliases for serialisation.
     """
 
     model_config = ConfigDict(alias_generator=ToCamel(), populate_by_name=True)
@@ -214,9 +213,11 @@ class BaseItem(BestEffortModel):
             corresponding difference pairs.
 
             Each field difference is a ``FieldDiff`` dictionary containing the
-            ``left`` and ``right`` values from this model and the other model,
-            respectively. If a field is missing in any of the models, its value
-            is considered to be ``None`` in this model.
+            ``left`` and ``right`` values from this model and the other model
+            respectively. Fields absent from one model are treated as ``None``
+            for comparison purposes, with one exception: a field present only
+            in ``other`` with a ``None`` value is omitted from the result
+            entirely (it compares equal to the implicit ``None`` in ``self``).
 
             FieldDiffMapping structure example:
 
@@ -322,16 +323,14 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 ``by_alias``, and others.
 
         Returns:
-            ModelDiffMapping: A dictionary mapping numeric item IDs to their
-            corresponding differences.
+            ModelDiffMapping: A dictionary mapping item ID strings to their
+            corresponding field differences. Items whose ``id_`` is ``None``
+            are excluded from comparison entirely. When ``exclude_missing`` is
+            ``False`` (the default), items present in only one page appear with
+            all their fields compared against an empty baseline item.
 
-            Each item difference is a ``FieldDiffMapping`` dictionary that maps
-            fields to the corresponding field differences.
-
-            Each field difference is a ``FieldDiff`` dictionary containing the
-            ``left`` and ``right`` values from this model and the other model,
-            respectively. If a field is missing in any of the models, its value
-            is considered to be ``None`` in this model.
+            Each value is a ``FieldDiffMapping`` — see ``BaseItem.model_diff``
+            for the exact structure and the ``None``-omission edge case.
 
             ModelDiffMapping structure example:
 
@@ -441,7 +440,9 @@ class BasePage(BestEffortModel, Generic[TItem]):
 
             # For unhashable attributes like allergens (List[str]):
             unique_allergen_sets = list(
-                page.iter_item_attr('allergens', default=[], unique=True, hashable=False)
+                page.iter_item_attr(
+                    'allergens', default=[], unique=True, hashable=False
+                )
             )
             ```
         """
