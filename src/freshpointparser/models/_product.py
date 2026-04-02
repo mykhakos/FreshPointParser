@@ -233,8 +233,7 @@ class Product(BaseItem):
         return self.quantity is not None and self.quantity == 1
 
     def compare_quantity(self, other: Product) -> ProductQuantityChange:
-        """Compare the stock availability of the product in two different
-        points in time.
+        """Compare stock quantity with another product instance.
 
         This comparison is meaningful primarily when the ``other`` argument
         represents the same product at a different state or time, such as
@@ -297,8 +296,7 @@ class Product(BaseItem):
         )
 
     def compare_price(self, other: Product) -> ProductPriceChange:
-        """Compare the pricing details of the product in two different points
-        in time.
+        """Compare pricing details with another product instance.
 
         This comparison is meaningful primarily when the ``other`` argument
         represents the same product but in a different pricing state, such as

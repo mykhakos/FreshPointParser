@@ -195,8 +195,7 @@ class BaseItem(BestEffortModel):
     """Unique item identifier (numeric unless undefined)."""
 
     def model_diff(self, other: BaseItem, **kwargs: Any) -> FieldDiffMapping:
-        """Compare this item with another one to identify which item fields
-        have different values.
+        """Compare this item with another, returning fields with differing values.
 
         If a field is not present in any of the models, its value is considered
         to be ``None``.
@@ -303,8 +302,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
     def item_diff(
         self, other: BasePage[TItem], *, exclude_missing: bool = False, **kwargs: Any
     ) -> ModelDiffMapping:
-        """Compare items between this page and another one to identify which
-        items differ. Items are matched by their ID.
+        """Compare items with another page by ID, returning items with differing fields.
 
         If a field of any item is not present in any of the models, the value of
         that field is considered to be ``None``. If an item is missing in either
@@ -407,8 +405,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
         unique: bool = False,
         hashable: bool = True,
     ) -> Iterator[Union[Any, T]]:
-        """Iterate over values of a specific attribute of the page's items,
-        with optional default fallback and optional uniqueness filtering.
+        """Iterate over a single attribute across all items, with optional deduplication.
 
         Tip: To convert the result from an iterator to a list, use
         ``list(page.iter_item_attr(...))``.
@@ -549,8 +546,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
         other: BasePage,
         precision: Optional[Literal['s', 'm', 'h', 'd']] = None,
     ) -> Optional[bool]:
-        """Check if this page is newer than another one by comparing
-        their ``recorded_at`` fields at the specified precision.
+        """Compare ``recorded_at`` timestamps, returning ``True``, ``False``, or ``None`` if equal.
 
         Note that precision here means truncating the datetime to the desired
         level (e.g., cutting off seconds, minutes, etc.), not rounding it.
@@ -575,8 +571,10 @@ class BasePage(BestEffortModel, Generic[TItem]):
 
                 result = new_page.is_newer_than(old_page, precision='m')
                 if result is True:
-                    process(new_page)
-                elif result is None:
+                    process(new_page)  # newer
+                elif result is False:
+                    pass  # older
+                else:
                     pass  # same minute, no action needed
         """
         recorded_at_self: Union[datetime, date]
