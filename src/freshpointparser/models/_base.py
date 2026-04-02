@@ -219,15 +219,13 @@ class BaseItem(BestEffortModel):
             respectively. If a field is missing in any of the models, its value
             is considered to be ``None`` in this model.
 
-            FieldDiffMapping structure example:
+            FieldDiffMapping structure example::
 
-            ```python
-            {
-                'field_common': {'left': 12.5, 'right': 15.0},
-                'field_missing_in_other': {'left': 'foo', 'right': None},
-                'field_missing_in_self': {'left': None, 'right': 'bar'},
-            }
-            ```
+                {
+                    'field_common': {'left': 12.5, 'right': 15.0},
+                    'field_missing_in_other': {'left': 'foo', 'right': None},
+                    'field_missing_in_self': {'left': None, 'right': 'bar'},
+                }
         """
         if self is other:
             return {}
@@ -335,20 +333,18 @@ class BasePage(BestEffortModel, Generic[TItem]):
             respectively. If a field is missing in any of the models, its value
             is considered to be ``None`` in this model.
 
-            ModelDiffMapping structure example:
+            ModelDiffMapping structure example::
 
-            ```python
-            {
-                '1001': {
-                    'field_common': {'left': 12.5, 'right': 15.0},
-                    'field_missing_in_other': {'left': 'foo', 'right': None},
-                },
-                '1002': {
-                    'field_common': {'left': 10.0, 'right': 12.0},
-                    'field_missing_in_self': {'left': None, 'right': 'qux'},
-                },
-            }
-            ```
+                {
+                    '1001': {
+                        'field_common': {'left': 12.5, 'right': 15.0},
+                        'field_missing_in_other': {'left': 'foo', 'right': None},
+                    },
+                    '1002': {
+                        'field_common': {'left': 10.0, 'right': 12.0},
+                        'field_missing_in_self': {'left': None, 'right': 'qux'},
+                    },
+                }
         """
         if self is other:
             return {}
@@ -429,8 +425,7 @@ class BasePage(BestEffortModel, Generic[TItem]):
                 types like lists or dictionaries, but is slower. Defaults to True.
 
         Yields:
-            Iterator[Union[Any, T]]: Attribute values collected from each item
-            on the page.
+            Union[Any, T]: Attribute values collected from each item on the page.
 
         Raises:
             AttributeError: If the attribute is not present in an item and

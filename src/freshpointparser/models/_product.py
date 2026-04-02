@@ -421,11 +421,11 @@ class ProductPage(BasePage[Product]):
         coerce_numbers_to_str=True,
         title='Location ID',
         description=(
-            'Unique identifier or the product location '
+            'Unique identifier of the product location '
             '(also known as the page ID or the device ID).'
         ),
     )
-    """Unique identifier or the product location (also known as the page ID or the device ID)."""
+    """Unique identifier of the product location (also known as the page ID or the device ID)."""
     location_name: Optional[str] = Field(
         default=None,
         title='Location Name',
